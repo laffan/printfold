@@ -114,7 +114,7 @@ export class TextFlowEngine {
           id,
           type: 'heading',
           level: token.depth,
-          content: token.text,
+          content: this.decodeHtmlEntities(token.text),
           rawMarkdown: token.raw,
         };
 
@@ -177,16 +177,50 @@ export class TextFlowEngine {
     }
   }
 
+  /**
+   * Decode HTML entities back to normal characters
+   */
+  private decodeHtmlEntities(text: string): string {
+    const entities: Record<string, string> = {
+      '&amp;': '&',
+      '&lt;': '<',
+      '&gt;': '>',
+      '&quot;': '"',
+      '&#39;': "'",
+      '&apos;': "'",
+      '&nbsp;': ' ',
+      '&mdash;': '\u2014', // em dash
+      '&ndash;': '\u2013', // en dash
+      '&hellip;': '\u2026', // ellipsis
+      '&lsquo;': '\u2018', // left single quote
+      '&rsquo;': '\u2019', // right single quote
+      '&ldquo;': '\u201C', // left double quote
+      '&rdquo;': '\u201D', // right double quote
+    };
+
+    let result = text;
+    for (const [entity, char] of Object.entries(entities)) {
+      result = result.replace(new RegExp(entity, 'g'), char);
+    }
+    // Handle numeric entities like &#60;
+    result = result.replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)));
+    result = result.replace(/&#x([0-9a-fA-F]+);/g, (_, code) => String.fromCharCode(parseInt(code, 16)));
+    return result;
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private extractText(token: any): string {
+    let text: string;
     if ('tokens' in token && token.tokens) {
-      return token.tokens.map((t: any) => {
+      text = token.tokens.map((t: any) => {
         if ('text' in t) return t.text;
         if ('raw' in t) return t.raw;
         return '';
       }).join('');
+    } else {
+      text = 'text' in token ? token.text : '';
     }
-    return 'text' in token ? token.text : '';
+    return this.decodeHtmlEntities(text);
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -198,17 +232,18 @@ export class TextFlowEngine {
         if ('text' in t) return t.text;
         return '';
       }).join('') || item.text;
-      return prefix + text;
+      return prefix + this.decodeHtmlEntities(text);
     }).join('\n');
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private extractBlockquoteText(token: any): string {
-    return token.tokens?.map((t: any) => {
+    const text = token.tokens?.map((t: any) => {
       if (t.type === 'paragraph') return this.extractText(t);
       if ('text' in t) return t.text;
       return '';
     }).join('\n') || '';
+    return this.decodeHtmlEntities(text);
   }
 
   /**

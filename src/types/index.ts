@@ -73,6 +73,7 @@ export interface LayoutOptions {
   spacingAboveH3: number;
   paragraphSpacing: number;
   lineHeight: number;
+  textAlign: 'left' | 'justify';
 }
 
 export interface FontStyle {

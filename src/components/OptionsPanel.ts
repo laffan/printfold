@@ -191,6 +191,50 @@ export class OptionsPanel {
         footer: { ...footer, recto: { ...footer.recto, right: value } },
       });
     });
+
+    // Header font options
+    this.bindSelect('opt-header-font', (value) => {
+      const header = appState.getProject().headerFooter.header;
+      appState.updateHeaderFooter({
+        header: { ...header, font: { ...header.font, fontFamily: value } },
+      });
+    });
+
+    this.bindNumberInput('opt-header-font-size', (value) => {
+      const header = appState.getProject().headerFooter.header;
+      appState.updateHeaderFooter({
+        header: { ...header, font: { ...header.font, fontSize: value } },
+      });
+    });
+
+    this.bindColorInput('opt-header-color', (value) => {
+      const header = appState.getProject().headerFooter.header;
+      appState.updateHeaderFooter({
+        header: { ...header, font: { ...header.font, color: value } },
+      });
+    });
+
+    // Footer font options
+    this.bindSelect('opt-footer-font', (value) => {
+      const footer = appState.getProject().headerFooter.footer;
+      appState.updateHeaderFooter({
+        footer: { ...footer, font: { ...footer.font, fontFamily: value } },
+      });
+    });
+
+    this.bindNumberInput('opt-footer-font-size', (value) => {
+      const footer = appState.getProject().headerFooter.footer;
+      appState.updateHeaderFooter({
+        footer: { ...footer, font: { ...footer.font, fontSize: value } },
+      });
+    });
+
+    this.bindColorInput('opt-footer-color', (value) => {
+      const footer = appState.getProject().headerFooter.footer;
+      appState.updateHeaderFooter({
+        footer: { ...footer, font: { ...footer.font, color: value } },
+      });
+    });
   }
 
   private setupFontOptions(): void {
@@ -208,6 +252,24 @@ export class OptionsPanel {
       appState.updateFontOptions({
         body: { ...fonts.body, fontSize: value },
       });
+    });
+
+    // Body color
+    this.bindColorInput('opt-color-body', (value) => {
+      const fonts = appState.getProject().fontOptions;
+      appState.updateFontOptions({
+        body: { ...fonts.body, color: value },
+      });
+    });
+
+    // Line height (in fonts section)
+    this.bindNumberInput('opt-line-height-fonts', (value) => {
+      appState.updateLayoutOptions({ lineHeight: value });
+    });
+
+    // Justify
+    this.bindCheckbox('opt-justify', (checked) => {
+      appState.updateLayoutOptions({ textAlign: checked ? 'justify' : 'left' });
     });
 
     // Heading font
@@ -245,6 +307,28 @@ export class OptionsPanel {
       appState.updateFontOptions({
         h3: { ...fonts.h3, fontSize: value },
       });
+    });
+
+    // Heading color
+    this.bindColorInput('opt-color-headings', (value) => {
+      const fonts = appState.getProject().fontOptions;
+      appState.updateFontOptions({
+        h1: { ...fonts.h1, color: value },
+        h2: { ...fonts.h2, color: value },
+        h3: { ...fonts.h3, color: value },
+        h4: { ...fonts.h4, color: value },
+        h5: { ...fonts.h5, color: value },
+        h6: { ...fonts.h6, color: value },
+      });
+    });
+  }
+
+  private bindColorInput(id: string, onChange: (value: string) => void): void {
+    const element = document.getElementById(id) as HTMLInputElement;
+    if (!element) return;
+
+    element.addEventListener('input', () => {
+      this.debounceUpdate(() => onChange(element.value));
     });
   }
 
@@ -337,10 +421,30 @@ export class OptionsPanel {
     // Font options
     this.setSelectValue('opt-font-body', project.fontOptions.body.fontFamily);
     this.setInputValue('opt-font-size-body', project.fontOptions.body.fontSize.toString());
+    this.setColorValue('opt-color-body', project.fontOptions.body.color);
+    this.setInputValue('opt-line-height-fonts', project.layoutOptions.lineHeight.toString());
+    this.setCheckboxValue('opt-justify', project.layoutOptions.textAlign === 'justify');
+
     this.setSelectValue('opt-font-h1', project.fontOptions.h1.fontFamily);
     this.setInputValue('opt-font-size-h1', project.fontOptions.h1.fontSize.toString());
     this.setInputValue('opt-font-size-h2', project.fontOptions.h2.fontSize.toString());
     this.setInputValue('opt-font-size-h3', project.fontOptions.h3.fontSize.toString());
+    this.setColorValue('opt-color-headings', project.fontOptions.h1.color);
+
+    // Header/footer font options
+    this.setSelectValue('opt-header-font', project.headerFooter.header.font.fontFamily);
+    this.setInputValue('opt-header-font-size', project.headerFooter.header.font.fontSize.toString());
+    this.setColorValue('opt-header-color', project.headerFooter.header.font.color);
+    this.setSelectValue('opt-footer-font', project.headerFooter.footer.font.fontFamily);
+    this.setInputValue('opt-footer-font-size', project.headerFooter.footer.font.fontSize.toString());
+    this.setColorValue('opt-footer-color', project.headerFooter.footer.font.color);
+  }
+
+  private setColorValue(id: string, value: string): void {
+    const element = document.getElementById(id) as HTMLInputElement;
+    if (element && element.value !== value) {
+      element.value = value;
+    }
   }
 
   private setSelectValue(id: string, value: string): void {

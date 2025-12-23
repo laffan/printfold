@@ -52,6 +52,7 @@ export const defaultLayoutOptions: LayoutOptions = {
   spacingAboveH3: 24,
   paragraphSpacing: 12,
   lineHeight: 1.5,
+  textAlign: 'left',
 };
 
 export const defaultFontOptions: FontOptions = {
