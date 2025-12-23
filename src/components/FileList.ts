@@ -162,42 +162,44 @@ export class FileList {
     const project = appState.getProject();
     const files = project.files;
 
-    // Check if we have files
-    if (files.length === 0) {
-      this.container.innerHTML = '';
-      this.container.appendChild(this.createDropZone());
-      return;
-    }
-
-    // Create file list with drop zone at the end
     this.container.innerHTML = '';
 
-    files.forEach(file => {
-      const item = this.createFileItem(file, project.mainDocument === file.id);
-      this.container.appendChild(item);
-    });
+    // Always show drop zone at the top
+    const dropZone = document.createElement('div');
+    dropZone.className = 'file-drop-zone' + (files.length > 0 ? ' mini' : '');
+    dropZone.id = 'file-drop-zone';
+    if (files.length === 0) {
+      dropZone.innerHTML = `
+        <p>Drop files here or click to add</p>
+        <p class="hint">Supports .md, .png, .jpg, .jpeg, .webp, .zip</p>
+      `;
+    } else {
+      dropZone.innerHTML = '<p>+ Drop files here</p>';
+    }
+    dropZone.addEventListener('click', () => this.openFileDialog());
 
-    // Add smaller drop zone at the end
-    const miniDropZone = document.createElement('div');
-    miniDropZone.className = 'file-drop-zone mini';
-    miniDropZone.innerHTML = '<p>+ Drop more files</p>';
-    miniDropZone.addEventListener('click', () => this.openFileDialog());
-
-    // Handle drag events on mini drop zone
+    // Handle drag events
     ['dragenter', 'dragover'].forEach(eventName => {
-      miniDropZone.addEventListener(eventName, (e) => {
+      dropZone.addEventListener(eventName, (e) => {
         e.preventDefault();
-        miniDropZone.classList.add('dragover');
+        dropZone.classList.add('dragover');
       });
     });
 
     ['dragleave', 'drop'].forEach(eventName => {
-      miniDropZone.addEventListener(eventName, () => {
-        miniDropZone.classList.remove('dragover');
+      dropZone.addEventListener(eventName, () => {
+        dropZone.classList.remove('dragover');
       });
     });
 
-    this.container.appendChild(miniDropZone);
+    this.dropZone = dropZone;
+    this.container.appendChild(dropZone);
+
+    // Add file items below drop zone
+    files.forEach(file => {
+      const item = this.createFileItem(file, project.mainDocument === file.id);
+      this.container.appendChild(item);
+    });
   }
 
   private createDropZone(): HTMLElement {

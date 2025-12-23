@@ -644,6 +644,46 @@ body {
   margin-top: 4px;
 }
 
+/* Font sections */
+.font-section {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.font-section:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.font-section-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-primary);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.inline-sizes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.inline-sizes label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.inline-sizes label span {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
 /* Info panel */
 .info-item {
   display: flex;

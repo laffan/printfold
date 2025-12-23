@@ -21,6 +21,26 @@ export class PDFGenerator {
   private fontCache: FontCache | null = null;
 
   /**
+   * Sanitize text for WinAnsi encoding (removes emojis and non-Latin characters)
+   */
+  private sanitizeText(text: string): string {
+    // Replace common special characters with ASCII equivalents
+    let sanitized = text
+      .replace(/[\u2018\u2019]/g, "'") // Smart quotes
+      .replace(/[\u201C\u201D]/g, '"') // Smart double quotes
+      .replace(/\u2014/g, '--') // Em dash
+      .replace(/\u2013/g, '-') // En dash
+      .replace(/\u2026/g, '...') // Ellipsis
+      .replace(/\u00A0/g, ' '); // Non-breaking space
+
+    // Remove any characters outside the WinAnsi range (keep only printable ASCII and Latin-1)
+    // WinAnsi supports: 0x20-0x7E (basic ASCII) and 0xA0-0xFF (Latin-1 supplement)
+    sanitized = sanitized.replace(/[^\x20-\x7E\xA0-\xFF]/g, '');
+
+    return sanitized;
+  }
+
+  /**
    * Generate a print-ready PDF
    */
   async generate(): Promise<Uint8Array> {
@@ -188,7 +208,7 @@ export class PDFGenerator {
           borderWidth: 1,
         });
 
-        pdfPage.drawText(`[Image: ${section.imageRef || 'unknown'}]`, {
+        pdfPage.drawText(this.sanitizeText(`[Image: ${section.imageRef || 'unknown'}]`), {
           x: contentX + 10,
           y: currentY - placeholderHeight / 2,
           size: 10,
@@ -206,7 +226,7 @@ export class PDFGenerator {
       for (const line of lines) {
         if (currentY < contentY) break;
 
-        pdfPage.drawText(line, {
+        pdfPage.drawText(this.sanitizeText(line), {
           x: contentX,
           y: currentY - fontStyle.fontSize,
           size: fontStyle.fontSize,
@@ -232,7 +252,7 @@ export class PDFGenerator {
       const pageNumStr = pageContent.pageNumber.toString();
 
       if (footerContent.left) {
-        const text = footerContent.left.replace('{{pageNumber}}', pageNumStr);
+        const text = this.sanitizeText(footerContent.left.replace('{{pageNumber}}', pageNumStr));
         pdfPage.drawText(text, {
           x: contentX,
           y: footerY,
@@ -243,7 +263,7 @@ export class PDFGenerator {
       }
 
       if (footerContent.center) {
-        const text = footerContent.center.replace('{{pageNumber}}', pageNumStr);
+        const text = this.sanitizeText(footerContent.center.replace('{{pageNumber}}', pageNumStr));
         const textWidth = footerFont.widthOfTextAtSize(text, footerSize);
         pdfPage.drawText(text, {
           x: x + width / 2 - textWidth / 2,
@@ -255,7 +275,7 @@ export class PDFGenerator {
       }
 
       if (footerContent.right) {
-        const text = footerContent.right.replace('{{pageNumber}}', pageNumStr);
+        const text = this.sanitizeText(footerContent.right.replace('{{pageNumber}}', pageNumStr));
         const textWidth = footerFont.widthOfTextAtSize(text, footerSize);
         pdfPage.drawText(text, {
           x: x + width - outerMargin - textWidth,
@@ -277,7 +297,7 @@ export class PDFGenerator {
       const pageNumStr = pageContent.pageNumber.toString();
 
       if (headerContent.left) {
-        const text = headerContent.left.replace('{{pageNumber}}', pageNumStr);
+        const text = this.sanitizeText(headerContent.left.replace('{{pageNumber}}', pageNumStr));
         pdfPage.drawText(text, {
           x: contentX,
           y: headerY,
@@ -288,7 +308,7 @@ export class PDFGenerator {
       }
 
       if (headerContent.center) {
-        const text = headerContent.center.replace('{{pageNumber}}', pageNumStr);
+        const text = this.sanitizeText(headerContent.center.replace('{{pageNumber}}', pageNumStr));
         const textWidth = headerFont.widthOfTextAtSize(text, headerSize);
         pdfPage.drawText(text, {
           x: x + width / 2 - textWidth / 2,
@@ -300,7 +320,7 @@ export class PDFGenerator {
       }
 
       if (headerContent.right) {
-        const text = headerContent.right.replace('{{pageNumber}}', pageNumStr);
+        const text = this.sanitizeText(headerContent.right.replace('{{pageNumber}}', pageNumStr));
         const textWidth = headerFont.widthOfTextAtSize(text, headerSize);
         pdfPage.drawText(text, {
           x: x + width - outerMargin - textWidth,

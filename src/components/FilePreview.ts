@@ -67,6 +67,7 @@ export class FilePreview {
       extensions: [
         basicSetup,
         markdown(),
+        EditorView.lineWrapping,
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             this.handleContentChange(update.state.doc.toString());

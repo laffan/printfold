@@ -288,41 +288,52 @@
             <span class="collapse-icon">▼</span>
           </div>
           <div class="panel-content">
-            <div class="form-group">
-              <label for="opt-font-body">Body Font</label>
-              <select id="opt-font-body">
-                <option value="Georgia, serif">Georgia</option>
-                <option value="Times New Roman, serif">Times New Roman</option>
-                <option value="Palatino, serif">Palatino</option>
-                <option value="Arial, sans-serif">Arial</option>
-                <option value="Helvetica, sans-serif">Helvetica</option>
-              </select>
+            <!-- Body (p) -->
+            <div class="font-section">
+              <h4 class="font-section-header">Body Text (p)</h4>
+              <div class="form-group">
+                <label for="opt-font-body">Font Family</label>
+                <select id="opt-font-body">
+                  <option value="Georgia, serif">Georgia</option>
+                  <option value="Times New Roman, serif">Times New Roman</option>
+                  <option value="Palatino, serif">Palatino</option>
+                  <option value="Arial, sans-serif">Arial</option>
+                  <option value="Helvetica, sans-serif">Helvetica</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="opt-font-size-body">Size (pt)</label>
+                <input type="number" id="opt-font-size-body" value="12" min="6" max="24">
+              </div>
             </div>
-            <div class="form-group">
-              <label for="opt-font-size-body">Body Size (pt)</label>
-              <input type="number" id="opt-font-size-body" value="12" min="6" max="24">
-            </div>
-            <div class="form-group">
-              <label for="opt-font-h1">Heading Font</label>
-              <select id="opt-font-h1">
-                <option value="Georgia, serif">Georgia</option>
-                <option value="Times New Roman, serif">Times New Roman</option>
-                <option value="Palatino, serif">Palatino</option>
-                <option value="Arial, sans-serif">Arial</option>
-                <option value="Helvetica, sans-serif">Helvetica</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="opt-font-size-h1">H1 Size (pt)</label>
-              <input type="number" id="opt-font-size-h1" value="24" min="12" max="72">
-            </div>
-            <div class="form-group">
-              <label for="opt-font-size-h2">H2 Size (pt)</label>
-              <input type="number" id="opt-font-size-h2" value="20" min="10" max="48">
-            </div>
-            <div class="form-group">
-              <label for="opt-font-size-h3">H3 Size (pt)</label>
-              <input type="number" id="opt-font-size-h3" value="16" min="8" max="36">
+
+            <!-- Headings -->
+            <div class="font-section">
+              <h4 class="font-section-header">Headings</h4>
+              <div class="form-group">
+                <label for="opt-font-h1">Font Family</label>
+                <select id="opt-font-h1">
+                  <option value="Georgia, serif">Georgia</option>
+                  <option value="Times New Roman, serif">Times New Roman</option>
+                  <option value="Palatino, serif">Palatino</option>
+                  <option value="Arial, sans-serif">Arial</option>
+                  <option value="Helvetica, sans-serif">Helvetica</option>
+                </select>
+              </div>
+              <div class="form-group inline-sizes">
+                <label>
+                  <span>H1</span>
+                  <input type="number" id="opt-font-size-h1" value="24" min="12" max="72">
+                </label>
+                <label>
+                  <span>H2</span>
+                  <input type="number" id="opt-font-size-h2" value="20" min="10" max="48">
+                </label>
+                <label>
+                  <span>H3</span>
+                  <input type="number" id="opt-font-size-h3" value="16" min="8" max="36">
+                </label>
+              </div>
             </div>
           </div>
         </div>

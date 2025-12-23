@@ -416,6 +416,7 @@ export class SpreadEditor {
       stroke: lineColor,
       strokeWidth: lineWidth,
       dash: [4, 4],
+      hitStrokeWidth: 20,
     });
     this.marginLayer.add(topLine);
     this.addMarginDragHandler(topLine, 'top', pageContent.pageNumber);
@@ -435,6 +436,7 @@ export class SpreadEditor {
       stroke: lineColor,
       strokeWidth: lineWidth,
       dash: [4, 4],
+      hitStrokeWidth: 20,
     });
     this.marginLayer.add(bottomLine);
     this.addMarginDragHandler(bottomLine, 'bottom', pageContent.pageNumber);
@@ -456,6 +458,7 @@ export class SpreadEditor {
       stroke: lineColor,
       strokeWidth: lineWidth,
       dash: [4, 4],
+      hitStrokeWidth: 20,
     });
     this.marginLayer.add(innerLine);
     this.addMarginDragHandler(innerLine, 'inner', pageContent.pageNumber);
@@ -476,6 +479,7 @@ export class SpreadEditor {
       stroke: lineColor,
       strokeWidth: lineWidth,
       dash: [4, 4],
+      hitStrokeWidth: 20,
     });
     this.marginLayer.add(outerLine);
     this.addMarginDragHandler(outerLine, 'outer', pageContent.pageNumber);
@@ -626,18 +630,40 @@ export class SpreadEditor {
         const imageFile = section.imageRef ? appState.getImageByName(section.imageRef) : null;
 
         if (imageFile) {
-          // Draw actual image
-          const img = new Image();
+          // Draw placeholder first, then load image
+          const imgX = x;
+          const imgY = currentY;
+          const imgWidth = Math.min(width, 200);
+          const imgHeight = 150;
+
+          // Create placeholder while image loads
+          const placeholder = new Konva.Rect({
+            x: imgX,
+            y: imgY,
+            width: imgWidth,
+            height: imgHeight,
+            fill: '#f8f8f8',
+            stroke: '#ddd',
+            strokeWidth: 1,
+          });
+          this.layer.add(placeholder);
+
+          // Load and display image asynchronously
+          const img = new window.Image();
+          img.onload = () => {
+            placeholder.destroy();
+            const konvaImage = new Konva.Image({
+              x: imgX,
+              y: imgY,
+              width: imgWidth,
+              height: imgHeight,
+              image: img,
+            });
+            this.layer.add(konvaImage);
+            this.layer.draw();
+          };
           img.src = `data:image/png;base64,${imageFile.content}`;
 
-          const konvaImage = new Konva.Image({
-            x,
-            y: currentY,
-            width: Math.min(width, 200),
-            height: 150,
-            image: img,
-          });
-          this.layer.add(konvaImage);
           currentY += 160;
         } else {
           // Draw placeholder
