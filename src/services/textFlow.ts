@@ -119,13 +119,15 @@ export class TextFlowEngine {
         };
 
       case 'paragraph':
-        // Check for image
+        // Check for image - format: ![caption](image-path.jpg)
         if (token.tokens?.length === 1 && token.tokens[0].type === 'image') {
           const imgToken = token.tokens[0];
+          // text = alt text (caption), title = optional title attribute
+          const caption = this.decodeHtmlEntities(imgToken.text || imgToken.title || '');
           return {
             id,
             type: 'image',
-            content: imgToken.title || imgToken.text || '',
+            content: caption,
             rawMarkdown: token.raw,
             imageRef: imgToken.href,
           };
