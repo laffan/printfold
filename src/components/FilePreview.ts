@@ -72,6 +72,10 @@ export class FilePreview {
           if (update.docChanged) {
             this.handleContentChange(update.state.doc.toString());
           }
+          // Track cursor position changes for page sync
+          if (update.selectionSet || update.docChanged) {
+            this.handleCursorChange(update.view);
+          }
         }),
         EditorView.theme({
           '&': {
@@ -127,6 +131,42 @@ export class FilePreview {
     }, 300);
   }
 
+  private cursorTimeout: number | null = null;
+
+  private handleCursorChange(view: EditorView): void {
+    // Only sync if we're editing the main document
+    if (!this.currentFile || this.currentFile.id !== appState.getProject().mainDocument) {
+      return;
+    }
+
+    // Debounce cursor changes
+    if (this.cursorTimeout) {
+      clearTimeout(this.cursorTimeout);
+    }
+
+    this.cursorTimeout = window.setTimeout(() => {
+      const pos = view.state.selection.main.head;
+      const lineNumber = view.state.doc.lineAt(pos).number;
+      const totalLines = view.state.doc.lines;
+
+      // Get total pages from project
+      const project = appState.getProject();
+      const totalPages = project.signatures.reduce(
+        (sum, sig) => sum + sig.spreads.length * 2,
+        0
+      );
+
+      if (totalPages === 0 || totalLines === 0) return;
+
+      // Estimate page number based on line position ratio
+      const ratio = lineNumber / totalLines;
+      const estimatedPage = Math.max(1, Math.ceil(ratio * totalPages));
+
+      // Update editor state (this will trigger SpreadEditor to navigate)
+      appState.updateEditor({ selectedPageNumber: estimatedPage });
+    }, 150);
+  }
+
   private showImage(file: ProjectFile): void {
     this.destroyEditor();
 
@@ -162,6 +202,10 @@ export class FilePreview {
     if (this.updateTimeout) {
       clearTimeout(this.updateTimeout);
       this.updateTimeout = null;
+    }
+    if (this.cursorTimeout) {
+      clearTimeout(this.cursorTimeout);
+      this.cursorTimeout = null;
     }
   }
 

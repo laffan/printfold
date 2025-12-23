@@ -182,5 +182,5 @@ export interface EditorState {
   dragMarginType: 'top' | 'bottom' | 'inner' | 'outer' | null;
   isLocalMarginChange: boolean; // Cmd key held
   zoomLevel: number;
-  activeTab: 'editor' | 'preview' | '3d';
+  activeTab: 'editor' | 'preview';
 }

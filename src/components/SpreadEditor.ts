@@ -28,6 +28,7 @@ export class SpreadEditor {
   private dragMarginType: 'top' | 'bottom' | 'inner' | 'outer' | null = null;
   private dragPageNumber: number | null = null;
   private isLocalChange = false;
+  private stateUnsubscribe: (() => void) | null = null;
 
   mount(): void {
     this.container = document.getElementById('konva-container')!;
@@ -48,9 +49,43 @@ export class SpreadEditor {
     this.setupControls();
     this.setupResizeObserver();
     this.setupKeyboardShortcuts();
+    this.setupStateListeners();
 
     // Initial render
     this.render();
+  }
+
+  private setupStateListeners(): void {
+    // Listen for selectedPageNumber changes to navigate to that page
+    this.stateUnsubscribe = appState.onEditorChange((state, prevState) => {
+      if (state.selectedPageNumber !== null && state.selectedPageNumber !== prevState.selectedPageNumber) {
+        this.navigateToPage(state.selectedPageNumber);
+      }
+    });
+  }
+
+  /**
+   * Navigate to a specific page number
+   */
+  navigateToPage(pageNumber: number): void {
+    const project = appState.getProject();
+    const allSpreads = project.signatures.flatMap(sig => sig.spreads);
+
+    // Find the spread containing this page
+    for (let i = 0; i < allSpreads.length; i++) {
+      const spread = allSpreads[i];
+      if (
+        (spread.verso && spread.verso.pageNumber === pageNumber) ||
+        (spread.recto && spread.recto.pageNumber === pageNumber)
+      ) {
+        if (this.currentSpreadIndex !== i) {
+          this.currentSpreadIndex = i;
+          this.updateSpreadIndicator();
+          this.render();
+        }
+        return;
+      }
+    }
   }
 
   private setupControls(): void {
@@ -264,6 +299,11 @@ export class SpreadEditor {
   }
 
   render(): void {
+    // Guard against rendering when container is not visible (prevents canvas errors)
+    if (this.container.clientWidth === 0 || this.container.clientHeight === 0) {
+      return;
+    }
+
     this.layer.destroyChildren();
     this.marginLayer.destroyChildren();
     this.marginLines = [];
@@ -518,8 +558,14 @@ export class SpreadEditor {
       const startPos = this.stage.getPointerPosition();
       const project = appState.getProject();
       const startMargins = { ...this.getMarginsForPage(pageNumber) };
+      const pageDimensions = this.getPageDimensions();
+      const spread = this.getCurrentSpread();
+      const isRecto = spread?.recto?.pageNumber === pageNumber;
 
-      const moveHandler = (e: Konva.KonvaEventObject<MouseEvent>) => {
+      // Track the current margin value during drag (visual only)
+      let currentMarginValue = startMargins[type];
+
+      const moveHandler = () => {
         if (!this.isDraggingMargin) return;
 
         const pos = this.stage.getPointerPosition();
@@ -528,45 +574,38 @@ export class SpreadEditor {
         const dx = (pos.x - startPos.x) / this.zoomLevel;
         const dy = (pos.y - startPos.y) / this.zoomLevel;
 
-        let newValue: number;
         switch (type) {
           case 'top':
-            newValue = Math.max(0, startMargins.top + dy);
+            currentMarginValue = Math.max(0, startMargins.top + dy);
             break;
           case 'bottom':
-            newValue = Math.max(0, startMargins.bottom - dy);
+            currentMarginValue = Math.max(0, startMargins.bottom - dy);
             break;
           case 'inner':
-            newValue = Math.max(0, startMargins.inner + (this.getCurrentSpread()?.recto?.pageNumber === pageNumber ? dx : -dx));
+            currentMarginValue = Math.max(0, startMargins.inner + (isRecto ? dx : -dx));
             break;
           case 'outer':
-            newValue = Math.max(0, startMargins.outer + (this.getCurrentSpread()?.recto?.pageNumber === pageNumber ? -dx : dx));
+            currentMarginValue = Math.max(0, startMargins.outer + (isRecto ? -dx : dx));
             break;
         }
 
-        // Update margins
-        if (this.isLocalChange) {
-          // Local change - update margin override for this page only
-          const overrides = [...project.layoutOptions.marginOverrides];
-          const existingIndex = overrides.findIndex(o => o.pageNumber === pageNumber);
-          const override = { pageNumber, margins: { [type]: newValue } };
+        // Update line position visually without triggering reflow
+        const points = line.points();
+        const x = isRecto ? pageDimensions.width : 0;
 
-          if (existingIndex >= 0) {
-            overrides[existingIndex] = {
-              ...overrides[existingIndex],
-              margins: { ...overrides[existingIndex].margins, [type]: newValue },
-            };
-          } else {
-            overrides.push(override);
-          }
-
-          appState.updateLayoutOptions({ marginOverrides: overrides });
-        } else {
-          // Global change
-          appState.updateLayoutOptions({
-            margins: { ...project.layoutOptions.margins, [type]: newValue },
-          });
+        if (type === 'top') {
+          line.points([points[0], currentMarginValue, points[2], currentMarginValue]);
+        } else if (type === 'bottom') {
+          line.points([points[0], pageDimensions.height - currentMarginValue, points[2], pageDimensions.height - currentMarginValue]);
+        } else if (type === 'inner') {
+          const innerLineX = isRecto ? x + currentMarginValue : x + pageDimensions.width - currentMarginValue;
+          line.points([innerLineX, points[1], innerLineX, points[3]]);
+        } else if (type === 'outer') {
+          const outerLineX = isRecto ? x + pageDimensions.width - currentMarginValue : x + currentMarginValue;
+          line.points([outerLineX, points[1], outerLineX, points[3]]);
         }
+
+        this.marginLayer.draw();
       };
 
       const upHandler = () => {
@@ -576,6 +615,30 @@ export class SpreadEditor {
         this.stage.container().style.cursor = 'default';
         this.stage.off('mousemove', moveHandler);
         this.stage.off('mouseup mouseleave', upHandler);
+
+        // Now apply the margin change to state (triggers reflow)
+        if (this.isLocalChange) {
+          // Local change - update margin override for this page only
+          const overrides = [...project.layoutOptions.marginOverrides];
+          const existingIndex = overrides.findIndex(o => o.pageNumber === pageNumber);
+          const override = { pageNumber, margins: { [type]: currentMarginValue } };
+
+          if (existingIndex >= 0) {
+            overrides[existingIndex] = {
+              ...overrides[existingIndex],
+              margins: { ...overrides[existingIndex].margins, [type]: currentMarginValue },
+            };
+          } else {
+            overrides.push(override);
+          }
+
+          appState.updateLayoutOptions({ marginOverrides: overrides });
+        } else {
+          // Global change
+          appState.updateLayoutOptions({
+            margins: { ...project.layoutOptions.margins, [type]: currentMarginValue },
+          });
+        }
       };
 
       this.stage.on('mousemove', moveHandler);

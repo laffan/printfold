@@ -10,7 +10,6 @@ import { FileList } from './FileList';
 import { FilePreview } from './FilePreview';
 import { SpreadEditor } from './SpreadEditor';
 import { PDFPreview } from './PDFPreview';
-import { ThreePreview } from './ThreePreview';
 import { OptionsPanel } from './OptionsPanel';
 import { ZipHandler } from '../services/zipHandler';
 import { PDFGenerator } from '../services/pdfGenerator';
@@ -21,7 +20,6 @@ export class App {
   private filePreview!: FilePreview;
   private spreadEditor!: SpreadEditor;
   private pdfPreview!: PDFPreview;
-  private threePreview!: ThreePreview;
   private optionsPanel!: OptionsPanel;
   private zipHandler!: ZipHandler;
   private pdfGenerator!: PDFGenerator;
@@ -32,7 +30,6 @@ export class App {
     this.filePreview = new FilePreview();
     this.spreadEditor = new SpreadEditor();
     this.pdfPreview = new PDFPreview();
-    this.threePreview = new ThreePreview();
     this.optionsPanel = new OptionsPanel();
     this.zipHandler = new ZipHandler();
     this.pdfGenerator = new PDFGenerator();
@@ -42,7 +39,6 @@ export class App {
     this.filePreview.mount();
     this.spreadEditor.mount();
     this.pdfPreview.mount();
-    this.threePreview.mount();
     this.optionsPanel.mount();
 
     // Connect file list to preview
@@ -141,7 +137,7 @@ export class App {
 
         // Update editor state
         appState.updateEditor({
-          activeTab: tabName as 'editor' | 'preview' | '3d',
+          activeTab: tabName as 'editor' | 'preview',
         });
 
         // Trigger resize for canvas components
@@ -149,8 +145,6 @@ export class App {
           this.spreadEditor.resize();
         } else if (tabName === 'preview') {
           this.pdfPreview.refresh();
-        } else if (tabName === '3d') {
-          this.threePreview.resize();
         }
       });
     });
