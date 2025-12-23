@@ -65,17 +65,9 @@ export class SpreadEditor {
       }
     });
 
-    // Listen for project changes (header/footer, fonts, etc.) to re-render
-    this.projectUnsubscribe = appState.onProjectChange((project, prevProject) => {
-      // Re-render if header/footer, fonts, or layout options changed
-      if (
-        JSON.stringify(project.headerFooter) !== JSON.stringify(prevProject.headerFooter) ||
-        JSON.stringify(project.fontOptions) !== JSON.stringify(prevProject.fontOptions) ||
-        JSON.stringify(project.layoutOptions) !== JSON.stringify(prevProject.layoutOptions)
-      ) {
-        this.render();
-      }
-    });
+    // Note: We don't listen for layoutOptions/fontOptions/headerFooter changes here
+    // because those trigger reflows, and App.ts calls spreadEditor.render() after reflow completes.
+    // Rendering here before reflow would show trimmed/clipped content.
   }
 
   /**
