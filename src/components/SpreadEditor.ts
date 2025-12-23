@@ -211,6 +211,10 @@ export class SpreadEditor {
   }
 
   resize(): void {
+    // Guard against resizing when container is hidden (prevents canvas errors)
+    if (this.container.clientWidth === 0 || this.container.clientHeight === 0) {
+      return;
+    }
     this.stage.width(this.container.clientWidth);
     this.stage.height(this.container.clientHeight);
     this.fitToView();
@@ -558,9 +562,11 @@ export class SpreadEditor {
       const startPos = this.stage.getPointerPosition();
       const project = appState.getProject();
       const startMargins = { ...this.getMarginsForPage(pageNumber) };
-      const pageDimensions = this.getPageDimensions();
       const spread = this.getCurrentSpread();
       const isRecto = spread?.recto?.pageNumber === pageNumber;
+
+      // Store original line points to apply delta directly
+      const startPoints = [...line.points()];
 
       // Track the current margin value during drag (visual only)
       let currentMarginValue = startMargins[type];
@@ -574,35 +580,23 @@ export class SpreadEditor {
         const dx = (pos.x - startPos.x) / this.zoomLevel;
         const dy = (pos.y - startPos.y) / this.zoomLevel;
 
-        switch (type) {
-          case 'top':
-            currentMarginValue = Math.max(0, startMargins.top + dy);
-            break;
-          case 'bottom':
-            currentMarginValue = Math.max(0, startMargins.bottom - dy);
-            break;
-          case 'inner':
-            currentMarginValue = Math.max(0, startMargins.inner + (isRecto ? dx : -dx));
-            break;
-          case 'outer':
-            currentMarginValue = Math.max(0, startMargins.outer + (isRecto ? -dx : dx));
-            break;
-        }
-
-        // Update line position visually without triggering reflow
-        const points = line.points();
-        const x = isRecto ? pageDimensions.width : 0;
-
+        // Update line position by applying delta to original points
         if (type === 'top') {
-          line.points([points[0], currentMarginValue, points[2], currentMarginValue]);
+          currentMarginValue = Math.max(0, startMargins.top + dy);
+          line.points([startPoints[0], startPoints[1] + dy, startPoints[2], startPoints[3] + dy]);
         } else if (type === 'bottom') {
-          line.points([points[0], pageDimensions.height - currentMarginValue, points[2], pageDimensions.height - currentMarginValue]);
+          currentMarginValue = Math.max(0, startMargins.bottom - dy);
+          line.points([startPoints[0], startPoints[1] - dy, startPoints[2], startPoints[3] - dy]);
         } else if (type === 'inner') {
-          const innerLineX = isRecto ? x + currentMarginValue : x + pageDimensions.width - currentMarginValue;
-          line.points([innerLineX, points[1], innerLineX, points[3]]);
+          // For recto: moving right (dx>0) increases inner margin
+          // For verso: moving left (dx<0) increases inner margin
+          currentMarginValue = Math.max(0, startMargins.inner + (isRecto ? dx : -dx));
+          line.points([startPoints[0] + dx, startPoints[1], startPoints[2] + dx, startPoints[3]]);
         } else if (type === 'outer') {
-          const outerLineX = isRecto ? x + pageDimensions.width - currentMarginValue : x + currentMarginValue;
-          line.points([outerLineX, points[1], outerLineX, points[3]]);
+          // For recto: moving left (dx<0) increases outer margin
+          // For verso: moving right (dx>0) increases outer margin
+          currentMarginValue = Math.max(0, startMargins.outer + (isRecto ? -dx : dx));
+          line.points([startPoints[0] + dx, startPoints[1], startPoints[2] + dx, startPoints[3]]);
         }
 
         this.marginLayer.draw();
