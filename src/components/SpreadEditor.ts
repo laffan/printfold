@@ -399,17 +399,19 @@ export class SpreadEditor {
     // Draw page background
     this.drawPageOutline(x, y, dimensions.width, dimensions.height);
 
-    // Draw page number indicator
-    const pageNum = new Konva.Text({
-      x: x + dimensions.width / 2,
-      y: y + dimensions.height - 20,
-      text: pageContent.pageNumber.toString(),
-      fontSize: 10,
-      fill: '#aaaaaa',
-      align: 'center',
-    });
-    pageNum.offsetX(pageNum.width() / 2);
-    this.layer.add(pageNum);
+    // Draw page number indicator only if footer is disabled (footer handles page numbers otherwise)
+    if (!project.headerFooter.footer.enabled) {
+      const pageNum = new Konva.Text({
+        x: x + dimensions.width / 2,
+        y: y + dimensions.height - 20,
+        text: pageContent.pageNumber.toString(),
+        fontSize: 10,
+        fill: '#aaaaaa',
+        align: 'center',
+      });
+      pageNum.offsetX(pageNum.width() / 2);
+      this.layer.add(pageNum);
+    }
 
     if (pageContent.isBlank) {
       const blankText = new Konva.Text({
@@ -720,14 +722,16 @@ export class SpreadEditor {
 
         const dy = (pos.y - startPos.y) / this.zoomLevel;
 
-        // Header: dragging down increases height
-        // Footer: dragging up increases height
+        // Header: dragging down increases height (line moves down)
+        // Footer: dragging up increases height (line moves up)
         if (type === 'header') {
           currentHeight = Math.max(12, Math.min(72, startHeight + dy));
           line.points([startPoints[0], startPoints[1] + dy, startPoints[2], startPoints[3] + dy]);
         } else {
+          // Footer line is at top of footer area - line should follow cursor (+ dy)
+          // but height increases when dragging up (- dy for height calc)
           currentHeight = Math.max(12, Math.min(72, startHeight - dy));
-          line.points([startPoints[0], startPoints[1] - dy, startPoints[2], startPoints[3] - dy]);
+          line.points([startPoints[0], startPoints[1] + dy, startPoints[2], startPoints[3] + dy]);
         }
 
         this.marginLayer.draw();
