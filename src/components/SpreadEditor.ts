@@ -549,28 +549,59 @@ export class SpreadEditor {
     this.marginLayer.add(outerLine);
     this.addMarginDragHandler(outerLine, 'outer', pageContent.pageNumber);
 
-    // Header/Footer margin lines (orange)
+    // Header/Footer rendering and drag lines (orange)
     const project = appState.getProject();
     const headerFooterLineColor = 'rgba(255, 140, 0, 0.5)';
 
-    // Header line (if enabled)
+    // Use existing leftMargin/rightMargin for positioning header/footer content
+    const contentWidth = dimensions.width - leftMargin - rightMargin;
+    const contentX = x + leftMargin;
+
+    // Header (if enabled)
     if (project.headerFooter.header.enabled) {
       const headerHeight = project.headerFooter.header.height;
+      const headerY = y + margins.top;
+      const headerLineY = headerY + headerHeight;
+
+      // Draw header content
+      this.drawHeaderFooterContent(
+        project.headerFooter.header,
+        pageContent.isRecto,
+        pageContent.pageNumber,
+        contentX,
+        headerY + headerHeight / 2 - 5,
+        contentWidth
+      );
+
+      // Draw header drag line (at bottom of header area)
       const headerLine = new Konva.Line({
-        points: [x, y + margins.top + headerHeight, x + dimensions.width, y + margins.top + headerHeight],
+        points: [x, headerLineY, x + dimensions.width, headerLineY],
         stroke: headerFooterLineColor,
         strokeWidth: 1,
         dash: [2, 2],
         hitStrokeWidth: 15,
       });
       this.marginLayer.add(headerLine);
-      this.addHeaderFooterDragHandler(headerLine, 'header', pageContent.pageNumber, y + margins.top);
+      this.addHeaderFooterDragHandler(headerLine, 'header', pageContent.pageNumber, headerY);
     }
 
-    // Footer line (if enabled)
+    // Footer (if enabled)
     if (project.headerFooter.footer.enabled) {
       const footerHeight = project.headerFooter.footer.height;
       const footerLineY = y + dimensions.height - margins.bottom - footerHeight;
+      const footerContentY = footerLineY + footerHeight / 2 - 5;
+
+      // Draw footer content
+      this.drawHeaderFooterContent(
+        project.headerFooter.footer,
+        pageContent.isRecto,
+        pageContent.pageNumber,
+        contentX,
+        footerContentY,
+        contentWidth
+      );
+
+      // Draw footer drag line (at top of footer area)
       const footerLine = new Konva.Line({
         points: [x, footerLineY, x + dimensions.width, footerLineY],
         stroke: headerFooterLineColor,
@@ -580,6 +611,67 @@ export class SpreadEditor {
       });
       this.marginLayer.add(footerLine);
       this.addHeaderFooterDragHandler(footerLine, 'footer', pageContent.pageNumber, y + dimensions.height - margins.bottom);
+    }
+  }
+
+  private drawHeaderFooterContent(
+    config: { verso: { left: string; center: string; right: string }; recto: { left: string; center: string; right: string }; font: FontStyle },
+    isRecto: boolean,
+    pageNumber: number,
+    x: number,
+    y: number,
+    width: number
+  ): void {
+    const positions = isRecto ? config.recto : config.verso;
+    const font = config.font;
+
+    // Replace template variables
+    const replaceVars = (text: string): string => {
+      return text.replace(/\{\{pageNumber\}\}/g, pageNumber.toString());
+    };
+
+    // Draw left-aligned text
+    if (positions.left) {
+      const text = new Konva.Text({
+        x,
+        y,
+        text: replaceVars(positions.left),
+        fontSize: font.fontSize,
+        fontFamily: font.fontFamily,
+        fill: font.color,
+        align: 'left',
+      });
+      this.layer.add(text);
+    }
+
+    // Draw center-aligned text
+    if (positions.center) {
+      const text = new Konva.Text({
+        x: x + width / 2,
+        y,
+        text: replaceVars(positions.center),
+        fontSize: font.fontSize,
+        fontFamily: font.fontFamily,
+        fill: font.color,
+        align: 'center',
+      });
+      text.offsetX(text.width() / 2);
+      this.layer.add(text);
+    }
+
+    // Draw right-aligned text
+    if (positions.right) {
+      const text = new Konva.Text({
+        x: x + width,
+        y,
+        text: replaceVars(positions.right),
+        fontSize: font.fontSize,
+        fontFamily: font.fontFamily,
+        fill: font.color,
+        align: 'right',
+      });
+      text.offsetX(text.width());
+      this.layer.add(text);
     }
   }
 
@@ -725,13 +817,15 @@ export class SpreadEditor {
           currentMarginValue = Math.max(0, startMargins.bottom - dy);
           line.points([startPoints[0], startPoints[1] - dy, startPoints[2], startPoints[3] - dy]);
         } else if (type === 'inner') {
-          // For recto: moving right (dx>0) increases inner margin
-          // For verso: moving left (dx<0) increases inner margin
+          // Inner margin: the line sits between the spine and content
+          // For recto: inner line is on LEFT (at x + margin). Drag RIGHT = expand margin, drag LEFT = shrink
+          // For verso: inner line is on RIGHT (at x + width - margin). Drag LEFT = expand margin, drag RIGHT = shrink
           currentMarginValue = Math.max(0, startMargins.inner + (isRecto ? dx : -dx));
           line.points([startPoints[0] + dx, startPoints[1], startPoints[2] + dx, startPoints[3]]);
         } else if (type === 'outer') {
-          // For recto: moving left (dx<0) increases outer margin
-          // For verso: moving right (dx>0) increases outer margin
+          // Outer margin: the line sits between content and page edge
+          // For recto: outer line is on RIGHT (at x + width - margin). Drag LEFT = expand margin, drag RIGHT = shrink
+          // For verso: outer line is on LEFT (at x + margin). Drag RIGHT = expand margin, drag LEFT = shrink
           currentMarginValue = Math.max(0, startMargins.outer + (isRecto ? -dx : dx));
           line.points([startPoints[0] + dx, startPoints[1], startPoints[2] + dx, startPoints[3]]);
         }
@@ -826,15 +920,14 @@ export class SpreadEditor {
         if (imageFile) {
           const imgX = x;
           const imgY = currentY;
-          const maxImgWidth = Math.min(width, 200);
-          const maxImgHeight = 200;
+          const maxImgWidth = width; // Full content width
 
           // Create placeholder while image loads
           const placeholder = new Konva.Rect({
             x: imgX,
             y: imgY,
             width: maxImgWidth,
-            height: maxImgHeight / 2,
+            height: 100,
             fill: '#f8f8f8',
             stroke: '#ddd',
             strokeWidth: 1,
@@ -846,15 +939,10 @@ export class SpreadEditor {
           img.onload = () => {
             placeholder.destroy();
 
-            // Calculate size maintaining aspect ratio
+            // Calculate size: full width, auto height maintaining aspect ratio
             const aspectRatio = img.width / img.height;
-            let displayWidth = maxImgWidth;
-            let displayHeight = displayWidth / aspectRatio;
-
-            if (displayHeight > maxImgHeight) {
-              displayHeight = maxImgHeight;
-              displayWidth = displayHeight * aspectRatio;
-            }
+            const displayWidth = maxImgWidth;
+            const displayHeight = displayWidth / aspectRatio;
 
             const konvaImage = new Konva.Image({
               x: imgX,
@@ -875,6 +963,7 @@ export class SpreadEditor {
                 fontStyle: 'italic',
                 fill: '#666666',
                 width: displayWidth,
+                align: 'center',
               });
               this.layer.add(captionText);
             }
@@ -883,7 +972,7 @@ export class SpreadEditor {
           };
           img.src = `data:image/png;base64,${imageFile.content}`;
 
-          currentY += 170;
+          currentY += 120; // Will be adjusted when image loads
         } else {
           // Draw placeholder
           const placeholder = new Konva.Rect({
