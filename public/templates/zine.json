@@ -1,0 +1,73 @@
+{
+  "id": "zine",
+  "name": "Mini Zine",
+  "description": "A compact quarter-fold zine format, perfect for small publications",
+  "outputOptions": {
+    "sheetSize": "letter",
+    "bookletSize": "quarter-letter",
+    "pagesPerSignature": 8
+  },
+  "layoutOptions": {
+    "margins": {
+      "top": 36,
+      "bottom": 36,
+      "inner": 36,
+      "outer": 24
+    },
+    "emptyPageBeforeH1": false,
+    "spacingAboveH1": 36,
+    "spacingAboveH2": 24,
+    "spacingAboveH3": 18,
+    "paragraphSpacing": 8,
+    "lineHeight": 1.4
+  },
+  "fontOptions": {
+    "body": {
+      "fontFamily": "Arial, sans-serif",
+      "fontSize": 10,
+      "fontWeight": "normal",
+      "fontStyle": "normal",
+      "color": "#000000"
+    },
+    "h1": {
+      "fontFamily": "Arial, sans-serif",
+      "fontSize": 18,
+      "fontWeight": "bold",
+      "fontStyle": "normal",
+      "color": "#000000"
+    },
+    "h2": {
+      "fontFamily": "Arial, sans-serif",
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "fontStyle": "normal",
+      "color": "#000000"
+    },
+    "h3": {
+      "fontFamily": "Arial, sans-serif",
+      "fontSize": 12,
+      "fontWeight": "bold",
+      "fontStyle": "normal",
+      "color": "#000000"
+    }
+  },
+  "headerFooter": {
+    "header": {
+      "enabled": false
+    },
+    "footer": {
+      "enabled": true,
+      "height": 18,
+      "verso": {
+        "left": "{{pageNumber}}",
+        "center": "",
+        "right": ""
+      },
+      "recto": {
+        "left": "",
+        "center": "",
+        "right": "{{pageNumber}}"
+      }
+    }
+  }
+}
