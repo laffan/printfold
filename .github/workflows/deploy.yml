@@ -2,7 +2,7 @@ name: Build and Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, 'claude/**']
   pull_request:
     branches: [main, master]
   workflow_dispatch:
@@ -48,7 +48,6 @@ jobs:
 
   deploy:
     needs: build
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
 
     environment:
