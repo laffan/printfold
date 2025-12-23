@@ -817,16 +817,16 @@ export class SpreadEditor {
           currentMarginValue = Math.max(0, startMargins.bottom - dy);
           line.points([startPoints[0], startPoints[1] - dy, startPoints[2], startPoints[3] - dy]);
         } else if (type === 'inner') {
-          // Inner margin: the line sits between the spine and content
-          // For recto: inner line is on LEFT (at x + margin). Drag RIGHT = expand margin, drag LEFT = shrink
-          // For verso: inner line is on RIGHT (at x + width - margin). Drag LEFT = expand margin, drag RIGHT = shrink
-          currentMarginValue = Math.max(0, startMargins.inner + (isRecto ? dx : -dx));
+          // Inner margin: dragging the line toward the spine shrinks margin, away from spine expands it
+          // For recto: inner line is on LEFT. Drag LEFT (toward spine) = shrink, drag RIGHT = expand
+          // For verso: inner line is on RIGHT. Drag RIGHT (toward spine) = shrink, drag LEFT = expand
+          currentMarginValue = Math.max(0, startMargins.inner + (isRecto ? -dx : dx));
           line.points([startPoints[0] + dx, startPoints[1], startPoints[2] + dx, startPoints[3]]);
         } else if (type === 'outer') {
-          // Outer margin: the line sits between content and page edge
-          // For recto: outer line is on RIGHT (at x + width - margin). Drag LEFT = expand margin, drag RIGHT = shrink
-          // For verso: outer line is on LEFT (at x + margin). Drag RIGHT = expand margin, drag LEFT = shrink
-          currentMarginValue = Math.max(0, startMargins.outer + (isRecto ? -dx : dx));
+          // Outer margin: dragging toward the outer edge shrinks margin, toward content expands it
+          // For recto: outer line is on RIGHT. Drag RIGHT (toward edge) = shrink, drag LEFT = expand
+          // For verso: outer line is on LEFT. Drag LEFT (toward edge) = shrink, drag RIGHT = expand
+          currentMarginValue = Math.max(0, startMargins.outer + (isRecto ? dx : -dx));
           line.points([startPoints[0] + dx, startPoints[1], startPoints[2] + dx, startPoints[3]]);
         }
 
