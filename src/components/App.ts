@@ -182,8 +182,10 @@ export class App {
   }
 
   private performReflow(): void {
+    console.log('[App] performReflow called');
     const mainDoc = appState.getMainDocument();
     if (!mainDoc) {
+      console.log('[App] No main document, clearing');
       // Clear everything
       appState.updateProject({ signatures: [] });
       this.spreadEditor.render();
@@ -191,9 +193,11 @@ export class App {
       return;
     }
 
+    console.log('[App] Performing text flow with margins:', appState.getProject().layoutOptions.margins);
     // Perform text flow
     const result = textFlowEngine.reflow(mainDoc.content);
 
+    console.log('[App] Reflow complete, pages:', result.totalPages);
     // Update project with flow result
     appState.updateProject({ signatures: result.signatures });
 

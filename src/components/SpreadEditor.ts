@@ -837,6 +837,8 @@ export class SpreadEditor {
         this.stage.off('mousemove', moveHandler);
         this.stage.off('mouseup mouseleave', upHandler);
 
+        console.log('[SpreadEditor] Margin drag ended, type:', type, 'value:', currentMarginValue);
+
         // Now apply the margin change to state (triggers reflow)
         if (this.isLocalChange) {
           // Local change - update margin override for this page only
@@ -853,9 +855,11 @@ export class SpreadEditor {
             overrides.push(override);
           }
 
+          console.log('[SpreadEditor] Updating local margin overrides');
           appState.updateLayoutOptions({ marginOverrides: overrides });
         } else {
           // Global change
+          console.log('[SpreadEditor] Updating global margins');
           appState.updateLayoutOptions({
             margins: { ...project.layoutOptions.margins, [type]: currentMarginValue },
           });

@@ -300,15 +300,17 @@ class AppState {
   }
 
   requestReflow(): void {
-    // Debounce reflow requests
+    console.log('[State] requestReflow called');
+    // Debounce reflow requests (reduced to 10ms for faster response)
     if (this.reflowTimeout) {
       clearTimeout(this.reflowTimeout);
     }
     this.reflowTimeout = window.setTimeout(() => {
+      console.log('[State] Executing reflow handlers, count:', this.reflowListeners.size);
       for (const handler of this.reflowListeners) {
         handler();
       }
-    }, 100);
+    }, 10);
   }
 
   private reflowTimeout: number | null = null;
