@@ -266,6 +266,37 @@ export interface HeaderFooterOptions {
   };
 }
 
+// Static spread - exists independently of markdown flow
+export interface StaticSpread {
+  id: string;
+  index: number; // Position in the static spreads list
+  verso: PageContent | null;
+  recto: PageContent | null;
+  // Items can span across both pages
+  spanningItems?: SpanningItem[];
+}
+
+// Item that spans across a spread (verso + recto)
+export interface SpanningItem extends PageItemBase {
+  // Position relative to the full spread (verso left edge = 0)
+  // x can extend from 0 to 2*pageWidth
+  type: PageItemType;
+  // Additional properties based on type
+  content?: string;
+  fontFamily?: string;
+  fontSize?: number;
+  fontWeight?: 'normal' | 'bold';
+  fontStyle?: 'normal' | 'italic';
+  color?: string;
+  textAlign?: 'left' | 'center' | 'right';
+  shapeType?: 'rectangle' | 'ellipse' | 'circle' | 'line' | 'arrow';
+  fillColor?: string;
+  fill?: FillConfig;
+  strokeColor?: string;
+  strokeWidth?: number;
+  imageFileId?: string;
+}
+
 // Complete project state
 export interface BookletProject {
   id: string;
@@ -279,6 +310,7 @@ export interface BookletProject {
   headerFooter: HeaderFooterOptions;
   signatures: Signature[];
   blankPages: number[]; // Page numbers where blank pages should be inserted
+  staticSpreads?: StaticSpread[]; // Spreads that exist without markdown
 }
 
 // Template definitions

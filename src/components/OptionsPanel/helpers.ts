@@ -246,14 +246,22 @@ export function setupDraggableCaps(): void {
 }
 
 /**
- * Update all input-cap labels to reflect the current unit
+ * Update margin/dimension input-cap labels to reflect the current unit
+ * Only updates caps that should change with measurement unit
  */
 export function updateInputCapLabels(): void {
   const unit = appState.getMeasurementUnit();
-  const caps = document.querySelectorAll('.input-cap');
 
-  caps.forEach(cap => {
-    const capElement = cap as HTMLElement;
-    capElement.textContent = unit;
+  // Only update margin and custom size caps - these follow the measurement unit
+  const marginCapIds = [
+    'opt-margin-top', 'opt-margin-bottom', 'opt-margin-inner', 'opt-margin-outer',
+    'opt-custom-width', 'opt-custom-height'
+  ];
+
+  marginCapIds.forEach(id => {
+    const cap = document.querySelector(`.input-cap[data-for="${id}"]`) as HTMLElement;
+    if (cap) {
+      cap.textContent = unit;
+    }
   });
 }

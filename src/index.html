@@ -84,7 +84,7 @@
                 <button id="btn-zoom-fit" class="btn btn-icon" title="Fit to View">⊡</button>
               </div>
               <div class="toolbar-group">
-                <button id="btn-add-blank-page" class="btn btn-secondary btn-small">+ Blank</button>
+                <button id="btn-add-blank-page" class="btn btn-secondary btn-small">+ Spread</button>
               </div>
               <div class="toolbar-group">
                 <label class="toolbar-label">
@@ -321,16 +321,25 @@
               </label>
             </div>
             <div class="form-group">
-              <label for="opt-spacing-h1">Spacing above H1 (pt)</label>
-              <input type="number" id="opt-spacing-h1" value="72" min="0">
+              <label for="opt-spacing-h1">Spacing above H1</label>
+              <div class="input-with-cap">
+                <input type="number" id="opt-spacing-h1" value="72" min="0">
+                <span class="input-cap" data-for="opt-spacing-h1">pt</span>
+              </div>
             </div>
             <div class="form-group">
               <label for="opt-line-height">Line Height</label>
-              <input type="number" id="opt-line-height" value="1.5" min="1" max="3" step="0.1">
+              <div class="input-with-cap">
+                <input type="number" id="opt-line-height" value="1.5" min="1" max="3" step="0.1">
+                <span class="input-cap" data-for="opt-line-height">×</span>
+              </div>
             </div>
             <div class="form-group">
-              <label for="opt-paragraph-spacing">Paragraph Spacing (pt)</label>
-              <input type="number" id="opt-paragraph-spacing" value="12" min="0">
+              <label for="opt-paragraph-spacing">Paragraph Spacing</label>
+              <div class="input-with-cap">
+                <input type="number" id="opt-paragraph-spacing" value="12" min="0">
+                <span class="input-cap" data-for="opt-paragraph-spacing">pt</span>
+              </div>
             </div>
           </div>
         </div>
@@ -370,7 +379,10 @@
                 </label>
                 <label>
                   <span>Size</span>
-                  <input type="number" id="opt-header-font-size" value="10" min="6" max="16">
+                  <div class="input-with-cap">
+                    <input type="number" id="opt-header-font-size" value="10" min="6" max="16">
+                    <span class="input-cap" data-for="opt-header-font-size">pt</span>
+                  </div>
                 </label>
                 <label>
                   <span>Color</span>
@@ -413,7 +425,10 @@
                 </label>
                 <label>
                   <span>Size</span>
-                  <input type="number" id="opt-footer-font-size" value="10" min="6" max="16">
+                  <div class="input-with-cap">
+                    <input type="number" id="opt-footer-font-size" value="10" min="6" max="16">
+                    <span class="input-cap" data-for="opt-footer-font-size">pt</span>
+                  </div>
                 </label>
                 <label>
                   <span>Color</span>
@@ -447,11 +462,17 @@
               <div class="form-group inline-sizes">
                 <label>
                   <span>Size</span>
-                  <input type="number" id="opt-font-size-body" value="12" min="6" max="24">
+                  <div class="input-with-cap">
+                    <input type="number" id="opt-font-size-body" value="12" min="6" max="24">
+                    <span class="input-cap" data-for="opt-font-size-body">pt</span>
+                  </div>
                 </label>
                 <label>
                   <span>Line Height</span>
-                  <input type="number" id="opt-line-height-fonts" value="1.5" min="1" max="3" step="0.1">
+                  <div class="input-with-cap">
+                    <input type="number" id="opt-line-height-fonts" value="1.5" min="1" max="3" step="0.1">
+                    <span class="input-cap" data-for="opt-line-height-fonts">×</span>
+                  </div>
                 </label>
               </div>
               <div class="form-group inline-sizes">
@@ -482,15 +503,24 @@
               <div class="form-group inline-sizes">
                 <label>
                   <span>H1</span>
-                  <input type="number" id="opt-font-size-h1" value="24" min="12" max="72">
+                  <div class="input-with-cap">
+                    <input type="number" id="opt-font-size-h1" value="24" min="12" max="72">
+                    <span class="input-cap" data-for="opt-font-size-h1">pt</span>
+                  </div>
                 </label>
                 <label>
                   <span>H2</span>
-                  <input type="number" id="opt-font-size-h2" value="20" min="10" max="48">
+                  <div class="input-with-cap">
+                    <input type="number" id="opt-font-size-h2" value="20" min="10" max="48">
+                    <span class="input-cap" data-for="opt-font-size-h2">pt</span>
+                  </div>
                 </label>
                 <label>
                   <span>H3</span>
-                  <input type="number" id="opt-font-size-h3" value="16" min="8" max="36">
+                  <div class="input-with-cap">
+                    <input type="number" id="opt-font-size-h3" value="16" min="8" max="36">
+                    <span class="input-cap" data-for="opt-font-size-h3">pt</span>
+                  </div>
                 </label>
               </div>
               <div class="form-group">
@@ -512,32 +542,49 @@
                 <div class="form-group inline-sizes">
                   <label>
                     <span>X</span>
-                    <input type="number" id="item-x" step="1">
+                    <div class="input-with-cap">
+                      <input type="number" id="item-x" step="1">
+                      <span class="input-cap" data-for="item-x">px</span>
+                    </div>
                   </label>
                   <label>
                     <span>Y</span>
-                    <input type="number" id="item-y" step="1">
+                    <div class="input-with-cap">
+                      <input type="number" id="item-y" step="1">
+                      <span class="input-cap" data-for="item-y">px</span>
+                    </div>
                   </label>
                 </div>
                 <div class="form-group inline-sizes">
                   <label>
                     <span>W</span>
-                    <input type="number" id="item-width" step="1" min="1">
+                    <div class="input-with-cap">
+                      <input type="number" id="item-width" step="1" min="1">
+                      <span class="input-cap" data-for="item-width">px</span>
+                    </div>
                   </label>
                   <label>
                     <span>H</span>
-                    <input type="number" id="item-height" step="1" min="1">
+                    <div class="input-with-cap">
+                      <input type="number" id="item-height" step="1" min="1">
+                      <span class="input-cap" data-for="item-height">px</span>
+                    </div>
                   </label>
                 </div>
                 <div class="form-group inline-sizes">
                   <label>
                     <span>Rotation</span>
-                    <input type="number" id="item-rotation" step="1" min="-360" max="360" value="0">
-                    <span class="unit">°</span>
+                    <div class="input-with-cap">
+                      <input type="number" id="item-rotation" step="1" min="-360" max="360" value="0">
+                      <span class="input-cap" data-for="item-rotation">°</span>
+                    </div>
                   </label>
                   <label>
                     <span>Opacity</span>
-                    <input type="number" id="item-opacity" step="0.1" min="0" max="1" value="1">
+                    <div class="input-with-cap">
+                      <input type="number" id="item-opacity" step="0.1" min="0" max="1" value="1">
+                      <span class="input-cap" data-for="item-opacity">%</span>
+                    </div>
                   </label>
                 </div>
               </div>
@@ -557,7 +604,10 @@
                 <div class="form-group">
                   <label>
                     <span>Stroke Width</span>
-                    <input type="number" id="item-stroke-width" step="0.5" min="0" value="1">
+                    <div class="input-with-cap">
+                      <input type="number" id="item-stroke-width" step="0.5" min="0" value="1">
+                      <span class="input-cap" data-for="item-stroke-width">px</span>
+                    </div>
                   </label>
                 </div>
               </div>
@@ -577,7 +627,10 @@
                 <div class="form-group inline-sizes">
                   <label>
                     <span>Size</span>
-                    <input type="number" id="item-font-size" step="1" min="6" value="16">
+                    <div class="input-with-cap">
+                      <input type="number" id="item-font-size" step="1" min="6" value="16">
+                      <span class="input-cap" data-for="item-font-size">pt</span>
+                    </div>
                   </label>
                   <label>
                     <span>Color</span>
