@@ -479,11 +479,70 @@ body {
   flex: 1;
   overflow: hidden;
   background: var(--color-bg);
+  display: flex;
+  flex-direction: row;
+}
+
+.spread-thumbnails {
+  width: 100px;
+  min-width: 100px;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--color-bg-secondary);
+  border-right: 1px solid var(--color-border);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.spread-thumbnail {
+  width: 84px;
+  aspect-ratio: 17 / 11; /* Approximate spread aspect ratio */
+  background: white;
+  border: 2px solid var(--color-border);
+  border-radius: 4px;
+  cursor: pointer;
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.spread-thumbnail:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.spread-thumbnail.active {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.3);
+}
+
+.spread-thumbnail canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.spread-thumbnail-label {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  font-size: 9px;
+  text-align: center;
+  padding: 2px;
 }
 
 .konva-container {
-  width: 100%;
+  flex: 1;
   height: 100%;
+  min-width: 0;
 }
 
 .spread-navigation {

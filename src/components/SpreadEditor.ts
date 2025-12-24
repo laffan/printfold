@@ -16,6 +16,7 @@ interface MarginLine {
 
 export class SpreadEditor {
   private container!: HTMLElement;
+  private thumbnailContainer!: HTMLElement;
   private stage!: Konva.Stage;
   private layer!: Konva.Layer;
   private marginLayer!: Konva.Layer;
@@ -32,6 +33,7 @@ export class SpreadEditor {
 
   mount(): void {
     this.container = document.getElementById('konva-container')!;
+    this.thumbnailContainer = document.getElementById('spread-thumbnails')!;
 
     // Create Konva stage
     this.stage = new Konva.Stage({
@@ -365,6 +367,109 @@ export class SpreadEditor {
     this.layer.draw();
     this.marginLayer.draw();
     this.updateSpreadIndicator();
+    this.renderThumbnails();
+  }
+
+  private renderThumbnails(): void {
+    const project = appState.getProject();
+    const allSpreads = project.signatures.flatMap(sig => sig.spreads);
+    const pageDimensions = this.getPageDimensions();
+
+    // Clear existing thumbnails
+    this.thumbnailContainer.innerHTML = '';
+
+    if (allSpreads.length === 0) {
+      return;
+    }
+
+    // Calculate thumbnail dimensions
+    const thumbWidth = 80;
+    const spreadAspect = (pageDimensions.width * 2) / pageDimensions.height;
+    const thumbHeight = thumbWidth / spreadAspect;
+
+    allSpreads.forEach((spread, index) => {
+      const thumbDiv = document.createElement('div');
+      thumbDiv.className = 'spread-thumbnail' + (index === this.currentSpreadIndex ? ' active' : '');
+      thumbDiv.addEventListener('click', () => {
+        this.currentSpreadIndex = index;
+        this.updateSpreadIndicator();
+        this.render();
+      });
+
+      // Create a small canvas for the thumbnail
+      const canvas = document.createElement('canvas');
+      canvas.width = thumbWidth * 2; // Higher res for retina
+      canvas.height = thumbHeight * 2;
+      const ctx = canvas.getContext('2d')!;
+      ctx.scale(2, 2);
+
+      // Draw page backgrounds
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, thumbWidth / 2, thumbHeight);
+      ctx.fillRect(thumbWidth / 2, 0, thumbWidth / 2, thumbHeight);
+
+      // Draw spine line
+      ctx.strokeStyle = '#e0e0e0';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(thumbWidth / 2, 0);
+      ctx.lineTo(thumbWidth / 2, thumbHeight);
+      ctx.stroke();
+
+      // Draw content indicators (simple lines to represent text)
+      ctx.fillStyle = '#d0d0d0';
+      const contentMargin = 3;
+
+      // Verso page content
+      if (spread.verso && spread.verso.sections.length > 0) {
+        let yPos = contentMargin;
+        for (const section of spread.verso.sections) {
+          if (yPos > thumbHeight - contentMargin) break;
+          const lineCount = (section as { lines?: string[] }).lines?.length || 1;
+          for (let i = 0; i < Math.min(lineCount, 5); i++) {
+            if (yPos > thumbHeight - contentMargin) break;
+            const lineWidth = (thumbWidth / 2 - contentMargin * 2) * (0.6 + Math.random() * 0.35);
+            ctx.fillRect(contentMargin, yPos, lineWidth, 1);
+            yPos += 2;
+          }
+          yPos += 1;
+        }
+      }
+
+      // Recto page content
+      if (spread.recto && spread.recto.sections.length > 0) {
+        let yPos = contentMargin;
+        for (const section of spread.recto.sections) {
+          if (yPos > thumbHeight - contentMargin) break;
+          const lineCount = (section as { lines?: string[] }).lines?.length || 1;
+          for (let i = 0; i < Math.min(lineCount, 5); i++) {
+            if (yPos > thumbHeight - contentMargin) break;
+            const lineWidth = (thumbWidth / 2 - contentMargin * 2) * (0.6 + Math.random() * 0.35);
+            ctx.fillRect(thumbWidth / 2 + contentMargin, yPos, lineWidth, 1);
+            yPos += 2;
+          }
+          yPos += 1;
+        }
+      }
+
+      thumbDiv.appendChild(canvas);
+
+      // Add label
+      const label = document.createElement('div');
+      label.className = 'spread-thumbnail-label';
+      const versoNum = spread.verso?.pageNumber || '–';
+      const rectoNum = spread.recto?.pageNumber || '–';
+      label.textContent = `${versoNum}–${rectoNum}`;
+      thumbDiv.appendChild(label);
+
+      this.thumbnailContainer.appendChild(thumbDiv);
+    });
+
+    // Scroll active thumbnail into view
+    const activeThumbnail = this.thumbnailContainer.querySelector('.spread-thumbnail.active');
+    if (activeThumbnail) {
+      activeThumbnail.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
   }
 
   private drawPageOutline(x: number, y: number, width: number, height: number): void {
