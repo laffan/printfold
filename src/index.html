@@ -426,6 +426,127 @@
           </div>
         </div>
 
+        <!-- Edit Page Panel (for static pages) -->
+        <div id="edit-page-panel" class="panel panel-edit-page" style="display: none;">
+          <div class="panel-header">
+            <h3>Edit Page</h3>
+          </div>
+          <div class="panel-content">
+            <!-- Add Section -->
+            <div class="edit-section">
+              <h4 class="edit-section-header">Add</h4>
+              <div class="add-buttons">
+                <button id="btn-add-text" class="btn btn-secondary btn-small">+ Text</button>
+                <button id="btn-add-rect" class="btn btn-secondary btn-small">+ Rectangle</button>
+                <button id="btn-add-ellipse" class="btn btn-secondary btn-small">+ Ellipse</button>
+                <button id="btn-add-line" class="btn btn-secondary btn-small">+ Line</button>
+                <button id="btn-add-image" class="btn btn-secondary btn-small">+ Image</button>
+              </div>
+            </div>
+
+            <!-- Edit Selected Section -->
+            <div id="edit-selected-section" class="edit-section" style="display: none;">
+              <h4 class="edit-section-header">Edit Selected</h4>
+
+              <!-- Common properties -->
+              <div class="edit-properties">
+                <div class="form-group inline-sizes">
+                  <label>
+                    <span>X</span>
+                    <input type="number" id="item-x" step="1">
+                  </label>
+                  <label>
+                    <span>Y</span>
+                    <input type="number" id="item-y" step="1">
+                  </label>
+                </div>
+                <div class="form-group inline-sizes">
+                  <label>
+                    <span>W</span>
+                    <input type="number" id="item-width" step="1" min="1">
+                  </label>
+                  <label>
+                    <span>H</span>
+                    <input type="number" id="item-height" step="1" min="1">
+                  </label>
+                </div>
+                <div class="form-group">
+                  <label>
+                    <span>Rotation</span>
+                    <input type="number" id="item-rotation" step="1" min="-360" max="360" value="0">
+                    <span class="unit">°</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Shape properties -->
+              <div id="shape-properties" class="edit-properties" style="display: none;">
+                <div class="form-group inline-sizes">
+                  <label>
+                    <span>Fill</span>
+                    <input type="color" id="item-fill" value="#cccccc">
+                  </label>
+                  <label>
+                    <span>Stroke</span>
+                    <input type="color" id="item-stroke" value="#000000">
+                  </label>
+                </div>
+                <div class="form-group">
+                  <label>
+                    <span>Stroke Width</span>
+                    <input type="number" id="item-stroke-width" step="0.5" min="0" value="1">
+                  </label>
+                </div>
+              </div>
+
+              <!-- Text properties -->
+              <div id="text-properties" class="edit-properties" style="display: none;">
+                <div class="form-group">
+                  <label for="item-font-family">Font</label>
+                  <select id="item-font-family">
+                    <option value="Arial">Arial</option>
+                    <option value="Georgia">Georgia</option>
+                    <option value="Times New Roman">Times New Roman</option>
+                    <option value="Courier New">Courier New</option>
+                    <option value="Helvetica">Helvetica</option>
+                  </select>
+                </div>
+                <div class="form-group inline-sizes">
+                  <label>
+                    <span>Size</span>
+                    <input type="number" id="item-font-size" step="1" min="6" value="16">
+                  </label>
+                  <label>
+                    <span>Color</span>
+                    <input type="color" id="item-text-color" value="#000000">
+                  </label>
+                </div>
+                <div class="form-group">
+                  <label>Align</label>
+                  <div class="btn-group">
+                    <button id="item-align-left" class="btn btn-icon btn-small" title="Left">◀</button>
+                    <button id="item-align-center" class="btn btn-icon btn-small" title="Center">●</button>
+                    <button id="item-align-right" class="btn btn-icon btn-small" title="Right">▶</button>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Style</label>
+                  <div class="btn-group">
+                    <button id="item-bold" class="btn btn-icon btn-small" title="Bold"><b>B</b></button>
+                    <button id="item-italic" class="btn btn-icon btn-small" title="Italic"><i>I</i></button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Actions -->
+              <div class="edit-actions">
+                <button id="btn-duplicate-item" class="btn btn-secondary btn-small">Duplicate</button>
+                <button id="btn-delete-item" class="btn btn-secondary btn-small btn-danger">Delete</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Document Info -->
         <div class="panel panel-info">
           <div class="panel-header">

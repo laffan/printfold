@@ -260,6 +260,7 @@ export interface EditorState {
   selectedPageNumber: number | null;
   selectedSpreadNumber: number | null;
   selectedPagePosition: 'verso' | 'recto' | null; // Which page in the spread is selected
+  selectedItemId: string | null; // Selected item on a static page
   isDraggingMargin: boolean;
   dragMarginType: 'top' | 'bottom' | 'inner' | 'outer' | null;
   isLocalMarginChange: boolean; // Cmd key held
