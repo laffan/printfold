@@ -5,10 +5,12 @@
 
 import { appState } from '../../services/state';
 import { createFontDropdown, FontDropdown } from '../FontDropdown';
-import type { PageItem, TextPageItem, ShapePageItem, ImagePageItem, ProjectFile } from '../../types';
+import { createFillPicker, FillPicker } from '../FillPicker';
+import type { PageItem, TextPageItem, ShapePageItem, ImagePageItem, ProjectFile, FillConfig } from '../../types';
 
-// Module-level font dropdown instance for text items
+// Module-level instances
 let itemFontDropdown: FontDropdown | null = null;
+let itemFillPicker: FillPicker | null = null;
 
 /**
  * Set up the Edit Page panel event handlers
@@ -154,7 +156,7 @@ function setupEditPropertyInputs(updateEditSelectedSectionFn: () => void): void 
     });
   };
 
-  setupColorInput('item-fill', 'fillColor');
+  // Fill picker for shapes (handled separately)
   setupColorInput('item-stroke', 'strokeColor');
   setupPropInput('item-stroke-width', 'strokeWidth');
 
@@ -419,7 +421,32 @@ export function updateEditSelectedSection(): void {
     shapeProps!.style.display = 'block';
     textProps!.style.display = 'none';
 
-    (document.getElementById('item-fill') as HTMLInputElement).value = shapeItem.fillColor || '#cccccc';
+    // Set up fill picker
+    const fillPickerContainer = document.getElementById('item-fill-picker');
+    if (fillPickerContainer) {
+      // Get current fill, falling back to fillColor for backwards compatibility
+      const currentFill: FillConfig = shapeItem.fill || {
+        type: 'color',
+        color: shapeItem.fillColor || '#cccccc'
+      };
+
+      if (itemFillPicker) {
+        itemFillPicker.setFill(currentFill);
+      } else {
+        itemFillPicker = createFillPicker(fillPickerContainer, currentFill, (fill) => {
+          const editorState = appState.getEditor();
+          if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+
+          // Update fill property
+          appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, {
+            fill,
+            // Also update fillColor for backwards compatibility
+            fillColor: fill.type === 'color' ? fill.color : undefined
+          });
+        });
+      }
+    }
+
     (document.getElementById('item-stroke') as HTMLInputElement).value = shapeItem.strokeColor || '#000000';
     (document.getElementById('item-stroke-width') as HTMLInputElement).value = (shapeItem.strokeWidth || 1).toString();
   } else if (item.type === 'text') {

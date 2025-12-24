@@ -6,7 +6,7 @@
 import { PDFDocument, PDFPage, PDFImage, rgb, StandardFonts, PDFFont, degrees } from 'pdf-lib';
 import { appState } from './state';
 import { textFlowEngine } from './textFlow';
-import type { Signature, PageContent, FontStyle, PageItem, TextPageItem, ShapePageItem, ImagePageItem } from '../types';
+import type { Signature, PageContent, FontStyle, PageItem, TextPageItem, ShapePageItem, ImagePageItem, FillConfig } from '../types';
 import { SHEET_SIZES, calculateSpreadRowsPerSheet } from '../types';
 
 interface FontCache {
@@ -533,6 +533,30 @@ export class PDFGenerator {
   }
 
   /**
+   * Get fill color from FillConfig (pdf-lib doesn't support gradients, so we use first color)
+   */
+  private getFillColorFromConfig(fill: FillConfig | undefined, fallbackColor: string | undefined): ReturnType<typeof rgb> | undefined {
+    if (!fill) {
+      return fallbackColor ? this.parseColor(fallbackColor) : undefined;
+    }
+
+    if (fill.type === 'color' && fill.color) {
+      return this.parseColor(fill.color);
+    } else if (fill.type === 'linearGradient' && fill.linearGradient?.stops?.length) {
+      // Use first gradient stop color as fallback
+      return this.parseColor(fill.linearGradient.stops[0].color);
+    } else if (fill.type === 'radialGradient' && fill.radialGradient?.stops?.length) {
+      // Use first gradient stop color as fallback
+      return this.parseColor(fill.radialGradient.stops[0].color);
+    } else if (fill.type === 'pattern') {
+      // Patterns can't be represented in PDF with pdf-lib, use a light gray
+      return rgb(0.9, 0.9, 0.9);
+    }
+
+    return fallbackColor ? this.parseColor(fallbackColor) : undefined;
+  }
+
+  /**
    * Draw page items (shapes, text) on a static/blank page
    */
   private drawPageItems(
@@ -568,7 +592,8 @@ export class PDFGenerator {
         });
       } else if (item.type === 'shape') {
         const shapeItem = item as ShapePageItem;
-        const fillColor = shapeItem.fillColor ? this.parseColor(shapeItem.fillColor) : undefined;
+        // Use FillConfig if available, fallback to fillColor for backwards compatibility
+        const fillColor = this.getFillColorFromConfig(shapeItem.fill, shapeItem.fillColor);
         const strokeColor = shapeItem.strokeColor ? this.parseColor(shapeItem.strokeColor) : rgb(0, 0, 0);
         const strokeWidth = shapeItem.strokeWidth ?? 1;
 

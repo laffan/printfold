@@ -5,7 +5,83 @@
 
 import Konva from 'konva';
 import { appState } from '../../services/state';
-import type { PageContent, PageItem, TextPageItem, ShapePageItem, ImagePageItem } from '../../types';
+import type { PageContent, PageItem, TextPageItem, ShapePageItem, ImagePageItem, FillConfig } from '../../types';
+
+/**
+ * Apply fill config to a Konva shape
+ */
+function applyFillToShape(
+  shape: Konva.Shape,
+  fill: FillConfig | undefined,
+  fallbackColor: string | undefined,
+  width: number,
+  height: number
+): void {
+  // Use fallback if no fill config
+  if (!fill) {
+    shape.fill(fallbackColor || 'transparent');
+    return;
+  }
+
+  if (fill.type === 'color') {
+    shape.fill(fill.color || 'transparent');
+  } else if (fill.type === 'linearGradient' && fill.linearGradient) {
+    const angle = (fill.linearGradient.angle * Math.PI) / 180;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+
+    // Calculate gradient endpoints based on angle
+    const cx = width / 2;
+    const cy = height / 2;
+    const length = Math.sqrt(width * width + height * height) / 2;
+
+    const startX = cx - cos * length;
+    const startY = cy - sin * length;
+    const endX = cx + cos * length;
+    const endY = cy + sin * length;
+
+    // Build color stops array for Konva
+    const colorStops: Array<number | string> = [];
+    for (const stop of fill.linearGradient.stops) {
+      colorStops.push(stop.offset);
+      colorStops.push(stop.color);
+    }
+
+    shape.fillLinearGradientStartPoint({ x: startX, y: startY });
+    shape.fillLinearGradientEndPoint({ x: endX, y: endY });
+    shape.fillLinearGradientColorStops(colorStops);
+  } else if (fill.type === 'radialGradient' && fill.radialGradient) {
+    const cx = fill.radialGradient.centerX * width;
+    const cy = fill.radialGradient.centerY * height;
+    const radius = fill.radialGradient.radius * Math.max(width, height);
+
+    const colorStops: Array<number | string> = [];
+    for (const stop of fill.radialGradient.stops) {
+      colorStops.push(stop.offset);
+      colorStops.push(stop.color);
+    }
+
+    shape.fillRadialGradientStartPoint({ x: cx, y: cy });
+    shape.fillRadialGradientEndPoint({ x: cx, y: cy });
+    shape.fillRadialGradientStartRadius(0);
+    shape.fillRadialGradientEndRadius(radius);
+    shape.fillRadialGradientColorStops(colorStops);
+  } else if (fill.type === 'pattern' && fill.pattern?.imageFileId) {
+    const file = appState.getProject().files.find(f => f.id === fill.pattern?.imageFileId);
+    if (file) {
+      const img = new window.Image();
+      img.src = `data:image/png;base64,${file.content}`;
+      img.onload = () => {
+        shape.fillPatternImage(img);
+        shape.fillPatternRepeat(fill.pattern?.repeat || 'repeat');
+        shape.fillPatternScale({ x: fill.pattern?.scale || 1, y: fill.pattern?.scale || 1 });
+        shape.fillPatternOffset({ x: fill.pattern?.offsetX || 0, y: fill.pattern?.offsetY || 0 });
+        shape.fillPatternRotation(fill.pattern?.rotation || 0);
+        shape.getLayer()?.batchDraw();
+      };
+    }
+  }
+}
 
 /**
  * Create a Konva node for a page item
@@ -26,25 +102,25 @@ export function createItemNode(
   if (item.type === 'shape') {
     const shapeItem = item as ShapePageItem;
     if (shapeItem.shapeType === 'rectangle') {
-      node = new Konva.Rect({
+      const rect = new Konva.Rect({
         x: xOffset + item.x,
         y: item.y,
         width: item.width,
         height: item.height,
-        fill: shapeItem.fillColor || 'transparent',
         stroke: shapeItem.strokeColor || '#000000',
         strokeWidth: shapeItem.strokeWidth || 1,
         rotation: item.rotation || 0,
         opacity,
         draggable: true,
       });
+      applyFillToShape(rect, shapeItem.fill, shapeItem.fillColor, item.width, item.height);
+      node = rect;
     } else if (shapeItem.shapeType === 'ellipse') {
-      node = new Konva.Ellipse({
+      const ellipse = new Konva.Ellipse({
         x: xOffset + item.x + item.width / 2,
         y: item.y + item.height / 2,
         radiusX: item.width / 2,
         radiusY: item.height / 2,
-        fill: shapeItem.fillColor || 'transparent',
         stroke: shapeItem.strokeColor || '#000000',
         strokeWidth: shapeItem.strokeWidth || 1,
         rotation: item.rotation || 0,
@@ -52,20 +128,23 @@ export function createItemNode(
         draggable: true,
         offset: { x: 0, y: 0 },
       });
+      applyFillToShape(ellipse, shapeItem.fill, shapeItem.fillColor, item.width, item.height);
+      node = ellipse;
     } else if (shapeItem.shapeType === 'circle') {
       // Circle uses the minimum of width/height for radius
       const radius = Math.min(item.width, item.height) / 2;
-      node = new Konva.Circle({
+      const circle = new Konva.Circle({
         x: xOffset + item.x + radius,
         y: item.y + radius,
         radius: radius,
-        fill: shapeItem.fillColor || 'transparent',
         stroke: shapeItem.strokeColor || '#000000',
         strokeWidth: shapeItem.strokeWidth || 1,
         rotation: item.rotation || 0,
         opacity,
         draggable: true,
       });
+      applyFillToShape(circle, shapeItem.fill, shapeItem.fillColor, radius * 2, radius * 2);
+      node = circle;
     } else if (shapeItem.shapeType === 'line') {
       node = new Konva.Line({
         x: xOffset + item.x,
