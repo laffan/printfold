@@ -5,7 +5,8 @@
 
 import { appState } from '../services/state';
 import { env } from '../services/environment';
-import { textFlowEngine } from '../services/textFlow';
+import { textFlowEngine, clearMeasurementCache } from '../services/textFlow';
+import { googleFonts } from '../services/googleFonts';
 import { FileList } from './FileList';
 import { FilePreview } from './FilePreview';
 import { SpreadEditor } from './SpreadEditor';
@@ -178,6 +179,22 @@ export class App {
     // Update document info when project changes
     appState.onProjectChange((project) => {
       this.updateDocumentInfo(project);
+    });
+
+    // Reflow when fonts finish loading (measurements may change)
+    // Use a debounce to avoid multiple reflows if many fonts load in succession
+    let fontReflowTimeout: number | null = null;
+    googleFonts.onFontLoaded(() => {
+      console.log('[App] Font loaded, scheduling cache clear and reflow');
+      if (fontReflowTimeout) {
+        clearTimeout(fontReflowTimeout);
+      }
+      fontReflowTimeout = window.setTimeout(() => {
+        console.log('[App] Executing font load reflow');
+        clearMeasurementCache();
+        this.performReflow();
+        fontReflowTimeout = null;
+      }, 100);
     });
   }
 

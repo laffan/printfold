@@ -35,6 +35,14 @@ interface FlowResult {
 // Cache for font measurements
 const measurementCache = new Map<string, number>();
 
+/**
+ * Clear the measurement cache - call this when fonts change
+ */
+export function clearMeasurementCache(): void {
+  measurementCache.clear();
+  console.log('[TextFlow] Measurement cache cleared');
+}
+
 export class TextFlowEngine {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
