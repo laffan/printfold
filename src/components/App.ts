@@ -172,11 +172,14 @@ export class App {
 
     // Handle preview panel
     const previewPanel = document.querySelector('.panel-preview');
+    const filesPanel = document.querySelector('.panel-files');
     if (previewPanel) {
       const header = previewPanel.querySelector('.panel-header.collapsible');
       if (header) {
         header.addEventListener('click', () => {
           previewPanel.classList.toggle('collapsed');
+          // When preview is collapsed, files panel should expand
+          filesPanel?.classList.toggle('expanded', previewPanel.classList.contains('collapsed'));
         });
       }
     }

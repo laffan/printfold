@@ -219,13 +219,15 @@ class AppState {
 
   updateFile(fileId: string, updates: Partial<ProjectFile>): void {
     const prevState = this.project;
+    const file = this.project.files.find(f => f.id === fileId);
     const files = this.project.files.map(f =>
       f.id === fileId ? { ...f, ...updates } : f
     );
     this.project = { ...this.project, files };
     this.notifyProjectListeners(prevState);
 
-    if (fileId === this.project.mainDocument) {
+    // Trigger reflow for any markdown file update (all text files are concatenated)
+    if (file?.type === 'markdown') {
       this.requestReflow();
     }
   }

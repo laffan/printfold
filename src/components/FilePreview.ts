@@ -128,7 +128,7 @@ export class FilePreview {
         content: newContent,
         lastModified: Date.now(),
       });
-    }, 300);
+    }, 100);
   }
 
   private cursorTimeout: number | null = null;

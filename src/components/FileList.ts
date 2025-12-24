@@ -9,7 +9,6 @@ import type { ProjectFile } from '../types';
 
 export class FileList {
   private container!: HTMLElement;
-  private dropZone!: HTMLElement;
   private selectedFileId: string | null = null;
   private onFileSelect: ((file: ProjectFile | null) => void) | null = null;
   private activeTab: 'text' | 'images' = 'text';
@@ -17,7 +16,6 @@ export class FileList {
 
   mount(): void {
     this.container = document.getElementById('file-list')!;
-    this.dropZone = document.getElementById('file-drop-zone')!;
 
     this.setupDropZone();
     this.setupAddButton();
@@ -30,7 +28,7 @@ export class FileList {
   }
 
   private setupDropZone(): void {
-    // Prevent default drag behaviors
+    // Prevent default drag behaviors on container
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
       this.container.addEventListener(eventName, (e) => {
         e.preventDefault();
@@ -38,16 +36,16 @@ export class FileList {
       });
     });
 
-    // Highlight drop zone on drag over
+    // Highlight container on drag over
     ['dragenter', 'dragover'].forEach(eventName => {
       this.container.addEventListener(eventName, () => {
-        this.dropZone.classList.add('dragover');
+        this.container.classList.add('dragover');
       });
     });
 
     ['dragleave', 'drop'].forEach(eventName => {
       this.container.addEventListener(eventName, () => {
-        this.dropZone.classList.remove('dragover');
+        this.container.classList.remove('dragover');
       });
     });
 
@@ -60,11 +58,6 @@ export class FileList {
       if (files.length > 0) {
         appState.addFiles(files);
       }
-    });
-
-    // Click to open file dialog
-    this.dropZone.addEventListener('click', () => {
-      this.openFileDialog();
     });
   }
 
@@ -166,37 +159,6 @@ export class FileList {
 
     this.container.innerHTML = '';
 
-    // Always show drop zone at the top
-    const dropZone = document.createElement('div');
-    dropZone.className = 'file-drop-zone' + (files.length > 0 ? ' mini' : '');
-    dropZone.id = 'file-drop-zone';
-    if (files.length === 0) {
-      dropZone.innerHTML = `
-        <p>Drop files here or click to add</p>
-        <p class="hint">Supports .md, .png, .jpg, .jpeg, .webp, .zip</p>
-      `;
-    } else {
-      dropZone.innerHTML = '<p>+ Drop files here</p>';
-    }
-    dropZone.addEventListener('click', () => this.openFileDialog());
-
-    // Handle drag events
-    ['dragenter', 'dragover'].forEach(eventName => {
-      dropZone.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        dropZone.classList.add('dragover');
-      });
-    });
-
-    ['dragleave', 'drop'].forEach(eventName => {
-      dropZone.addEventListener(eventName, () => {
-        dropZone.classList.remove('dragover');
-      });
-    });
-
-    this.dropZone = dropZone;
-    this.container.appendChild(dropZone);
-
     // Add tabs
     const tabsContainer = document.createElement('div');
     tabsContainer.className = 'file-tabs';
@@ -253,20 +215,6 @@ export class FileList {
     }
 
     this.container.appendChild(fileListContainer);
-  }
-
-  private createDropZone(): HTMLElement {
-    const dropZone = document.createElement('div');
-    dropZone.className = 'file-drop-zone';
-    dropZone.id = 'file-drop-zone';
-    dropZone.innerHTML = `
-      <p>Drop files here or click to add</p>
-      <p class="hint">Supports .md, .png, .jpg, .jpeg, .webp, .zip</p>
-    `;
-    dropZone.addEventListener('click', () => this.openFileDialog());
-
-    this.dropZone = dropZone;
-    return dropZone;
   }
 
   private createFileItem(file: ProjectFile): HTMLElement {
