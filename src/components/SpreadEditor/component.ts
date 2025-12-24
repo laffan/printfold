@@ -201,10 +201,9 @@ export class SpreadEditor {
       }
     });
 
-    // Listen for project changes to update items
+    // Listen for project changes to update items and page backgrounds
     this.projectUnsubscribe = appState.onProjectChange(() => {
-      this.renderItems();
-      this.updateTransformer();
+      this.render();
     });
   }
 

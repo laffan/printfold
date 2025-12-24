@@ -40,6 +40,10 @@ export class FillPicker {
   private hueSlider: HTMLElement | null = null;
   private gradientCanvas: HTMLCanvasElement | null = null;
 
+  // Panel reference and close handler
+  private panelElement: HTMLElement | null = null;
+  private closeHandler: ((e: MouseEvent) => void) | null = null;
+
   constructor(
     container: HTMLElement,
     initialFill: FillConfig,
@@ -86,6 +90,9 @@ export class FillPicker {
   }
 
   private render(): void {
+    // Remove any existing panel first
+    this.removePanel();
+
     this.container.innerHTML = '';
     this.container.className = 'fill-picker';
 
@@ -103,9 +110,10 @@ export class FillPicker {
     if (this.isOpen) {
       const panel = document.createElement('div');
       panel.className = 'fill-picker-panel';
+      this.panelElement = panel;
 
       // Stop clicks inside panel from closing it
-      panel.addEventListener('click', (e) => {
+      panel.addEventListener('mousedown', (e) => {
         e.stopPropagation();
       });
 
@@ -125,6 +133,7 @@ export class FillPicker {
         tab.textContent = label;
         tab.addEventListener('click', (e) => {
           e.stopPropagation();
+          e.preventDefault();
           this.activeTab = type;
           this.renderTabContent(panel);
         });
@@ -151,6 +160,9 @@ export class FillPicker {
 
       // Position the panel relative to the preview button
       this.positionPanel(panel, preview);
+
+      // Set up close handler
+      this.setupCloseHandler();
     }
   }
 
@@ -362,20 +374,28 @@ export class FillPicker {
     const linearBtn = document.createElement('button');
     linearBtn.className = 'fill-type-btn' + (!this.isRadial ? ' active' : '');
     linearBtn.textContent = 'Linear';
-    linearBtn.addEventListener('click', () => {
+    linearBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
       this.isRadial = false;
       this.activeTab = 'linearGradient';
-      this.render();
+      // Just update the tab content, don't full re-render
+      if (this.panelElement) {
+        this.renderTabContent(this.panelElement);
+      }
       this.updateGradient();
     });
 
     const radialBtn = document.createElement('button');
     radialBtn.className = 'fill-type-btn' + (this.isRadial ? ' active' : '');
     radialBtn.textContent = 'Radial';
-    radialBtn.addEventListener('click', () => {
+    radialBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
       this.isRadial = true;
       this.activeTab = 'radialGradient';
-      this.render();
+      // Just update the tab content, don't full re-render
+      if (this.panelElement) {
+        this.renderTabContent(this.panelElement);
+      }
       this.updateGradient();
     });
 
@@ -790,35 +810,45 @@ export class FillPicker {
 
   private togglePicker(): void {
     this.isOpen = !this.isOpen;
-
-    // Remove any existing panel from body
-    this.removePanel();
-
     this.render();
+  }
 
-    // Close on outside click
-    if (this.isOpen) {
-      const closeHandler = (e: MouseEvent) => {
-        const panel = document.querySelector('.fill-picker-panel');
-        if (!this.container.contains(e.target as Node) &&
-            (!panel || !panel.contains(e.target as Node))) {
-          this.isOpen = false;
-          this.removePanel();
-          this.render();
-          document.removeEventListener('click', closeHandler);
-        }
-      };
-      // Delay to avoid closing immediately
-      setTimeout(() => {
-        document.addEventListener('click', closeHandler);
-      }, 0);
+  private setupCloseHandler(): void {
+    // Remove any existing handler first
+    if (this.closeHandler) {
+      document.removeEventListener('mousedown', this.closeHandler);
     }
+
+    this.closeHandler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      // Check if click is outside both container and panel
+      if (!this.container.contains(target) &&
+          (!this.panelElement || !this.panelElement.contains(target))) {
+        this.isOpen = false;
+        this.removePanel();
+        this.render();
+      }
+    };
+
+    // Delay slightly to avoid closing immediately from the click that opened it
+    setTimeout(() => {
+      if (this.closeHandler) {
+        document.addEventListener('mousedown', this.closeHandler);
+      }
+    }, 10);
   }
 
   private removePanel(): void {
-    const existingPanel = document.querySelector('.fill-picker-panel');
-    if (existingPanel) {
-      existingPanel.remove();
+    // Remove close handler
+    if (this.closeHandler) {
+      document.removeEventListener('mousedown', this.closeHandler);
+      this.closeHandler = null;
+    }
+
+    // Remove panel element
+    if (this.panelElement) {
+      this.panelElement.remove();
+      this.panelElement = null;
     }
   }
 

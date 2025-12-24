@@ -506,7 +506,7 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  padding: 8px;
+  padding: 8px 0;
   border: 2px dashed transparent;
   transition: all 0.2s ease;
 }
@@ -1083,6 +1083,45 @@ body {
 
 .margin-inputs input {
   width: 100%;
+}
+
+/* Input with draggable cap */
+.input-with-cap {
+  display: flex;
+  align-items: stretch;
+}
+
+.input-with-cap input {
+  flex: 1;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  min-width: 0;
+}
+
+.input-cap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-left: none;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  cursor: ew-resize;
+  user-select: none;
+  min-width: 28px;
+}
+
+.input-cap:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.input-cap.dragging {
+  background: var(--color-primary);
+  color: #fff;
 }
 
 .inline-inputs {

@@ -13,6 +13,8 @@ import {
   setColorValue,
   setMarginInputValue,
   updateMarginInputs,
+  setupDraggableCaps,
+  updateInputCapLabels,
 } from './helpers';
 import { convertFromPoints, UNIT_CONVERSIONS, type MarginUnit } from '../../types';
 import { setupOutputOptions, updateFillSpaceVisibility } from './outputOptions';
@@ -37,6 +39,7 @@ export class OptionsPanel {
     setupEditPagePanel(updateEditSelectedSection);
     initFontDropdowns(this.fontDropdowns);
     this.setupMeasurementUnit();
+    setupDraggableCaps();
     this.syncFromState();
 
     // Listen for state changes to update UI
@@ -69,6 +72,7 @@ export class OptionsPanel {
         const unit = unitSelect.value as MarginUnit;
         appState.setMeasurementUnit(unit);
         updateMarginInputs();
+        updateInputCapLabels();
         this.updateCustomSizeInputs();
       });
     }
@@ -168,5 +172,8 @@ export class OptionsPanel {
     this.fontDropdowns.get('opt-footer-font')?.setValue(project.headerFooter.footer.font.fontFamily);
     setInputValue('opt-footer-font-size', project.headerFooter.footer.font.fontSize.toString());
     setColorValue('opt-footer-color', project.headerFooter.footer.font.color);
+
+    // Update input cap labels to reflect current unit
+    updateInputCapLabels();
   }
 }

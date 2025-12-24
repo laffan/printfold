@@ -176,3 +176,84 @@ export function updateMarginInputs(): void {
   setMarginInputValue('opt-margin-inner', project.layoutOptions.margins.inner, unit);
   setMarginInputValue('opt-margin-outer', project.layoutOptions.margins.outer, unit);
 }
+
+/**
+ * Set up draggable caps for all input-cap elements
+ * Dragging left decreases the value, dragging right increases it
+ */
+export function setupDraggableCaps(): void {
+  const caps = document.querySelectorAll('.input-cap');
+
+  caps.forEach(cap => {
+    const capElement = cap as HTMLElement;
+    const inputId = capElement.dataset.for;
+    if (!inputId) return;
+
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    if (!input) return;
+
+    let startX = 0;
+    let startValue = 0;
+    let isDragging = false;
+
+    const onMouseDown = (e: MouseEvent) => {
+      e.preventDefault();
+      isDragging = true;
+      startX = e.clientX;
+      startValue = parseFloat(input.value) || 0;
+      capElement.classList.add('dragging');
+      document.body.style.cursor = 'ew-resize';
+
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return;
+
+      const deltaX = e.clientX - startX;
+      // Sensitivity: 1 pixel = 0.01 units (adjust as needed)
+      const step = parseFloat(input.step) || 0.1;
+      const sensitivity = step * 2;
+      const deltaValue = deltaX * sensitivity;
+      let newValue = startValue + deltaValue;
+
+      // Apply min/max constraints
+      const min = parseFloat(input.min);
+      const max = parseFloat(input.max);
+      if (!isNaN(min)) newValue = Math.max(min, newValue);
+      if (!isNaN(max)) newValue = Math.min(max, newValue);
+
+      // Round to step precision
+      const precision = step < 1 ? Math.ceil(-Math.log10(step)) : 0;
+      newValue = parseFloat(newValue.toFixed(precision));
+
+      input.value = newValue.toString();
+      // Dispatch input event to trigger existing handlers
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+
+    const onMouseUp = () => {
+      isDragging = false;
+      capElement.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    capElement.addEventListener('mousedown', onMouseDown);
+  });
+}
+
+/**
+ * Update all input-cap labels to reflect the current unit
+ */
+export function updateInputCapLabels(): void {
+  const unit = appState.getMeasurementUnit();
+  const caps = document.querySelectorAll('.input-cap');
+
+  caps.forEach(cap => {
+    const capElement = cap as HTMLElement;
+    capElement.textContent = unit;
+  });
+}

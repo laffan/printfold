@@ -246,13 +246,17 @@
               <div class="inline-inputs">
                 <label>
                   <span>Width</span>
-                  <input type="number" id="opt-custom-width" step="0.1" min="1">
-                  <span class="unit" id="custom-width-unit">in</span>
+                  <div class="input-with-cap">
+                    <input type="number" id="opt-custom-width" step="0.1" min="1">
+                    <span class="input-cap" data-for="opt-custom-width" id="custom-width-unit">in</span>
+                  </div>
                 </label>
                 <label>
                   <span>Height</span>
-                  <input type="number" id="opt-custom-height" step="0.1" min="1">
-                  <span class="unit" id="custom-height-unit">in</span>
+                  <div class="input-with-cap">
+                    <input type="number" id="opt-custom-height" step="0.1" min="1">
+                    <span class="input-cap" data-for="opt-custom-height" id="custom-height-unit">in</span>
+                  </div>
                 </label>
               </div>
             </div>
@@ -278,31 +282,35 @@
           </div>
           <div class="panel-content">
             <div class="form-group">
-              <div class="label-with-dropdown">
-                <label>Margins</label>
-                <select id="opt-margin-unit" class="unit-dropdown">
-                  <option value="pt">Points</option>
-                  <option value="in" selected>Inches</option>
-                  <option value="cm">Centimeters</option>
-                  <option value="px">Pixels</option>
-                </select>
-              </div>
+              <label>Margins</label>
               <div class="margin-inputs">
                 <label>
                   <span>Top</span>
-                  <input type="number" id="opt-margin-top" value="54" min="0" step="any">
+                  <div class="input-with-cap">
+                    <input type="number" id="opt-margin-top" value="54" min="0" step="any">
+                    <span class="input-cap" data-for="opt-margin-top">in</span>
+                  </div>
                 </label>
                 <label>
                   <span>Bottom</span>
-                  <input type="number" id="opt-margin-bottom" value="54" min="0" step="any">
+                  <div class="input-with-cap">
+                    <input type="number" id="opt-margin-bottom" value="54" min="0" step="any">
+                    <span class="input-cap" data-for="opt-margin-bottom">in</span>
+                  </div>
                 </label>
                 <label>
                   <span>Inner</span>
-                  <input type="number" id="opt-margin-inner" value="54" min="0" step="any">
+                  <div class="input-with-cap">
+                    <input type="number" id="opt-margin-inner" value="54" min="0" step="any">
+                    <span class="input-cap" data-for="opt-margin-inner">in</span>
+                  </div>
                 </label>
                 <label>
                   <span>Outer</span>
-                  <input type="number" id="opt-margin-outer" value="36" min="0" step="any">
+                  <div class="input-with-cap">
+                    <input type="number" id="opt-margin-outer" value="36" min="0" step="any">
+                    <span class="input-cap" data-for="opt-margin-outer">in</span>
+                  </div>
                 </label>
               </div>
             </div>
