@@ -290,8 +290,6 @@ export class TextFlowEngine {
     const contentWidth = pageWidth - margins.inner - margins.outer;
     const contentHeight = pageHeight - margins.top - margins.bottom - headerHeight - footerHeight;
 
-    console.log('[TextFlow] calculatePageDimensions: margins=', margins, 'contentWidth=', contentWidth);
-
     return { width: pageWidth, height: pageHeight, contentWidth, contentHeight };
   }
 

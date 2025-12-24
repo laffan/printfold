@@ -175,6 +175,28 @@ export interface AppEvent {
   payload?: unknown;
 }
 
+// Unit types for margin display
+export type MarginUnit = 'pt' | 'in' | 'cm' | 'px';
+
+// Unit conversion utilities (internal unit is points, 72pt = 1in)
+export const UNIT_CONVERSIONS: Record<MarginUnit, { factor: number; decimals: number; label: string }> = {
+  'pt': { factor: 1, decimals: 0, label: 'pt' },
+  'in': { factor: 1 / 72, decimals: 2, label: '"' },
+  'cm': { factor: 2.54 / 72, decimals: 2, label: 'cm' },
+  'px': { factor: 96 / 72, decimals: 0, label: 'px' },  // 96 DPI screen
+};
+
+export function convertFromPoints(points: number, unit: MarginUnit): number {
+  const conv = UNIT_CONVERSIONS[unit];
+  return Math.round(points * conv.factor * Math.pow(10, conv.decimals)) / Math.pow(10, conv.decimals);
+}
+
+export function formatMarginValue(points: number, unit: MarginUnit): string {
+  const value = convertFromPoints(points, unit);
+  const conv = UNIT_CONVERSIONS[unit];
+  return `${value}${conv.label}`;
+}
+
 // Editor state
 export interface EditorState {
   selectedPageNumber: number | null;
@@ -184,4 +206,5 @@ export interface EditorState {
   isLocalMarginChange: boolean; // Cmd key held
   zoomLevel: number;
   activeTab: 'editor' | 'preview';
+  marginUnit: MarginUnit;
 }

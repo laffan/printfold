@@ -6,7 +6,8 @@
 import { appState } from '../services/state';
 import { googleFonts } from '../services/googleFonts';
 import { FontDropdown, createFontDropdown } from './FontDropdown';
-import type { OutputOptions, LayoutOptions, FontOptions, HeaderFooterOptions } from '../types';
+import type { OutputOptions, LayoutOptions, FontOptions, HeaderFooterOptions, MarginUnit } from '../types';
+import { convertFromPoints, UNIT_CONVERSIONS } from '../types';
 
 export class OptionsPanel {
   private updateTimeout: number | null = null;
@@ -106,26 +107,22 @@ export class OptionsPanel {
   }
 
   private setupLayoutOptions(): void {
-    // Margins
-    this.bindNumberInput('opt-margin-top', (value) => {
-      const margins = { ...appState.getProject().layoutOptions.margins, top: value };
-      appState.updateLayoutOptions({ margins });
-    });
+    // Unit dropdown
+    const unitSelect = document.getElementById('opt-margin-unit') as HTMLSelectElement;
+    if (unitSelect) {
+      unitSelect.value = appState.getEditor().marginUnit;
+      unitSelect.addEventListener('change', () => {
+        const unit = unitSelect.value as MarginUnit;
+        appState.updateEditor({ marginUnit: unit });
+        this.updateMarginInputs(); // Update displayed values
+      });
+    }
 
-    this.bindNumberInput('opt-margin-bottom', (value) => {
-      const margins = { ...appState.getProject().layoutOptions.margins, bottom: value };
-      appState.updateLayoutOptions({ margins });
-    });
-
-    this.bindNumberInput('opt-margin-inner', (value) => {
-      const margins = { ...appState.getProject().layoutOptions.margins, inner: value };
-      appState.updateLayoutOptions({ margins });
-    });
-
-    this.bindNumberInput('opt-margin-outer', (value) => {
-      const margins = { ...appState.getProject().layoutOptions.margins, outer: value };
-      appState.updateLayoutOptions({ margins });
-    });
+    // Margins - convert from display units to points when saving
+    this.bindMarginInput('opt-margin-top', 'top');
+    this.bindMarginInput('opt-margin-bottom', 'bottom');
+    this.bindMarginInput('opt-margin-inner', 'inner');
+    this.bindMarginInput('opt-margin-outer', 'outer');
 
     // Empty page before H1
     this.bindCheckbox('opt-empty-before-h1', (checked) => {
@@ -393,6 +390,53 @@ export class OptionsPanel {
     });
   }
 
+  /**
+   * Bind a margin input with unit conversion
+   */
+  private bindMarginInput(id: string, marginKey: 'top' | 'bottom' | 'inner' | 'outer'): void {
+    const element = document.getElementById(id) as HTMLInputElement;
+    if (!element) return;
+
+    element.addEventListener('input', () => {
+      const displayValue = parseFloat(element.value);
+      if (isNaN(displayValue)) return;
+
+      // Convert from display unit to points
+      const unit = appState.getEditor().marginUnit;
+      const conv = UNIT_CONVERSIONS[unit];
+      const pointsValue = displayValue / conv.factor;
+
+      this.debounceUpdate(() => {
+        const margins = { ...appState.getProject().layoutOptions.margins, [marginKey]: pointsValue };
+        appState.updateLayoutOptions({ margins });
+      });
+    });
+  }
+
+  /**
+   * Update all margin inputs to reflect the current unit
+   */
+  private updateMarginInputs(): void {
+    const project = appState.getProject();
+    const unit = appState.getEditor().marginUnit;
+
+    this.setMarginInputValue('opt-margin-top', project.layoutOptions.margins.top, unit);
+    this.setMarginInputValue('opt-margin-bottom', project.layoutOptions.margins.bottom, unit);
+    this.setMarginInputValue('opt-margin-inner', project.layoutOptions.margins.inner, unit);
+    this.setMarginInputValue('opt-margin-outer', project.layoutOptions.margins.outer, unit);
+  }
+
+  /**
+   * Set a margin input value converted to the specified unit
+   */
+  private setMarginInputValue(id: string, pointsValue: number, unit: MarginUnit): void {
+    const element = document.getElementById(id) as HTMLInputElement;
+    if (!element) return;
+
+    const displayValue = convertFromPoints(pointsValue, unit);
+    element.value = displayValue.toString();
+  }
+
   private debounceUpdate(fn: () => void): void {
     if (this.updateTimeout) {
       clearTimeout(this.updateTimeout);
@@ -414,11 +458,13 @@ export class OptionsPanel {
     document.getElementById('custom-size-group')!.style.display =
       project.outputOptions.bookletSize === 'custom' ? 'block' : 'none';
 
-    // Layout options
-    this.setInputValue('opt-margin-top', project.layoutOptions.margins.top.toString());
-    this.setInputValue('opt-margin-bottom', project.layoutOptions.margins.bottom.toString());
-    this.setInputValue('opt-margin-inner', project.layoutOptions.margins.inner.toString());
-    this.setInputValue('opt-margin-outer', project.layoutOptions.margins.outer.toString());
+    // Layout options - margins are converted to display unit
+    const unit = appState.getEditor().marginUnit;
+    this.setSelectValue('opt-margin-unit', unit);
+    this.setMarginInputValue('opt-margin-top', project.layoutOptions.margins.top, unit);
+    this.setMarginInputValue('opt-margin-bottom', project.layoutOptions.margins.bottom, unit);
+    this.setMarginInputValue('opt-margin-inner', project.layoutOptions.margins.inner, unit);
+    this.setMarginInputValue('opt-margin-outer', project.layoutOptions.margins.outer, unit);
     this.setCheckboxValue('opt-empty-before-h1', project.layoutOptions.emptyPageBeforeH1);
     this.setInputValue('opt-spacing-h1', project.layoutOptions.spacingAboveH1.toString());
     this.setInputValue('opt-line-height', project.layoutOptions.lineHeight.toString());

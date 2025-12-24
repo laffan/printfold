@@ -6,7 +6,7 @@
 import Konva from 'konva';
 import { appState } from '../services/state';
 import type { Spread, PageContent, Margins, FontStyle } from '../types';
-import { SHEET_SIZES } from '../types';
+import { SHEET_SIZES, formatMarginValue } from '../types';
 
 interface MarginLine {
   line: Konva.Line;
@@ -546,6 +546,9 @@ export class SpreadEditor {
     const marginColor = 'rgba(74, 158, 255, 0.08)';
     const lineColor = 'rgba(74, 158, 255, 0.4)';
     const lineWidth = 1;
+    const labelColor = 'rgba(74, 158, 255, 0.7)';
+    const labelFontSize = 9;
+    const unit = appState.getEditor().marginUnit;
 
     // For recto (right page): inner margin is on LEFT (spine), outer on RIGHT
     // For verso (left page): outer margin is on LEFT, inner on RIGHT (spine)
@@ -572,6 +575,18 @@ export class SpreadEditor {
     this.marginLayer.add(topLine);
     this.addMarginDragHandler(topLine, 'top', pageContent.pageNumber);
 
+    // Top margin label
+    const topLabel = new Konva.Text({
+      x: x + dimensions.width / 2,
+      y: y + margins.top / 2 - labelFontSize / 2,
+      text: formatMarginValue(margins.top, unit),
+      fontSize: labelFontSize,
+      fill: labelColor,
+      align: 'center',
+    });
+    topLabel.offsetX(topLabel.width() / 2);
+    this.marginLayer.add(topLabel);
+
     // Bottom margin
     const bottomRect = new Konva.Rect({
       x,
@@ -591,6 +606,18 @@ export class SpreadEditor {
     });
     this.marginLayer.add(bottomLine);
     this.addMarginDragHandler(bottomLine, 'bottom', pageContent.pageNumber);
+
+    // Bottom margin label
+    const bottomLabel = new Konva.Text({
+      x: x + dimensions.width / 2,
+      y: y + dimensions.height - margins.bottom / 2 - labelFontSize / 2,
+      text: formatMarginValue(margins.bottom, unit),
+      fontSize: labelFontSize,
+      fill: labelColor,
+      align: 'center',
+    });
+    bottomLabel.offsetX(bottomLabel.width() / 2);
+    this.marginLayer.add(bottomLabel);
 
     // Inner margin (spine side) - always uses margins.inner
     // Recto: spine on LEFT, Verso: spine on RIGHT
@@ -615,6 +642,20 @@ export class SpreadEditor {
     this.marginLayer.add(innerLine);
     this.addMarginDragHandler(innerLine, 'inner', pageContent.pageNumber);
 
+    // Inner margin label (rotated vertically)
+    const innerLabelX = pageContent.isRecto ? x + margins.inner / 2 : x + dimensions.width - margins.inner / 2;
+    const innerLabel = new Konva.Text({
+      x: innerLabelX,
+      y: y + dimensions.height / 2,
+      text: formatMarginValue(margins.inner, unit),
+      fontSize: labelFontSize,
+      fill: labelColor,
+      rotation: -90,
+    });
+    innerLabel.offsetX(innerLabel.width() / 2);
+    innerLabel.offsetY(innerLabel.height() / 2);
+    this.marginLayer.add(innerLabel);
+
     // Outer margin (outside edge) - always uses margins.outer
     // Recto: outer on RIGHT, Verso: outer on LEFT
     const outerRectX = pageContent.isRecto ? x + dimensions.width - margins.outer : x;
@@ -637,6 +678,20 @@ export class SpreadEditor {
     });
     this.marginLayer.add(outerLine);
     this.addMarginDragHandler(outerLine, 'outer', pageContent.pageNumber);
+
+    // Outer margin label (rotated vertically)
+    const outerLabelX = pageContent.isRecto ? x + dimensions.width - margins.outer / 2 : x + margins.outer / 2;
+    const outerLabel = new Konva.Text({
+      x: outerLabelX,
+      y: y + dimensions.height / 2,
+      text: formatMarginValue(margins.outer, unit),
+      fontSize: labelFontSize,
+      fill: labelColor,
+      rotation: -90,
+    });
+    outerLabel.offsetX(outerLabel.width() / 2);
+    outerLabel.offsetY(outerLabel.height() / 2);
+    this.marginLayer.add(outerLabel);
 
     // Header/Footer rendering and drag lines (orange)
     const project = appState.getProject();
@@ -908,8 +963,10 @@ export class SpreadEditor {
           currentMarginValue = Math.max(0, startMargins.top + dy);
           line.points([startPoints[0], startPoints[1] + dy, startPoints[2], startPoints[3] + dy]);
         } else if (type === 'bottom') {
+          // Bottom margin: line follows cursor (+ dy), but margin value is inverse
+          // Dragging down (+ dy) shrinks margin, dragging up (- dy) grows margin
           currentMarginValue = Math.max(0, startMargins.bottom - dy);
-          line.points([startPoints[0], startPoints[1] - dy, startPoints[2], startPoints[3] - dy]);
+          line.points([startPoints[0], startPoints[1] + dy, startPoints[2], startPoints[3] + dy]);
         } else if (type === 'inner') {
           // Inner margin: dragging the line toward the spine shrinks margin, away from spine expands it
           // For recto: inner line is on LEFT. Drag LEFT (toward spine) = shrink, drag RIGHT = expand
@@ -941,8 +998,6 @@ export class SpreadEditor {
         // Check if Cmd/Ctrl is held at the moment of release for local changes
         // This is more reliable than tracking keydown/keyup separately
         const isLocalChange = e.evt?.metaKey || e.evt?.ctrlKey || false;
-
-        console.log('[SpreadEditor] Margin drag ended, isLocalChange:', isLocalChange, 'type:', type, 'value:', currentMarginValue);
 
         // Now apply the margin change to state (triggers reflow)
         if (isLocalChange) {

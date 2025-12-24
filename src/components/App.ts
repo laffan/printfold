@@ -185,12 +185,10 @@ export class App {
     // Use a debounce to avoid multiple reflows if many fonts load in succession
     let fontReflowTimeout: number | null = null;
     googleFonts.onFontLoaded(() => {
-      console.log('[App] Font loaded, scheduling cache clear and reflow');
       if (fontReflowTimeout) {
         clearTimeout(fontReflowTimeout);
       }
       fontReflowTimeout = window.setTimeout(() => {
-        console.log('[App] Executing font load reflow');
         clearMeasurementCache();
         this.performReflow();
         fontReflowTimeout = null;
@@ -199,14 +197,11 @@ export class App {
   }
 
   private performReflow(): void {
-    console.log('[App] performReflow called');
-
     // Always clear measurement cache to ensure fresh measurements with loaded fonts
     clearMeasurementCache();
 
     const mainDoc = appState.getMainDocument();
     if (!mainDoc) {
-      console.log('[App] No main document, clearing');
       // Clear everything
       appState.updateProject({ signatures: [] });
       this.spreadEditor.render();
@@ -214,22 +209,13 @@ export class App {
       return;
     }
 
-    console.log('[App] Performing text flow with margins:', appState.getProject().layoutOptions.margins);
     // Perform text flow
     const result = textFlowEngine.reflow(mainDoc.content);
-
-    console.log('[App] Reflow complete, pages:', result.totalPages);
-    console.log('[App] First page sections:', result.signatures[0]?.spreads[0]?.verso?.sections?.length || 0);
 
     // Update project with flow result
     appState.updateProject({ signatures: result.signatures });
 
-    // Verify signatures were stored
-    const storedSigs = appState.getProject().signatures;
-    console.log('[App] Stored signatures count:', storedSigs.length);
-
     // Update spread editor
-    console.log('[App] Calling spreadEditor.render()');
     this.spreadEditor.render();
 
     // Update document info

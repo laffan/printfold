@@ -181,23 +181,31 @@
           </div>
           <div class="panel-content">
             <div class="form-group">
-              <label>Margins (pt)</label>
+              <div class="label-with-dropdown">
+                <label>Margins</label>
+                <select id="opt-margin-unit" class="unit-dropdown">
+                  <option value="pt">Points</option>
+                  <option value="in" selected>Inches</option>
+                  <option value="cm">Centimeters</option>
+                  <option value="px">Pixels</option>
+                </select>
+              </div>
               <div class="margin-inputs">
                 <label>
                   <span>Top</span>
-                  <input type="number" id="opt-margin-top" value="54" min="0">
+                  <input type="number" id="opt-margin-top" value="54" min="0" step="any">
                 </label>
                 <label>
                   <span>Bottom</span>
-                  <input type="number" id="opt-margin-bottom" value="54" min="0">
+                  <input type="number" id="opt-margin-bottom" value="54" min="0" step="any">
                 </label>
                 <label>
                   <span>Inner</span>
-                  <input type="number" id="opt-margin-inner" value="54" min="0">
+                  <input type="number" id="opt-margin-inner" value="54" min="0" step="any">
                 </label>
                 <label>
                   <span>Outer</span>
-                  <input type="number" id="opt-margin-outer" value="36" min="0">
+                  <input type="number" id="opt-margin-outer" value="36" min="0" step="any">
                 </label>
               </div>
             </div>
