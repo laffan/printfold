@@ -38,6 +38,7 @@ export const defaultOutputOptions: OutputOptions = {
   bookletSize: 'half-letter',
   pagesPerSignature: 8,
   orientation: 'portrait',
+  fillAvailableSpace: false,
 };
 
 export const defaultLayoutOptions: LayoutOptions = {

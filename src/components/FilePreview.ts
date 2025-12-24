@@ -134,8 +134,8 @@ export class FilePreview {
   private cursorTimeout: number | null = null;
 
   private handleCursorChange(view: EditorView): void {
-    // Only sync if we're editing the main document
-    if (!this.currentFile || this.currentFile.id !== appState.getProject().mainDocument) {
+    // Only sync for markdown files
+    if (!this.currentFile || this.currentFile.type !== 'markdown') {
       return;
     }
 
@@ -147,10 +147,32 @@ export class FilePreview {
     this.cursorTimeout = window.setTimeout(() => {
       const pos = view.state.selection.main.head;
       const lineNumber = view.state.doc.lineAt(pos).number;
-      const totalLines = view.state.doc.lines;
+      const currentFileLines = view.state.doc.lines;
+
+      // Get all markdown files to calculate position in concatenated content
+      const project = appState.getProject();
+      const markdownFiles = project.files.filter(f => f.type === 'markdown');
+
+      // Calculate total lines and offset for current file
+      let totalLines = 0;
+      let lineOffset = 0;
+      let foundCurrentFile = false;
+
+      for (const file of markdownFiles) {
+        const fileLines = (file.content.match(/\n/g) || []).length + 1;
+        if (file.id === this.currentFile!.id) {
+          foundCurrentFile = true;
+          lineOffset = totalLines;
+        }
+        totalLines += fileLines + 1; // +1 for the blank line between files
+      }
+
+      if (!foundCurrentFile) return;
+
+      // Calculate absolute line position in concatenated content
+      const absoluteLine = lineOffset + lineNumber;
 
       // Get total pages from project
-      const project = appState.getProject();
       const totalPages = project.signatures.reduce(
         (sum, sig) => sum + sig.spreads.length * 2,
         0
@@ -159,7 +181,7 @@ export class FilePreview {
       if (totalPages === 0 || totalLines === 0) return;
 
       // Estimate page number based on line position ratio
-      const ratio = lineNumber / totalLines;
+      const ratio = absoluteLine / totalLines;
       const estimatedPage = Math.max(1, Math.ceil(ratio * totalPages));
 
       // Update editor state (this will trigger SpreadEditor to navigate)

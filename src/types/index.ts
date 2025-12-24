@@ -62,6 +62,23 @@ export interface OutputOptions {
   customHeight?: number;
   pagesPerSignature: 4 | 8 | 12 | 16 | 20 | 24;
   orientation: 'portrait' | 'landscape';
+  fillAvailableSpace: boolean; // Print multiple rows of spreads per sheet when possible
+}
+
+/**
+ * Calculate how many spread rows can fit on a sheet
+ * Returns 1 if fill mode is disabled or only 1 row fits
+ */
+export function calculateSpreadRowsPerSheet(
+  sheetSize: { width: number; height: number },
+  pageHeight: number,
+  fillEnabled: boolean
+): number {
+  if (!fillEnabled) return 1;
+  // Each spread row needs pageHeight vertical space
+  // We need at least 2 rows for fill mode to make sense
+  const maxRows = Math.floor(sheetSize.height / pageHeight);
+  return maxRows >= 2 ? maxRows : 1;
 }
 
 export interface LayoutOptions {

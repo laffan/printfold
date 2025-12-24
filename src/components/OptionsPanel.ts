@@ -7,7 +7,7 @@ import { appState } from '../services/state';
 import { googleFonts } from '../services/googleFonts';
 import { FontDropdown, createFontDropdown } from './FontDropdown';
 import type { OutputOptions, LayoutOptions, FontOptions, HeaderFooterOptions, MarginUnit } from '../types';
-import { convertFromPoints, UNIT_CONVERSIONS } from '../types';
+import { convertFromPoints, UNIT_CONVERSIONS, SHEET_SIZES, calculateSpreadRowsPerSheet } from '../types';
 
 export class OptionsPanel {
   private updateTimeout: number | null = null;
@@ -80,6 +80,7 @@ export class OptionsPanel {
     // Sheet size
     this.bindSelect('opt-sheet-size', (value) => {
       appState.updateOutputOptions({ sheetSize: value as OutputOptions['sheetSize'] });
+      this.updateFillSpaceVisibility();
     });
 
     // Booklet size
@@ -89,6 +90,8 @@ export class OptionsPanel {
       // Show/hide custom size inputs
       const customGroup = document.getElementById('custom-size-group')!;
       customGroup.style.display = value === 'custom' ? 'block' : 'none';
+
+      this.updateFillSpaceVisibility();
     });
 
     // Custom dimensions
@@ -98,12 +101,64 @@ export class OptionsPanel {
 
     this.bindNumberInput('opt-custom-height', (value) => {
       appState.updateOutputOptions({ customHeight: value });
+      this.updateFillSpaceVisibility();
+    });
+
+    // Fill available space
+    this.bindCheckbox('opt-fill-space', (checked) => {
+      appState.updateOutputOptions({ fillAvailableSpace: checked });
     });
 
     // Pages per signature
     this.bindSelect('opt-pages-per-sig', (value) => {
       appState.updateOutputOptions({ pagesPerSignature: parseInt(value) as OutputOptions['pagesPerSignature'] });
     });
+  }
+
+  /**
+   * Calculate the page height for the current booklet size
+   */
+  private getPageHeight(): number {
+    const project = appState.getProject();
+    const sheetSize = SHEET_SIZES[project.outputOptions.sheetSize];
+
+    if (project.outputOptions.bookletSize === 'custom') {
+      return project.outputOptions.customHeight || sheetSize.height;
+    } else if (project.outputOptions.bookletSize.startsWith('quarter-')) {
+      return sheetSize.height / 2;
+    } else {
+      return sheetSize.height;
+    }
+  }
+
+  /**
+   * Update the visibility of the fill space option based on whether it's applicable
+   */
+  private updateFillSpaceVisibility(): void {
+    const project = appState.getProject();
+    const sheetSize = SHEET_SIZES[project.outputOptions.sheetSize];
+    const pageHeight = this.getPageHeight();
+
+    // Calculate how many rows could fit
+    const maxRows = Math.floor(sheetSize.height / pageHeight);
+    const fillSpaceGroup = document.getElementById('fill-space-group');
+    const fillSpaceHint = document.getElementById('fill-space-hint');
+
+    if (fillSpaceGroup) {
+      // Show option if at least 2 rows can fit
+      if (maxRows >= 2) {
+        fillSpaceGroup.style.display = 'block';
+        if (fillSpaceHint) {
+          fillSpaceHint.textContent = `Print ${maxRows} rows per sheet, then cut`;
+        }
+      } else {
+        fillSpaceGroup.style.display = 'none';
+        // Disable fill space if it was enabled but no longer applicable
+        if (project.outputOptions.fillAvailableSpace) {
+          appState.updateOutputOptions({ fillAvailableSpace: false });
+        }
+      }
+    }
   }
 
   private setupLayoutOptions(): void {
@@ -457,6 +512,10 @@ export class OptionsPanel {
     // Show/hide custom size
     document.getElementById('custom-size-group')!.style.display =
       project.outputOptions.bookletSize === 'custom' ? 'block' : 'none';
+
+    // Fill available space
+    this.setCheckboxValue('opt-fill-space', project.outputOptions.fillAvailableSpace);
+    this.updateFillSpaceVisibility();
 
     // Layout options - margins are converted to display unit
     const unit = appState.getEditor().marginUnit;
