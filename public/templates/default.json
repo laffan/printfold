@@ -1,0 +1,73 @@
+{
+  "id": "default",
+  "name": "Standard Booklet",
+  "description": "A standard booklet layout suitable for most projects",
+  "outputOptions": {
+    "sheetSize": "letter",
+    "bookletSize": "half-letter",
+    "pagesPerSignature": 8
+  },
+  "layoutOptions": {
+    "margins": {
+      "top": 54,
+      "bottom": 54,
+      "inner": 54,
+      "outer": 36
+    },
+    "emptyPageBeforeH1": true,
+    "spacingAboveH1": 72,
+    "spacingAboveH2": 36,
+    "spacingAboveH3": 24,
+    "paragraphSpacing": 12,
+    "lineHeight": 1.5
+  },
+  "fontOptions": {
+    "body": {
+      "fontFamily": "Georgia, serif",
+      "fontSize": 12,
+      "fontWeight": "normal",
+      "fontStyle": "normal",
+      "color": "#000000"
+    },
+    "h1": {
+      "fontFamily": "Georgia, serif",
+      "fontSize": 24,
+      "fontWeight": "bold",
+      "fontStyle": "normal",
+      "color": "#000000"
+    },
+    "h2": {
+      "fontFamily": "Georgia, serif",
+      "fontSize": 20,
+      "fontWeight": "bold",
+      "fontStyle": "normal",
+      "color": "#000000"
+    },
+    "h3": {
+      "fontFamily": "Georgia, serif",
+      "fontSize": 16,
+      "fontWeight": "bold",
+      "fontStyle": "normal",
+      "color": "#000000"
+    }
+  },
+  "headerFooter": {
+    "header": {
+      "enabled": false
+    },
+    "footer": {
+      "enabled": true,
+      "height": 24,
+      "verso": {
+        "left": "{{pageNumber}}",
+        "center": "",
+        "right": ""
+      },
+      "recto": {
+        "left": "",
+        "center": "",
+        "right": "{{pageNumber}}"
+      }
+    }
+  }
+}

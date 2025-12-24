@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PrintFold - Booklet Creator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="app-title">
+        <span class="logo">📖</span>
+        <h1>PrintFold</h1>
+      </div>
+      <div class="header-actions">
+        <button id="btn-new" class="btn btn-secondary">New</button>
+        <button id="btn-open" class="btn btn-secondary">Open</button>
+        <button id="btn-save" class="btn btn-secondary">Save</button>
+        <button id="btn-export" class="btn btn-primary">Export PDF</button>
+      </div>
+    </header>
+
+    <!-- Main 3-column layout -->
+    <main class="app-main">
+      <!-- Column 1: Input -->
+      <section class="column column-input">
+        <div class="column-header">
+          <h2>Input</h2>
+        </div>
+
+        <!-- File List -->
+        <div class="panel panel-files">
+          <div class="panel-header">
+            <h3>Files</h3>
+            <button id="btn-add-files" class="btn btn-icon" title="Add Files">+</button>
+          </div>
+          <div id="file-list" class="file-list"></div>
+        </div>
+
+        <!-- File Preview / Editor -->
+        <div class="panel panel-preview">
+          <div class="panel-header collapsible">
+            <h3>Preview</h3>
+            <span id="preview-filename" class="filename"></span>
+            <span class="collapse-icon">▼</span>
+          </div>
+          <div id="file-preview" class="file-preview">
+            <div class="preview-placeholder">
+              <p>Select a file to preview</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Column 2: Editor / Preview -->
+      <section class="column column-editor">
+        <div class="column-header">
+          <h2>Booklet</h2>
+          <div class="tabs" role="tablist">
+            <button class="tab active" role="tab" data-tab="editor" aria-selected="true">Editor</button>
+            <button class="tab" role="tab" data-tab="preview" aria-selected="false">Preview</button>
+          </div>
+        </div>
+
+        <!-- Tab Panels -->
+        <div class="tab-panels">
+          <!-- Editor Tab -->
+          <div id="tab-editor" class="tab-panel active" role="tabpanel">
+            <div class="editor-toolbar">
+              <div class="toolbar-group">
+                <button id="btn-zoom-out" class="btn btn-icon" title="Zoom Out">−</button>
+                <span id="zoom-level" class="zoom-display">100%</span>
+                <button id="btn-zoom-in" class="btn btn-icon" title="Zoom In">+</button>
+                <button id="btn-zoom-fit" class="btn btn-icon" title="Fit to View">⊡</button>
+              </div>
+              <div class="toolbar-group">
+                <button id="btn-add-blank-page" class="btn btn-secondary btn-small">+ Blank Page</button>
+              </div>
+              <div class="toolbar-group">
+                <label class="toolbar-label">
+                  <input type="checkbox" id="chk-show-margins">
+                  <span>Show Margins</span>
+                </label>
+              </div>
+            </div>
+            <div id="spread-editor" class="spread-editor">
+              <div id="spread-thumbnails" class="spread-thumbnails"></div>
+              <div id="konva-container" class="konva-container"></div>
+            </div>
+            <div class="spread-navigation">
+              <button id="btn-prev-spread" class="btn btn-icon">‹</button>
+              <span id="spread-indicator">Spread 1 of 1</span>
+              <button id="btn-next-spread" class="btn btn-icon">›</button>
+            </div>
+          </div>
+
+          <!-- Preview Tab -->
+          <div id="tab-preview" class="tab-panel" role="tabpanel">
+            <div id="pdf-preview-container" class="pdf-preview-container">
+              <div class="preview-placeholder">PDF preview will appear here</div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- Column 3: Options -->
+      <section class="column column-options">
+        <div class="column-header">
+          <h2>Options</h2>
+        </div>
+
+        <!-- Output Options -->
+        <div class="panel panel-options collapsed" data-panel="output">
+          <div class="panel-header collapsible">
+            <h3>Output</h3>
+            <span class="collapse-icon">▼</span>
+          </div>
+          <div class="panel-content">
+            <div class="form-group">
+              <label for="opt-sheet-size">Sheet Size</label>
+              <select id="opt-sheet-size">
+                <option value="letter">US Letter (8.5×11")</option>
+                <option value="a4">A4 (210×297mm)</option>
+                <option value="legal">US Legal (8.5×14")</option>
+                <option value="tabloid">Tabloid (11×17")</option>
+                <option value="a3">A3 (297×420mm)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="opt-booklet-size">Booklet Size</label>
+              <select id="opt-booklet-size">
+                <option value="half-letter">Half Letter</option>
+                <option value="quarter-letter">Quarter Letter</option>
+                <option value="half-a4">Half A4</option>
+                <option value="quarter-a4">Quarter A4</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+            <div class="form-group" id="custom-size-group" style="display: none;">
+              <div class="inline-inputs">
+                <label>
+                  <span>Width</span>
+                  <input type="number" id="opt-custom-width" step="0.1" min="1">
+                  <span class="unit">pt</span>
+                </label>
+                <label>
+                  <span>Height</span>
+                  <input type="number" id="opt-custom-height" step="0.1" min="1">
+                  <span class="unit">pt</span>
+                </label>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="opt-pages-per-sig">Pages per Signature</label>
+              <select id="opt-pages-per-sig">
+                <option value="4">4 pages</option>
+                <option value="8" selected>8 pages</option>
+                <option value="12">12 pages</option>
+                <option value="16">16 pages</option>
+                <option value="20">20 pages</option>
+                <option value="24">24 pages</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Layout Options -->
+        <div class="panel panel-options collapsed" data-panel="layout">
+          <div class="panel-header collapsible">
+            <h3>Layout</h3>
+            <span class="collapse-icon">▼</span>
+          </div>
+          <div class="panel-content">
+            <div class="form-group">
+              <div class="label-with-dropdown">
+                <label>Margins</label>
+                <select id="opt-margin-unit" class="unit-dropdown">
+                  <option value="pt">Points</option>
+                  <option value="in" selected>Inches</option>
+                  <option value="cm">Centimeters</option>
+                  <option value="px">Pixels</option>
+                </select>
+              </div>
+              <div class="margin-inputs">
+                <label>
+                  <span>Top</span>
+                  <input type="number" id="opt-margin-top" value="54" min="0" step="any">
+                </label>
+                <label>
+                  <span>Bottom</span>
+                  <input type="number" id="opt-margin-bottom" value="54" min="0" step="any">
+                </label>
+                <label>
+                  <span>Inner</span>
+                  <input type="number" id="opt-margin-inner" value="54" min="0" step="any">
+                </label>
+                <label>
+                  <span>Outer</span>
+                  <input type="number" id="opt-margin-outer" value="36" min="0" step="any">
+                </label>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="opt-empty-before-h1" checked>
+                <span>New page before H1</span>
+              </label>
+            </div>
+            <div class="form-group">
+              <label for="opt-spacing-h1">Spacing above H1 (pt)</label>
+              <input type="number" id="opt-spacing-h1" value="72" min="0">
+            </div>
+            <div class="form-group">
+              <label for="opt-line-height">Line Height</label>
+              <input type="number" id="opt-line-height" value="1.5" min="1" max="3" step="0.1">
+            </div>
+            <div class="form-group">
+              <label for="opt-paragraph-spacing">Paragraph Spacing (pt)</label>
+              <input type="number" id="opt-paragraph-spacing" value="12" min="0">
+            </div>
+          </div>
+        </div>
+
+        <!-- Header/Footer Options -->
+        <div class="panel panel-options collapsed" data-panel="headerfooter">
+          <div class="panel-header collapsible">
+            <h3>Header / Footer</h3>
+            <span class="collapse-icon">▼</span>
+          </div>
+          <div class="panel-content">
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="opt-header-enabled">
+                <span>Enable Header</span>
+              </label>
+            </div>
+            <div id="header-options" class="sub-options" style="display: none;">
+              <div class="form-group">
+                <label>Header Content (Left/Center/Right)</label>
+                <div class="hf-inputs">
+                  <input type="text" id="opt-header-left" placeholder="Left">
+                  <input type="text" id="opt-header-center" placeholder="Center">
+                  <input type="text" id="opt-header-right" placeholder="Right">
+                </div>
+                <p class="hint">Use {{pageNumber}} for page numbers</p>
+              </div>
+              <div class="form-group inline-sizes">
+                <label>
+                  <span>Font</span>
+                  <select id="opt-header-font">
+                    <option value="Georgia, serif">Georgia</option>
+                    <option value="Times New Roman, serif">Times New Roman</option>
+                    <option value="Arial, sans-serif">Arial</option>
+                    <option value="Helvetica, sans-serif">Helvetica</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Size</span>
+                  <input type="number" id="opt-header-font-size" value="10" min="6" max="16">
+                </label>
+                <label>
+                  <span>Color</span>
+                  <input type="color" id="opt-header-color" value="#000000">
+                </label>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="opt-footer-enabled" checked>
+                <span>Enable Footer</span>
+              </label>
+            </div>
+            <div id="footer-options" class="sub-options">
+              <div class="form-group">
+                <label>Footer Content (Verso: L/C/R)</label>
+                <div class="hf-inputs">
+                  <input type="text" id="opt-footer-verso-left" placeholder="Left" value="{{pageNumber}}">
+                  <input type="text" id="opt-footer-verso-center" placeholder="Center">
+                  <input type="text" id="opt-footer-verso-right" placeholder="Right">
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Footer Content (Recto: L/C/R)</label>
+                <div class="hf-inputs">
+                  <input type="text" id="opt-footer-recto-left" placeholder="Left">
+                  <input type="text" id="opt-footer-recto-center" placeholder="Center">
+                  <input type="text" id="opt-footer-recto-right" placeholder="Right" value="{{pageNumber}}">
+                </div>
+              </div>
+              <div class="form-group inline-sizes">
+                <label>
+                  <span>Font</span>
+                  <select id="opt-footer-font">
+                    <option value="Georgia, serif">Georgia</option>
+                    <option value="Times New Roman, serif">Times New Roman</option>
+                    <option value="Arial, sans-serif">Arial</option>
+                    <option value="Helvetica, sans-serif">Helvetica</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Size</span>
+                  <input type="number" id="opt-footer-font-size" value="10" min="6" max="16">
+                </label>
+                <label>
+                  <span>Color</span>
+                  <input type="color" id="opt-footer-color" value="#000000">
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Font Options -->
+        <div class="panel panel-options collapsed" data-panel="fonts">
+          <div class="panel-header collapsible">
+            <h3>Fonts</h3>
+            <span class="collapse-icon">▼</span>
+          </div>
+          <div class="panel-content">
+            <!-- Body (p) -->
+            <div class="font-section">
+              <h4 class="font-section-header">Body Text (p)</h4>
+              <div class="form-group">
+                <label for="opt-font-body">Font Family</label>
+                <select id="opt-font-body">
+                  <option value="Georgia, serif">Georgia</option>
+                  <option value="Times New Roman, serif">Times New Roman</option>
+                  <option value="Palatino, serif">Palatino</option>
+                  <option value="Arial, sans-serif">Arial</option>
+                  <option value="Helvetica, sans-serif">Helvetica</option>
+                </select>
+              </div>
+              <div class="form-group inline-sizes">
+                <label>
+                  <span>Size</span>
+                  <input type="number" id="opt-font-size-body" value="12" min="6" max="24">
+                </label>
+                <label>
+                  <span>Line Height</span>
+                  <input type="number" id="opt-line-height-fonts" value="1.5" min="1" max="3" step="0.1">
+                </label>
+              </div>
+              <div class="form-group inline-sizes">
+                <label>
+                  <span>Color</span>
+                  <input type="color" id="opt-color-body" value="#000000">
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="opt-justify">
+                  <span>Full Justify</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Headings -->
+            <div class="font-section">
+              <h4 class="font-section-header">Headings</h4>
+              <div class="form-group">
+                <label for="opt-font-h1">Font Family</label>
+                <select id="opt-font-h1">
+                  <option value="Georgia, serif">Georgia</option>
+                  <option value="Times New Roman, serif">Times New Roman</option>
+                  <option value="Palatino, serif">Palatino</option>
+                  <option value="Arial, sans-serif">Arial</option>
+                  <option value="Helvetica, sans-serif">Helvetica</option>
+                </select>
+              </div>
+              <div class="form-group inline-sizes">
+                <label>
+                  <span>H1</span>
+                  <input type="number" id="opt-font-size-h1" value="24" min="12" max="72">
+                </label>
+                <label>
+                  <span>H2</span>
+                  <input type="number" id="opt-font-size-h2" value="20" min="10" max="48">
+                </label>
+                <label>
+                  <span>H3</span>
+                  <input type="number" id="opt-font-size-h3" value="16" min="8" max="36">
+                </label>
+              </div>
+              <div class="form-group">
+                <label for="opt-color-headings">Color</label>
+                <input type="color" id="opt-color-headings" value="#000000">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Document Info -->
+        <div class="panel panel-info">
+          <div class="panel-header">
+            <h3>Document Info</h3>
+          </div>
+          <div class="panel-content">
+            <div class="info-item">
+              <span class="info-label">Pages:</span>
+              <span id="info-pages" class="info-value">0</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Spreads:</span>
+              <span id="info-spreads" class="info-value">0</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Signatures:</span>
+              <span id="info-signatures" class="info-value">0</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Sheets:</span>
+              <span id="info-sheets" class="info-value">0</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Modal for alerts/dialogs -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-title">Modal</h3>
+        <button class="btn btn-icon modal-close">&times;</button>
+      </div>
+      <div id="modal-content" class="modal-content"></div>
+      <div class="modal-actions">
+        <button id="modal-cancel" class="btn btn-secondary">Cancel</button>
+        <button id="modal-confirm" class="btn btn-primary">OK</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
