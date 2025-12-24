@@ -7,7 +7,7 @@ import { PDFDocument, PDFPage, rgb, StandardFonts, PDFFont, degrees } from 'pdf-
 import { appState } from './state';
 import { textFlowEngine } from './textFlow';
 import type { Signature, PageContent, FontStyle } from '../types';
-import { SHEET_SIZES } from '../types';
+import { SHEET_SIZES, calculateSpreadRowsPerSheet } from '../types';
 
 interface FontCache {
   regular: PDFFont;
@@ -79,9 +79,16 @@ export class PDFGenerator {
       await this.generateSignatureSheets(pdfDoc, signature, sheetSize, pageWidth, pageHeight);
     }
 
+    // Calculate rows per sheet for cut marks
+    const rowsPerSheet = calculateSpreadRowsPerSheet(
+      sheetSize,
+      pageHeight,
+      project.outputOptions.fillAvailableSpace
+    );
+
     // Add cut marks and fold indicators if there are pages
     if (project.signatures.length > 0) {
-      this.addPrintMarks(pdfDoc, sheetSize);
+      this.addPrintMarks(pdfDoc, sheetSize, pageHeight, rowsPerSheet);
     }
 
     return pdfDoc.save();
@@ -107,36 +114,55 @@ export class PDFGenerator {
       pages.push(spread.recto);
     }
 
-    // Generate each sheet (front and back)
-    for (const sheet of imposition) {
-      // Front of sheet
+    // Calculate rows per sheet (for fill available space mode)
+    const rowsPerSheet = calculateSpreadRowsPerSheet(
+      sheetSize,
+      pageHeight,
+      project.outputOptions.fillAvailableSpace
+    );
+
+    // Group imposition sheets for multi-row layout
+    for (let i = 0; i < imposition.length; i += rowsPerSheet) {
+      const sheetsInGroup = imposition.slice(i, i + rowsPerSheet);
+
+      // Front of combined sheet
       const frontPage = pdfDoc.addPage([sheetSize.width, sheetSize.height]);
 
-      // Draw left page (rotated 180° for booklet fold)
-      const leftPageIndex = sheet.front.left - 1 - (signature.signatureNumber - 1) * signature.pageCount;
-      const rightPageIndex = sheet.front.right - 1 - (signature.signatureNumber - 1) * signature.pageCount;
+      // Draw each row on the front
+      sheetsInGroup.forEach((sheet, rowIndex) => {
+        // Y position: start from top, work down
+        const rowY = sheetSize.height - (rowIndex + 1) * pageHeight;
 
-      if (leftPageIndex >= 0 && leftPageIndex < pages.length && pages[leftPageIndex]) {
-        this.drawPage(frontPage, pages[leftPageIndex]!, 0, 0, pageWidth, pageHeight, project, false);
-      }
+        const leftPageIndex = sheet.front.left - 1 - (signature.signatureNumber - 1) * signature.pageCount;
+        const rightPageIndex = sheet.front.right - 1 - (signature.signatureNumber - 1) * signature.pageCount;
 
-      if (rightPageIndex >= 0 && rightPageIndex < pages.length && pages[rightPageIndex]) {
-        this.drawPage(frontPage, pages[rightPageIndex]!, pageWidth, 0, pageWidth, pageHeight, project, true);
-      }
+        if (leftPageIndex >= 0 && leftPageIndex < pages.length && pages[leftPageIndex]) {
+          this.drawPage(frontPage, pages[leftPageIndex]!, 0, rowY, pageWidth, pageHeight, project, false);
+        }
 
-      // Back of sheet
+        if (rightPageIndex >= 0 && rightPageIndex < pages.length && pages[rightPageIndex]) {
+          this.drawPage(frontPage, pages[rightPageIndex]!, pageWidth, rowY, pageWidth, pageHeight, project, true);
+        }
+      });
+
+      // Back of combined sheet
       const backPage = pdfDoc.addPage([sheetSize.width, sheetSize.height]);
 
-      const backLeftIndex = sheet.back.left - 1 - (signature.signatureNumber - 1) * signature.pageCount;
-      const backRightIndex = sheet.back.right - 1 - (signature.signatureNumber - 1) * signature.pageCount;
+      // Draw each row on the back (same vertical positions, content is flipped for duplex)
+      sheetsInGroup.forEach((sheet, rowIndex) => {
+        const rowY = sheetSize.height - (rowIndex + 1) * pageHeight;
 
-      if (backLeftIndex >= 0 && backLeftIndex < pages.length && pages[backLeftIndex]) {
-        this.drawPage(backPage, pages[backLeftIndex]!, 0, 0, pageWidth, pageHeight, project, true);
-      }
+        const backLeftIndex = sheet.back.left - 1 - (signature.signatureNumber - 1) * signature.pageCount;
+        const backRightIndex = sheet.back.right - 1 - (signature.signatureNumber - 1) * signature.pageCount;
 
-      if (backRightIndex >= 0 && backRightIndex < pages.length && pages[backRightIndex]) {
-        this.drawPage(backPage, pages[backRightIndex]!, pageWidth, 0, pageWidth, pageHeight, project, false);
-      }
+        if (backLeftIndex >= 0 && backLeftIndex < pages.length && pages[backLeftIndex]) {
+          this.drawPage(backPage, pages[backLeftIndex]!, 0, rowY, pageWidth, pageHeight, project, true);
+        }
+
+        if (backRightIndex >= 0 && backRightIndex < pages.length && pages[backRightIndex]) {
+          this.drawPage(backPage, pages[backRightIndex]!, pageWidth, rowY, pageWidth, pageHeight, project, false);
+        }
+      });
     }
   }
 
@@ -338,7 +364,9 @@ export class PDFGenerator {
    */
   private addPrintMarks(
     pdfDoc: PDFDocument,
-    sheetSize: { width: number; height: number }
+    sheetSize: { width: number; height: number },
+    pageHeight: number,
+    rowsPerSheet: number
   ): void {
     const markLength = 18; // 0.25 inch
     const markOffset = 9; // Distance from edge
@@ -418,6 +446,37 @@ export class PDFGenerator {
         thickness: lineWidth,
         color: markColor,
       });
+
+      // Horizontal cut marks for multi-row layouts
+      if (rowsPerSheet > 1) {
+        for (let row = 1; row < rowsPerSheet; row++) {
+          const cutY = sheetSize.height - row * pageHeight;
+
+          // Left side cut mark
+          page.drawLine({
+            start: { x: markOffset, y: cutY },
+            end: { x: markOffset + markLength, y: cutY },
+            thickness: lineWidth,
+            color: markColor,
+          });
+
+          // Right side cut mark
+          page.drawLine({
+            start: { x: sheetSize.width - markOffset, y: cutY },
+            end: { x: sheetSize.width - markOffset - markLength, y: cutY },
+            thickness: lineWidth,
+            color: markColor,
+          });
+
+          // Center cut mark (at fold line)
+          page.drawLine({
+            start: { x: centerX - markLength / 2, y: cutY },
+            end: { x: centerX + markLength / 2, y: cutY },
+            thickness: lineWidth,
+            color: markColor,
+          });
+        }
+      }
     }
   }
 

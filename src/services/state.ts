@@ -11,6 +11,7 @@ import type {
   HeaderFooterOptions,
   EditorState,
   FontStyle,
+  PageItem,
 } from '../types';
 
 type StateChangeHandler<T> = (state: T, prevState: T) => void;
@@ -38,6 +39,7 @@ export const defaultOutputOptions: OutputOptions = {
   bookletSize: 'half-letter',
   pagesPerSignature: 8,
   orientation: 'portrait',
+  fillAvailableSpace: false,
 };
 
 export const defaultLayoutOptions: LayoutOptions = {
@@ -99,6 +101,8 @@ export const defaultHeaderFooter: HeaderFooterOptions = {
 export const defaultEditorState: EditorState = {
   selectedPageNumber: null,
   selectedSpreadNumber: null,
+  selectedPagePosition: null,
+  selectedItemId: null,
   isDraggingMargin: false,
   dragMarginType: null,
   isLocalMarginChange: false,
@@ -323,6 +327,104 @@ class AppState {
     const blankPages = this.project.blankPages.filter(p => p !== pageNumber);
     this.updateProject({ blankPages });
     this.requestReflow();
+  }
+
+  // Page items (for static pages)
+  addItemToPage(pageNumber: number, item: PageItem): void {
+    const prevState = this.project;
+
+    // Find the page in signatures and add the item
+    const signatures = this.project.signatures.map(sig => ({
+      ...sig,
+      spreads: sig.spreads.map(spread => {
+        const updatePage = (page: typeof spread.verso) => {
+          if (!page || page.pageNumber !== pageNumber) return page;
+          return {
+            ...page,
+            items: [...(page.items || []), item],
+          };
+        };
+        return {
+          ...spread,
+          verso: updatePage(spread.verso),
+          recto: updatePage(spread.recto),
+        };
+      }),
+    }));
+
+    this.project = { ...this.project, signatures };
+    this.notifyProjectListeners(prevState);
+  }
+
+  updateItemOnPage(pageNumber: number, itemId: string, updates: Partial<PageItem>): void {
+    const prevState = this.project;
+
+    const signatures = this.project.signatures.map(sig => ({
+      ...sig,
+      spreads: sig.spreads.map(spread => {
+        const updatePage = (page: typeof spread.verso) => {
+          if (!page || page.pageNumber !== pageNumber) return page;
+          return {
+            ...page,
+            items: (page.items || []).map(item =>
+              item.id === itemId ? { ...item, ...updates } as PageItem : item
+            ),
+          };
+        };
+        return {
+          ...spread,
+          verso: updatePage(spread.verso),
+          recto: updatePage(spread.recto),
+        };
+      }),
+    }));
+
+    this.project = { ...this.project, signatures };
+    this.notifyProjectListeners(prevState);
+  }
+
+  deleteItemFromPage(pageNumber: number, itemId: string): void {
+    const prevState = this.project;
+
+    const signatures = this.project.signatures.map(sig => ({
+      ...sig,
+      spreads: sig.spreads.map(spread => {
+        const updatePage = (page: typeof spread.verso) => {
+          if (!page || page.pageNumber !== pageNumber) return page;
+          return {
+            ...page,
+            items: (page.items || []).filter(item => item.id !== itemId),
+          };
+        };
+        return {
+          ...spread,
+          verso: updatePage(spread.verso),
+          recto: updatePage(spread.recto),
+        };
+      }),
+    }));
+
+    this.project = { ...this.project, signatures };
+    this.notifyProjectListeners(prevState);
+
+    // Clear selection if the deleted item was selected
+    if (this.editor.selectedItemId === itemId) {
+      this.updateEditor({ selectedItemId: null });
+    }
+  }
+
+  getItemFromPage(pageNumber: number, itemId: string): PageItem | null {
+    for (const sig of this.project.signatures) {
+      for (const spread of sig.spreads) {
+        const checkPage = (page: typeof spread.verso) => {
+          if (!page || page.pageNumber !== pageNumber) return null;
+          return page.items?.find(item => item.id === itemId) || null;
+        };
+        const item = checkPage(spread.verso) || checkPage(spread.recto);
+        if (item) return item;
+      }
+    }
+    return null;
   }
 
   // Reflow

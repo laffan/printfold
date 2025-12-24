@@ -5,7 +5,7 @@
 
 import Konva from 'konva';
 import { appState } from '../services/state';
-import type { Spread, PageContent, Margins, FontStyle } from '../types';
+import type { Spread, PageContent, Margins, FontStyle, PageItem, TextPageItem, ShapePageItem } from '../types';
 import { SHEET_SIZES, formatMarginValue } from '../types';
 
 interface MarginLine {
@@ -26,6 +26,8 @@ export class SpreadEditor {
   private stage!: Konva.Stage;
   private layer!: Konva.Layer;
   private marginLayer!: Konva.Layer;
+  private itemsLayer!: Konva.Layer;
+  private transformer!: Konva.Transformer;
 
   private currentSpreadIndex = 0;
   private zoomLevel = 1;
@@ -36,6 +38,7 @@ export class SpreadEditor {
   private dragMarginType: 'top' | 'bottom' | 'inner' | 'outer' | 'header' | 'footer' | null = null;
   private dragPageNumber: number | null = null;
   private stateUnsubscribe: (() => void) | null = null;
+  private itemNodes: Map<string, Konva.Node> = new Map();
 
   mount(): void {
     this.container = document.getElementById('konva-container')!;
@@ -50,8 +53,24 @@ export class SpreadEditor {
 
     this.layer = new Konva.Layer();
     this.marginLayer = new Konva.Layer();
+    this.itemsLayer = new Konva.Layer();
     this.stage.add(this.layer);
     this.stage.add(this.marginLayer);
+    this.stage.add(this.itemsLayer);
+
+    // Create transformer for item selection
+    this.transformer = new Konva.Transformer({
+      rotateEnabled: true,
+      enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'middle-left', 'middle-right', 'top-center', 'bottom-center'],
+      boundBoxFunc: (oldBox, newBox) => {
+        // Limit resize
+        if (newBox.width < 10 || newBox.height < 10) {
+          return oldBox;
+        }
+        return newBox;
+      },
+    });
+    this.itemsLayer.add(this.transformer);
 
     // Set up event handlers
     this.setupControls();
@@ -76,6 +95,16 @@ export class SpreadEditor {
       if (state.marginUnit !== prevState.marginUnit) {
         this.render();
       }
+      // Update transformer when selected item changes
+      if (state.selectedItemId !== prevState.selectedItemId) {
+        this.updateTransformer();
+      }
+    });
+
+    // Listen for project changes to update items
+    this.projectUnsubscribe = appState.onProjectChange(() => {
+      this.renderItems();
+      this.updateTransformer();
     });
 
     // Note: We don't listen for layoutOptions/fontOptions/headerFooter changes here
@@ -198,6 +227,19 @@ export class SpreadEditor {
       isPanning = false;
       this.stage.container().style.cursor = 'default';
     });
+
+    // Click on background to deselect page and items
+    this.stage.on('click', (e) => {
+      // Only deselect if clicking directly on stage (not on a shape)
+      if (e.target === this.stage) {
+        appState.updateEditor({
+          selectedPageNumber: null,
+          selectedPagePosition: null,
+          selectedItemId: null,
+        });
+        this.render();
+      }
+    });
   }
 
   private setupResizeObserver(): void {
@@ -209,11 +251,45 @@ export class SpreadEditor {
 
   private setupKeyboardShortcuts(): void {
     document.addEventListener('keydown', (e) => {
+      // Don't handle if typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      const editorState = appState.getEditor();
+
       // Arrow keys for navigation
       if (e.key === 'ArrowLeft') {
         this.navigateSpread(-1);
       } else if (e.key === 'ArrowRight') {
         this.navigateSpread(1);
+      }
+
+      // Delete/Backspace to delete selected item
+      if ((e.key === 'Delete' || e.key === 'Backspace') && editorState.selectedItemId && editorState.selectedPageNumber) {
+        e.preventDefault();
+        appState.deleteItemFromPage(editorState.selectedPageNumber, editorState.selectedItemId);
+      }
+
+      // Escape to deselect
+      if (e.key === 'Escape') {
+        appState.updateEditor({ selectedItemId: null });
+      }
+
+      // Duplicate with Cmd/Ctrl+D
+      if ((e.metaKey || e.ctrlKey) && e.key === 'd' && editorState.selectedItemId && editorState.selectedPageNumber) {
+        e.preventDefault();
+        const item = appState.getItemFromPage(editorState.selectedPageNumber, editorState.selectedItemId);
+        if (item) {
+          const newItem: PageItem = {
+            ...item,
+            id: crypto.randomUUID(),
+            x: item.x + 20,
+            y: item.y + 20,
+          };
+          appState.addItemToPage(editorState.selectedPageNumber, newItem);
+          appState.updateEditor({ selectedItemId: newItem.id });
+        }
       }
     });
   }
@@ -317,6 +393,7 @@ export class SpreadEditor {
     }
 
     const project = appState.getProject();
+    const editorState = appState.getEditor();
 
     this.layer.destroyChildren();
     this.marginLayer.destroyChildren();
@@ -362,14 +439,294 @@ export class SpreadEditor {
       this.drawPageOutline(pageDimensions.width, 0, pageDimensions.width, pageDimensions.height);
     }
 
+    // Draw selected page indicator
+    this.drawSelectedPageIndicator(spread, pageDimensions, editorState);
+
+    // Add clickable areas for page selection
+    this.addPageClickAreas(spread, pageDimensions);
+
     this.layer.draw();
     this.marginLayer.draw();
+
+    // Render items on static pages
+    this.renderItems();
+
     this.updateSpreadIndicator();
     this.renderThumbnails();
   }
 
+  /**
+   * Draw a solid green bar below the selected page
+   */
+  private drawSelectedPageIndicator(
+    spread: Spread,
+    pageDimensions: { width: number; height: number },
+    editorState: ReturnType<typeof appState.getEditor>
+  ): void {
+    const selectedPosition = editorState.selectedPagePosition;
+    if (!selectedPosition) return;
+
+    // Check if the selected page is in this spread
+    const isVersoSelected = selectedPosition === 'verso' &&
+      spread.verso?.pageNumber === editorState.selectedPageNumber;
+    const isRectoSelected = selectedPosition === 'recto' &&
+      spread.recto?.pageNumber === editorState.selectedPageNumber;
+
+    if (!isVersoSelected && !isRectoSelected) return;
+
+    const x = isVersoSelected ? 0 : pageDimensions.width;
+    const barHeight = 5;
+
+    // Draw solid green bar below the page
+    const selectionBar = new Konva.Rect({
+      x: x,
+      y: pageDimensions.height,
+      width: pageDimensions.width,
+      height: barHeight,
+      fill: '#22c55e', // Green color
+      listening: false,
+    });
+    this.marginLayer.add(selectionBar);
+  }
+
+  /**
+   * Add invisible click areas for page selection
+   */
+  private addPageClickAreas(
+    spread: Spread,
+    pageDimensions: { width: number; height: number }
+  ): void {
+    // Verso click area
+    if (spread.verso) {
+      const versoArea = new Konva.Rect({
+        x: 0,
+        y: 0,
+        width: pageDimensions.width,
+        height: pageDimensions.height,
+        fill: 'transparent',
+        listening: true,
+      });
+      versoArea.on('click', () => {
+        this.selectPage(spread.verso!.pageNumber, 'verso');
+      });
+      this.layer.add(versoArea);
+    }
+
+    // Recto click area
+    if (spread.recto) {
+      const rectoArea = new Konva.Rect({
+        x: pageDimensions.width,
+        y: 0,
+        width: pageDimensions.width,
+        height: pageDimensions.height,
+        fill: 'transparent',
+        listening: true,
+      });
+      rectoArea.on('click', () => {
+        this.selectPage(spread.recto!.pageNumber, 'recto');
+      });
+      this.layer.add(rectoArea);
+    }
+  }
+
+  /**
+   * Select a page
+   */
+  private selectPage(pageNumber: number, position: 'verso' | 'recto'): void {
+    appState.updateEditor({
+      selectedPageNumber: pageNumber,
+      selectedPagePosition: position,
+    });
+    this.render();
+  }
+
+  /**
+   * Render items on static pages in the current spread
+   */
+  private renderItems(): void {
+    const project = appState.getProject();
+    const allSpreads = project.signatures.flatMap(sig => sig.spreads);
+    const spread = allSpreads[this.currentSpreadIndex];
+    const pageDimensions = this.getPageDimensions();
+
+    if (!spread) return;
+
+    // Clear existing items (except transformer)
+    this.itemNodes.forEach(node => node.destroy());
+    this.itemNodes.clear();
+
+    // Render items on verso page
+    if (spread.verso?.items) {
+      this.renderPageItems(spread.verso, 0, pageDimensions);
+    }
+
+    // Render items on recto page
+    if (spread.recto?.items) {
+      this.renderPageItems(spread.recto, pageDimensions.width, pageDimensions);
+    }
+
+    this.itemsLayer.draw();
+  }
+
+  /**
+   * Render items for a specific page
+   */
+  private renderPageItems(
+    page: PageContent,
+    xOffset: number,
+    pageDimensions: { width: number; height: number }
+  ): void {
+    if (!page.items) return;
+
+    for (const item of page.items) {
+      const node = this.createItemNode(item, xOffset, page.pageNumber);
+      if (node) {
+        this.itemNodes.set(item.id, node);
+        this.itemsLayer.add(node);
+      }
+    }
+  }
+
+  /**
+   * Create a Konva node for a page item
+   */
+  private createItemNode(item: PageItem, xOffset: number, pageNumber: number): Konva.Shape | Konva.Text | null {
+    let node: Konva.Shape | Konva.Text | null = null;
+
+    if (item.type === 'shape') {
+      const shapeItem = item as ShapePageItem;
+      if (shapeItem.shapeType === 'rectangle') {
+        node = new Konva.Rect({
+          x: xOffset + item.x,
+          y: item.y,
+          width: item.width,
+          height: item.height,
+          fill: shapeItem.fillColor || 'transparent',
+          stroke: shapeItem.strokeColor || '#000000',
+          strokeWidth: shapeItem.strokeWidth || 1,
+          rotation: item.rotation || 0,
+          draggable: true,
+        });
+      } else if (shapeItem.shapeType === 'ellipse') {
+        node = new Konva.Ellipse({
+          x: xOffset + item.x + item.width / 2,
+          y: item.y + item.height / 2,
+          radiusX: item.width / 2,
+          radiusY: item.height / 2,
+          fill: shapeItem.fillColor || 'transparent',
+          stroke: shapeItem.strokeColor || '#000000',
+          strokeWidth: shapeItem.strokeWidth || 1,
+          rotation: item.rotation || 0,
+          draggable: true,
+          offset: { x: 0, y: 0 },
+        });
+      } else if (shapeItem.shapeType === 'line') {
+        node = new Konva.Line({
+          x: xOffset + item.x,
+          y: item.y,
+          points: [0, 0, item.width, 0],
+          stroke: shapeItem.strokeColor || '#000000',
+          strokeWidth: shapeItem.strokeWidth || 2,
+          rotation: item.rotation || 0,
+          draggable: true,
+        });
+      }
+    } else if (item.type === 'text') {
+      const textItem = item as TextPageItem;
+      node = new Konva.Text({
+        x: xOffset + item.x,
+        y: item.y,
+        width: item.width,
+        text: textItem.content,
+        fontSize: textItem.fontSize,
+        fontFamily: textItem.fontFamily,
+        fontStyle: `${textItem.fontWeight === 'bold' ? 'bold' : ''} ${textItem.fontStyle === 'italic' ? 'italic' : ''}`.trim() || 'normal',
+        fill: textItem.color,
+        align: textItem.textAlign,
+        rotation: item.rotation || 0,
+        draggable: true,
+      });
+    }
+
+    if (node) {
+      node.setAttr('itemId', item.id);
+      node.setAttr('pageNumber', pageNumber);
+      node.setAttr('xOffset', xOffset);
+
+      // Handle click to select
+      node.on('click tap', () => {
+        appState.updateEditor({ selectedItemId: item.id });
+      });
+
+      // Handle drag end to update position
+      node.on('dragend', () => {
+        const newX = node!.x() - xOffset;
+        const newY = node!.y();
+        appState.updateItemOnPage(pageNumber, item.id, { x: newX, y: newY });
+      });
+
+      // Handle transform end to update size/rotation
+      node.on('transformend', () => {
+        const scaleX = node!.scaleX();
+        const scaleY = node!.scaleY();
+        const rotation = node!.rotation();
+
+        // Reset scale and apply to width/height
+        node!.scaleX(1);
+        node!.scaleY(1);
+
+        let newWidth = item.width * scaleX;
+        let newHeight = item.height * scaleY;
+        const newX = node!.x() - xOffset;
+        const newY = node!.y();
+
+        // For ellipse, we need to handle differently since it's centered
+        if (item.type === 'shape' && (item as ShapePageItem).shapeType === 'ellipse') {
+          const ellipse = node as Konva.Ellipse;
+          newWidth = ellipse.radiusX() * 2 * scaleX;
+          newHeight = ellipse.radiusY() * 2 * scaleY;
+          ellipse.radiusX(newWidth / 2);
+          ellipse.radiusY(newHeight / 2);
+        }
+
+        appState.updateItemOnPage(pageNumber, item.id, {
+          x: newX,
+          y: newY,
+          width: newWidth,
+          height: newHeight,
+          rotation: rotation,
+        });
+      });
+    }
+
+    return node;
+  }
+
+  /**
+   * Update the transformer to attach to the selected item
+   */
+  private updateTransformer(): void {
+    const editorState = appState.getEditor();
+
+    if (!editorState.selectedItemId) {
+      this.transformer.nodes([]);
+      this.itemsLayer.draw();
+      return;
+    }
+
+    const node = this.itemNodes.get(editorState.selectedItemId);
+    if (node) {
+      this.transformer.nodes([node]);
+    } else {
+      this.transformer.nodes([]);
+    }
+
+    this.itemsLayer.draw();
+  }
+
   private renderThumbnails(): void {
     const project = appState.getProject();
+    const editorState = appState.getEditor();
     const allSpreads = project.signatures.flatMap(sig => sig.spreads);
     const pageDimensions = this.getPageDimensions();
 
@@ -380,7 +737,7 @@ export class SpreadEditor {
       return;
     }
 
-    // Calculate thumbnail dimensions
+    // Calculate thumbnail dimensions - maintain actual spread aspect ratio
     const thumbWidth = 80;
     const spreadAspect = (pageDimensions.width * 2) / pageDimensions.height;
     const thumbHeight = thumbWidth / spreadAspect;
@@ -388,16 +745,13 @@ export class SpreadEditor {
     allSpreads.forEach((spread, index) => {
       const thumbDiv = document.createElement('div');
       thumbDiv.className = 'spread-thumbnail' + (index === this.currentSpreadIndex ? ' active' : '');
-      thumbDiv.addEventListener('click', () => {
-        this.currentSpreadIndex = index;
-        this.updateSpreadIndicator();
-        this.render();
-      });
 
       // Create a small canvas for the thumbnail
       const canvas = document.createElement('canvas');
       canvas.width = thumbWidth * 2; // Higher res for retina
       canvas.height = thumbHeight * 2;
+      canvas.style.width = `${thumbWidth}px`;
+      canvas.style.height = `${thumbHeight}px`;
       const ctx = canvas.getContext('2d')!;
       ctx.scale(2, 2);
 
@@ -418,47 +772,134 @@ export class SpreadEditor {
       ctx.fillStyle = '#d0d0d0';
       const contentMargin = 3;
 
-      // Verso page content
-      if (spread.verso && spread.verso.sections.length > 0) {
-        let yPos = contentMargin;
-        for (const section of spread.verso.sections) {
-          if (yPos > thumbHeight - contentMargin) break;
-          const lineCount = (section as { lines?: string[] }).lines?.length || 1;
-          for (let i = 0; i < Math.min(lineCount, 5); i++) {
+      // Verso page content - draw blank indicator or content lines
+      if (spread.verso) {
+        if (spread.verso.isBlank || spread.verso.isStatic) {
+          // Draw blank/static page indicator
+          ctx.fillStyle = '#f0f0f0';
+          ctx.fillRect(1, 1, thumbWidth / 2 - 2, thumbHeight - 2);
+          ctx.fillStyle = '#cccccc';
+          ctx.font = '6px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(spread.verso.isStatic ? 'S' : '∅', thumbWidth / 4, thumbHeight / 2 + 2);
+        } else if (spread.verso.sections.length > 0) {
+          ctx.fillStyle = '#d0d0d0';
+          let yPos = contentMargin;
+          for (const section of spread.verso.sections) {
             if (yPos > thumbHeight - contentMargin) break;
-            const lineWidth = (thumbWidth / 2 - contentMargin * 2) * (0.6 + Math.random() * 0.35);
-            ctx.fillRect(contentMargin, yPos, lineWidth, 1);
-            yPos += 2;
+            const lineCount = (section as { lines?: string[] }).lines?.length || 1;
+            for (let i = 0; i < Math.min(lineCount, 5); i++) {
+              if (yPos > thumbHeight - contentMargin) break;
+              const lineWidth = (thumbWidth / 2 - contentMargin * 2) * (0.6 + Math.random() * 0.35);
+              ctx.fillRect(contentMargin, yPos, lineWidth, 1);
+              yPos += 2;
+            }
+            yPos += 1;
           }
-          yPos += 1;
         }
       }
 
       // Recto page content
-      if (spread.recto && spread.recto.sections.length > 0) {
-        let yPos = contentMargin;
-        for (const section of spread.recto.sections) {
-          if (yPos > thumbHeight - contentMargin) break;
-          const lineCount = (section as { lines?: string[] }).lines?.length || 1;
-          for (let i = 0; i < Math.min(lineCount, 5); i++) {
+      if (spread.recto) {
+        if (spread.recto.isBlank || spread.recto.isStatic) {
+          // Draw blank/static page indicator
+          ctx.fillStyle = '#f0f0f0';
+          ctx.fillRect(thumbWidth / 2 + 1, 1, thumbWidth / 2 - 2, thumbHeight - 2);
+          ctx.fillStyle = '#cccccc';
+          ctx.font = '6px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(spread.recto.isStatic ? 'S' : '∅', thumbWidth * 3 / 4, thumbHeight / 2 + 2);
+        } else if (spread.recto.sections.length > 0) {
+          ctx.fillStyle = '#d0d0d0';
+          let yPos = contentMargin;
+          for (const section of spread.recto.sections) {
             if (yPos > thumbHeight - contentMargin) break;
-            const lineWidth = (thumbWidth / 2 - contentMargin * 2) * (0.6 + Math.random() * 0.35);
-            ctx.fillRect(thumbWidth / 2 + contentMargin, yPos, lineWidth, 1);
-            yPos += 2;
+            const lineCount = (section as { lines?: string[] }).lines?.length || 1;
+            for (let i = 0; i < Math.min(lineCount, 5); i++) {
+              if (yPos > thumbHeight - contentMargin) break;
+              const lineWidth = (thumbWidth / 2 - contentMargin * 2) * (0.6 + Math.random() * 0.35);
+              ctx.fillRect(thumbWidth / 2 + contentMargin, yPos, lineWidth, 1);
+              yPos += 2;
+            }
+            yPos += 1;
           }
-          yPos += 1;
         }
       }
 
+      // Check selection state for labels
+      const isVersoSelected = editorState.selectedPagePosition === 'verso' &&
+        spread.verso?.pageNumber === editorState.selectedPageNumber;
+      const isRectoSelected = editorState.selectedPagePosition === 'recto' &&
+        spread.recto?.pageNumber === editorState.selectedPageNumber;
+
       thumbDiv.appendChild(canvas);
 
-      // Add label
-      const label = document.createElement('div');
-      label.className = 'spread-thumbnail-label';
-      const versoNum = spread.verso?.pageNumber || '–';
-      const rectoNum = spread.recto?.pageNumber || '–';
-      label.textContent = `${versoNum}–${rectoNum}`;
-      thumbDiv.appendChild(label);
+      // Create labels container with individual page numbers
+      const labelsContainer = document.createElement('div');
+      labelsContainer.className = 'spread-thumbnail-labels';
+
+      // Verso label
+      const versoLabel = document.createElement('div');
+      versoLabel.className = 'spread-thumbnail-page-label' + (isVersoSelected ? ' selected' : '');
+      versoLabel.textContent = spread.verso?.pageNumber?.toString() || '–';
+      versoLabel.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.currentSpreadIndex = index;
+        if (spread.verso) {
+          this.selectPage(spread.verso.pageNumber, 'verso');
+        }
+        this.updateSpreadIndicator();
+      });
+      labelsContainer.appendChild(versoLabel);
+
+      // Recto label
+      const rectoLabel = document.createElement('div');
+      rectoLabel.className = 'spread-thumbnail-page-label' + (isRectoSelected ? ' selected' : '');
+      rectoLabel.textContent = spread.recto?.pageNumber?.toString() || '–';
+      rectoLabel.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.currentSpreadIndex = index;
+        if (spread.recto) {
+          this.selectPage(spread.recto.pageNumber, 'recto');
+        }
+        this.updateSpreadIndicator();
+      });
+      labelsContainer.appendChild(rectoLabel);
+
+      thumbDiv.appendChild(labelsContainer);
+
+      // Create click areas for page selection (overlaid on canvas)
+      const clickContainer = document.createElement('div');
+      clickContainer.className = 'spread-thumbnail-clicks';
+      clickContainer.style.cssText = `position: absolute; top: 0; left: 0; width: 100%; height: ${thumbHeight}px; display: flex;`;
+
+      // Verso click area
+      const versoClick = document.createElement('div');
+      versoClick.style.cssText = 'flex: 1; cursor: pointer;';
+      versoClick.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.currentSpreadIndex = index;
+        if (spread.verso) {
+          this.selectPage(spread.verso.pageNumber, 'verso');
+        }
+        this.updateSpreadIndicator();
+      });
+      clickContainer.appendChild(versoClick);
+
+      // Recto click area
+      const rectoClick = document.createElement('div');
+      rectoClick.style.cssText = 'flex: 1; cursor: pointer;';
+      rectoClick.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.currentSpreadIndex = index;
+        if (spread.recto) {
+          this.selectPage(spread.recto.pageNumber, 'recto');
+        }
+        this.updateSpreadIndicator();
+      });
+      clickContainer.appendChild(rectoClick);
+
+      thumbDiv.appendChild(clickContainer);
 
       this.thumbnailContainer.appendChild(thumbDiv);
     });

@@ -26,7 +26,48 @@ export interface PageContent {
   overflow?: DocumentSection[]; // Content that didn't fit
   isBlank: boolean;
   isRecto: boolean; // Right-hand page
+  isStatic: boolean; // Static pages don't receive text flow
+  items?: PageItem[]; // Items placed on static pages
 }
+
+// Items that can be placed on static pages
+export type PageItemType = 'text' | 'shape' | 'image';
+
+export interface PageItemBase {
+  id: string;
+  type: PageItemType;
+  x: number; // Position in points from left edge of page
+  y: number; // Position in points from top of page
+  width: number;
+  height: number;
+  rotation?: number; // Degrees
+}
+
+export interface TextPageItem extends PageItemBase {
+  type: 'text';
+  content: string;
+  fontFamily: string;
+  fontSize: number;
+  fontWeight: 'normal' | 'bold';
+  fontStyle: 'normal' | 'italic';
+  color: string;
+  textAlign: 'left' | 'center' | 'right';
+}
+
+export interface ShapePageItem extends PageItemBase {
+  type: 'shape';
+  shapeType: 'rectangle' | 'ellipse' | 'line';
+  fillColor?: string;
+  strokeColor?: string;
+  strokeWidth?: number;
+}
+
+export interface ImagePageItem extends PageItemBase {
+  type: 'image';
+  imageFileId: string; // Reference to project file
+}
+
+export type PageItem = TextPageItem | ShapePageItem | ImagePageItem;
 
 export interface Spread {
   id: string;
@@ -62,6 +103,23 @@ export interface OutputOptions {
   customHeight?: number;
   pagesPerSignature: 4 | 8 | 12 | 16 | 20 | 24;
   orientation: 'portrait' | 'landscape';
+  fillAvailableSpace: boolean; // Print multiple rows of spreads per sheet when possible
+}
+
+/**
+ * Calculate how many spread rows can fit on a sheet
+ * Returns 1 if fill mode is disabled or only 1 row fits
+ */
+export function calculateSpreadRowsPerSheet(
+  sheetSize: { width: number; height: number },
+  pageHeight: number,
+  fillEnabled: boolean
+): number {
+  if (!fillEnabled) return 1;
+  // Each spread row needs pageHeight vertical space
+  // We need at least 2 rows for fill mode to make sense
+  const maxRows = Math.floor(sheetSize.height / pageHeight);
+  return maxRows >= 2 ? maxRows : 1;
 }
 
 export interface LayoutOptions {
@@ -201,6 +259,8 @@ export function formatMarginValue(points: number, unit: MarginUnit): string {
 export interface EditorState {
   selectedPageNumber: number | null;
   selectedSpreadNumber: number | null;
+  selectedPagePosition: 'verso' | 'recto' | null; // Which page in the spread is selected
+  selectedItemId: string | null; // Selected item on a static page
   isDraggingMargin: boolean;
   dragMarginType: 'top' | 'bottom' | 'inner' | 'outer' | null;
   isLocalMarginChange: boolean; // Cmd key held
