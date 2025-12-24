@@ -246,6 +246,7 @@ export class FileList {
       `;
     } else {
       // Text file: show icon and name
+      item.classList.add('file-item-text');
       const icon = this.getFileIcon(file.type);
       item.innerHTML = `
         ${dragHandle}

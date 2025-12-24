@@ -11,6 +11,7 @@ import type { PageItem, TextPageItem, ShapePageItem, ImagePageItem, ProjectFile,
 // Module-level instances
 let itemFontDropdown: FontDropdown | null = null;
 let itemFillPicker: FillPicker | null = null;
+let pageBackgroundPicker: FillPicker | null = null;
 
 /**
  * Set up the Edit Page panel event handlers
@@ -383,10 +384,27 @@ export function updateEditSelectedSection(): void {
   const editorState = appState.getEditor();
   const panel = document.getElementById('edit-page-panel');
   const section = document.getElementById('edit-selected-section');
+  const pageBackgroundSection = document.getElementById('page-background-section');
   const shapeProps = document.getElementById('shape-properties');
   const textProps = document.getElementById('text-properties');
 
   if (!section) return;
+
+  // If page selected but no item, show page background options
+  if (editorState.selectedPageNumber && !editorState.selectedItemId) {
+    section.style.display = 'none';
+    if (pageBackgroundSection) {
+      pageBackgroundSection.style.display = 'block';
+      setupPageBackgroundPicker(editorState.selectedPageNumber);
+    }
+    if (panel) panel.style.display = 'block';
+    return;
+  }
+
+  // Hide page background section if item is selected
+  if (pageBackgroundSection) {
+    pageBackgroundSection.style.display = 'none';
+  }
 
   // Hide if no item selected
   if (!editorState.selectedItemId || !editorState.selectedPageNumber) {
@@ -475,5 +493,29 @@ export function updateEditSelectedSection(): void {
   } else {
     shapeProps!.style.display = 'none';
     textProps!.style.display = 'none';
+  }
+}
+
+/**
+ * Set up the page background fill picker
+ */
+function setupPageBackgroundPicker(pageNumber: number): void {
+  const container = document.getElementById('page-background-picker');
+  if (!container) return;
+
+  // Get current page background
+  const currentFill: FillConfig = appState.getPageBackground(pageNumber) || {
+    type: 'color',
+    color: '#ffffff'
+  };
+
+  if (pageBackgroundPicker) {
+    pageBackgroundPicker.setFill(currentFill);
+  } else {
+    pageBackgroundPicker = createFillPicker(container, currentFill, (fill) => {
+      const editorState = appState.getEditor();
+      if (!editorState.selectedPageNumber) return;
+      appState.updatePageBackground(editorState.selectedPageNumber, fill);
+    });
   }
 }

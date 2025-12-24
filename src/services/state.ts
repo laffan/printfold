@@ -117,6 +117,7 @@ function createEmptyProject(): BookletProject {
     name: 'Untitled Booklet',
     files: [],
     mainDocument: null,
+    measurementUnit: 'in',
     outputOptions: { ...defaultOutputOptions },
     layoutOptions: JSON.parse(JSON.stringify(defaultLayoutOptions)),
     fontOptions: JSON.parse(JSON.stringify(defaultFontOptions)),
@@ -316,6 +317,17 @@ class AppState {
     this.requestReflow();
   }
 
+  // Measurement unit - project-wide setting
+  getMeasurementUnit(): import('../types').MarginUnit {
+    return this.project.measurementUnit || 'in';
+  }
+
+  setMeasurementUnit(unit: import('../types').MarginUnit): void {
+    this.updateProject({ measurementUnit: unit });
+    // Also update editor marginUnit for backward compatibility
+    this.updateEditor({ marginUnit: unit });
+  }
+
   // Blank pages
   addBlankPage(afterPageNumber: number): void {
     const blankPages = [...this.project.blankPages, afterPageNumber].sort((a, b) => a - b);
@@ -411,6 +423,38 @@ class AppState {
     if (this.editor.selectedItemId === itemId) {
       this.updateEditor({ selectedItemId: null });
     }
+  }
+
+  updatePageBackground(pageNumber: number, backgroundFill: import('../types').FillConfig | undefined): void {
+    const prevState = this.project;
+
+    const signatures = this.project.signatures.map(sig => ({
+      ...sig,
+      spreads: sig.spreads.map(spread => {
+        const updatePage = (page: typeof spread.verso) => {
+          if (!page || page.pageNumber !== pageNumber) return page;
+          return { ...page, backgroundFill };
+        };
+        return {
+          ...spread,
+          verso: updatePage(spread.verso),
+          recto: updatePage(spread.recto),
+        };
+      }),
+    }));
+
+    this.project = { ...this.project, signatures };
+    this.notifyProjectListeners(prevState);
+  }
+
+  getPageBackground(pageNumber: number): import('../types').FillConfig | undefined {
+    for (const sig of this.project.signatures) {
+      for (const spread of sig.spreads) {
+        if (spread.verso?.pageNumber === pageNumber) return spread.verso.backgroundFill;
+        if (spread.recto?.pageNumber === pageNumber) return spread.recto.backgroundFill;
+      }
+    }
+    return undefined;
   }
 
   getItemFromPage(pageNumber: number, itemId: string): PageItem | null {

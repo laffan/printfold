@@ -102,7 +102,7 @@ export function bindMarginInput(id: string, marginKey: 'top' | 'bottom' | 'inner
     if (isNaN(displayValue)) return;
 
     // Convert from display unit to points
-    const unit = appState.getEditor().marginUnit;
+    const unit = appState.getMeasurementUnit();
     const conv = UNIT_CONVERSIONS[unit];
     const pointsValue = displayValue / conv.factor;
 
@@ -169,7 +169,7 @@ export function setMarginInputValue(id: string, pointsValue: number, unit: Margi
  */
 export function updateMarginInputs(): void {
   const project = appState.getProject();
-  const unit = appState.getEditor().marginUnit;
+  const unit = appState.getMeasurementUnit();
 
   setMarginInputValue('opt-margin-top', project.layoutOptions.margins.top, unit);
   setMarginInputValue('opt-margin-bottom', project.layoutOptions.margins.bottom, unit);

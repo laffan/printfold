@@ -109,6 +109,7 @@ export interface PageContent {
   isRecto: boolean; // Right-hand page
   isStatic: boolean; // Static pages don't receive text flow
   items?: PageItem[]; // Items placed on static pages
+  backgroundFill?: FillConfig; // Optional background fill for the page
 }
 
 // Items that can be placed on static pages
@@ -271,6 +272,7 @@ export interface BookletProject {
   name: string;
   files: ProjectFile[];
   mainDocument: string | null; // ID of main markdown file
+  measurementUnit: MarginUnit; // Project-wide measurement unit
   outputOptions: OutputOptions;
   layoutOptions: LayoutOptions;
   fontOptions: FontOptions;

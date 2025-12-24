@@ -5,8 +5,8 @@
 
 import { appState } from '../../services/state';
 import type { OutputOptions } from '../../types';
-import { SHEET_SIZES } from '../../types';
-import { bindSelect, bindNumberInput, bindCheckbox, type DebounceCallback } from './helpers';
+import { SHEET_SIZES, UNIT_CONVERSIONS } from '../../types';
+import { bindSelect, bindCheckbox, type DebounceCallback } from './helpers';
 
 /**
  * Set up output options event handlers
@@ -29,15 +29,35 @@ export function setupOutputOptions(debounce: (fn: DebounceCallback) => void): vo
     updateFillSpaceVisibility();
   }, debounce);
 
-  // Custom dimensions
-  bindNumberInput('opt-custom-width', (value) => {
-    appState.updateOutputOptions({ customWidth: value });
-  }, debounce);
+  // Custom dimensions - convert from display unit to points
+  const widthInput = document.getElementById('opt-custom-width') as HTMLInputElement;
+  if (widthInput) {
+    widthInput.addEventListener('input', () => {
+      const displayValue = parseFloat(widthInput.value);
+      if (isNaN(displayValue)) return;
+      const unit = appState.getMeasurementUnit();
+      const conv = UNIT_CONVERSIONS[unit];
+      const pointsValue = displayValue / conv.factor;
+      debounce(() => {
+        appState.updateOutputOptions({ customWidth: pointsValue });
+      });
+    });
+  }
 
-  bindNumberInput('opt-custom-height', (value) => {
-    appState.updateOutputOptions({ customHeight: value });
-    updateFillSpaceVisibility();
-  }, debounce);
+  const heightInput = document.getElementById('opt-custom-height') as HTMLInputElement;
+  if (heightInput) {
+    heightInput.addEventListener('input', () => {
+      const displayValue = parseFloat(heightInput.value);
+      if (isNaN(displayValue)) return;
+      const unit = appState.getMeasurementUnit();
+      const conv = UNIT_CONVERSIONS[unit];
+      const pointsValue = displayValue / conv.factor;
+      debounce(() => {
+        appState.updateOutputOptions({ customHeight: pointsValue });
+        updateFillSpaceVisibility();
+      });
+    });
+  }
 
   // Fill available space
   bindCheckbox('opt-fill-space', (checked) => {

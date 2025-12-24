@@ -12,7 +12,9 @@ import {
   setCheckboxValue,
   setColorValue,
   setMarginInputValue,
+  updateMarginInputs,
 } from './helpers';
+import { convertFromPoints, UNIT_CONVERSIONS, type MarginUnit } from '../../types';
 import { setupOutputOptions, updateFillSpaceVisibility } from './outputOptions';
 import { setupLayoutOptions } from './layoutOptions';
 import { setupHeaderFooterOptions } from './headerFooterOptions';
@@ -34,6 +36,7 @@ export class OptionsPanel {
     setupSelectedPagePanel();
     setupEditPagePanel(updateEditSelectedSection);
     initFontDropdowns(this.fontDropdowns);
+    this.setupMeasurementUnit();
     this.syncFromState();
 
     // Listen for state changes to update UI
@@ -59,27 +62,67 @@ export class OptionsPanel {
     preloadFonts();
   }
 
+  private setupMeasurementUnit(): void {
+    const unitSelect = document.getElementById('opt-measurement-unit') as HTMLSelectElement;
+    if (unitSelect) {
+      unitSelect.addEventListener('change', () => {
+        const unit = unitSelect.value as MarginUnit;
+        appState.setMeasurementUnit(unit);
+        updateMarginInputs();
+        this.updateCustomSizeInputs();
+      });
+    }
+  }
+
+  private updateCustomSizeInputs(): void {
+    const project = appState.getProject();
+    const unit = appState.getMeasurementUnit();
+    const conv = UNIT_CONVERSIONS[unit];
+
+    // Update custom width/height values
+    const widthInput = document.getElementById('opt-custom-width') as HTMLInputElement;
+    const heightInput = document.getElementById('opt-custom-height') as HTMLInputElement;
+    const widthUnit = document.getElementById('custom-width-unit');
+    const heightUnit = document.getElementById('custom-height-unit');
+
+    if (project.outputOptions.customWidth && widthInput) {
+      const displayValue = convertFromPoints(project.outputOptions.customWidth, unit);
+      widthInput.value = displayValue.toString();
+    }
+    if (project.outputOptions.customHeight && heightInput) {
+      const displayValue = convertFromPoints(project.outputOptions.customHeight, unit);
+      heightInput.value = displayValue.toString();
+    }
+
+    // Update unit labels
+    if (widthUnit) widthUnit.textContent = conv.label;
+    if (heightUnit) heightUnit.textContent = conv.label;
+  }
+
   private syncFromState(): void {
     const project = appState.getProject();
+    const unit = appState.getMeasurementUnit();
+
+    // Measurement unit in Info panel
+    setSelectValue('opt-measurement-unit', unit);
 
     // Output options
     setSelectValue('opt-sheet-size', project.outputOptions.sheetSize);
     setSelectValue('opt-booklet-size', project.outputOptions.bookletSize);
-    setInputValue('opt-custom-width', project.outputOptions.customWidth?.toString() || '');
-    setInputValue('opt-custom-height', project.outputOptions.customHeight?.toString() || '');
     setSelectValue('opt-pages-per-sig', project.outputOptions.pagesPerSignature.toString());
 
     // Show/hide custom size
     document.getElementById('custom-size-group')!.style.display =
       project.outputOptions.bookletSize === 'custom' ? 'block' : 'none';
 
+    // Update custom size inputs with unit conversion
+    this.updateCustomSizeInputs();
+
     // Fill available space
     setCheckboxValue('opt-fill-space', project.outputOptions.fillAvailableSpace);
     updateFillSpaceVisibility();
 
     // Layout options - margins are converted to display unit
-    const unit = appState.getEditor().marginUnit;
-    setSelectValue('opt-margin-unit', unit);
     setMarginInputValue('opt-margin-top', project.layoutOptions.margins.top, unit);
     setMarginInputValue('opt-margin-bottom', project.layoutOptions.margins.bottom, unit);
     setMarginInputValue('opt-margin-inner', project.layoutOptions.margins.inner, unit);

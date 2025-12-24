@@ -153,8 +153,8 @@ export class App {
   }
 
   private setupCollapsiblePanels(): void {
-    // Handle options panels
-    const optionsPanels = document.querySelectorAll('.panel-options');
+    // Handle options panels (including Info panel)
+    const optionsPanels = document.querySelectorAll('.panel-options, .panel-info');
 
     optionsPanels.forEach(panel => {
       const header = panel.querySelector('.panel-header.collapsible');
@@ -163,9 +163,9 @@ export class App {
           panel.classList.toggle('collapsed');
         });
 
-        // Start expanded for first panel
+        // Info and Output panels start expanded, others start collapsed
         const panelName = panel.getAttribute('data-panel');
-        if (panelName !== 'output') {
+        if (panelName !== 'output' && panelName !== 'info') {
           panel.classList.add('collapsed');
         }
       }

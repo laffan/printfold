@@ -5,7 +5,7 @@
 
 import Konva from 'konva';
 import { appState } from '../../services/state';
-import type { Spread, PageContent, Margins, PageItem, ImagePageItem } from '../../types';
+import type { Spread, PageContent, Margins, PageItem, ImagePageItem, FillConfig } from '../../types';
 import { SHEET_SIZES } from '../../types';
 import type { MarginLine, MarginLabel } from './types';
 import { createItemNode, renderPageItems } from './items';
@@ -734,6 +734,17 @@ export class SpreadEditor {
       if (node.getAttr('imageLoading')) {
         this.transformer.nodes([]);
       } else {
+        // Configure transformer based on shape type
+        const className = node.getClassName();
+        if (className === 'Line' || className === 'Arrow') {
+          // Lines and arrows need special handling - disable resize, only allow rotate/move
+          this.transformer.enabledAnchors([]);
+          this.transformer.rotateEnabled(true);
+        } else {
+          // Standard shapes get full anchor set
+          this.transformer.enabledAnchors(['top-left', 'top-right', 'bottom-left', 'bottom-right', 'middle-left', 'middle-right', 'top-center', 'bottom-center']);
+          this.transformer.rotateEnabled(true);
+        }
         this.transformer.nodes([node]);
       }
     } else {
@@ -760,6 +771,77 @@ export class SpreadEditor {
     this.layer.add(page);
   }
 
+  private drawPageBackground(x: number, y: number, width: number, height: number, backgroundFill?: FillConfig): void {
+    const page = new Konva.Rect({
+      x,
+      y,
+      width,
+      height,
+      stroke: '#cccccc',
+      strokeWidth: 1,
+      shadowColor: 'black',
+      shadowBlur: 10,
+      shadowOpacity: 0.2,
+      shadowOffset: { x: 2, y: 2 },
+    });
+
+    // Apply background fill
+    if (backgroundFill) {
+      if (backgroundFill.type === 'color') {
+        page.fill(backgroundFill.color || '#ffffff');
+      } else if (backgroundFill.type === 'linearGradient' && backgroundFill.linearGradient) {
+        const angle = (backgroundFill.linearGradient.angle * Math.PI) / 180;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        const cx = width / 2;
+        const cy = height / 2;
+        const length = Math.sqrt(width * width + height * height) / 2;
+
+        const colorStops: Array<number | string> = [];
+        for (const stop of backgroundFill.linearGradient.stops) {
+          colorStops.push(stop.offset);
+          colorStops.push(stop.color);
+        }
+
+        page.fillLinearGradientStartPoint({ x: cx - cos * length, y: cy - sin * length });
+        page.fillLinearGradientEndPoint({ x: cx + cos * length, y: cy + sin * length });
+        page.fillLinearGradientColorStops(colorStops);
+      } else if (backgroundFill.type === 'radialGradient' && backgroundFill.radialGradient) {
+        const cx = backgroundFill.radialGradient.centerX * width;
+        const cy = backgroundFill.radialGradient.centerY * height;
+        const radius = backgroundFill.radialGradient.radius * Math.max(width, height);
+
+        const colorStops: Array<number | string> = [];
+        for (const stop of backgroundFill.radialGradient.stops) {
+          colorStops.push(stop.offset);
+          colorStops.push(stop.color);
+        }
+
+        page.fillRadialGradientStartPoint({ x: cx, y: cy });
+        page.fillRadialGradientEndPoint({ x: cx, y: cy });
+        page.fillRadialGradientStartRadius(0);
+        page.fillRadialGradientEndRadius(radius);
+        page.fillRadialGradientColorStops(colorStops);
+      } else if (backgroundFill.type === 'pattern' && backgroundFill.pattern?.imageFileId) {
+        const file = appState.getProject().files.find(f => f.id === backgroundFill.pattern?.imageFileId);
+        if (file) {
+          const img = new window.Image();
+          img.src = `data:image/png;base64,${file.content}`;
+          img.onload = () => {
+            page.fillPatternImage(img);
+            page.fillPatternRepeat(backgroundFill.pattern?.repeat || 'repeat');
+            page.fillPatternScale({ x: backgroundFill.pattern?.scale || 1, y: backgroundFill.pattern?.scale || 1 });
+            this.layer.batchDraw();
+          };
+        }
+      }
+    } else {
+      page.fill('#ffffff');
+    }
+
+    this.layer.add(page);
+  }
+
   private drawPage(
     pageContent: PageContent,
     x: number,
@@ -769,8 +851,8 @@ export class SpreadEditor {
     const project = appState.getProject();
     const margins = getMarginsForPage(pageContent.pageNumber);
 
-    // Draw page background
-    this.drawPageOutline(x, y, dimensions.width, dimensions.height);
+    // Draw page background with optional fill
+    this.drawPageBackground(x, y, dimensions.width, dimensions.height, pageContent.backgroundFill);
 
     // Draw page number indicator only if footer is disabled (footer handles page numbers otherwise)
     if (!project.headerFooter.footer.enabled) {

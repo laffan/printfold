@@ -249,6 +249,12 @@ export function createItemNode(
       });
     }
 
+    // Handle drag move to keep transformer in sync
+    node.on('dragmove', () => {
+      // Force transformer to update during drag
+      itemsLayer.batchDraw();
+    });
+
     // Handle drag end to update position
     node.on('dragend', () => {
       let newX = node!.x() - xOffset;

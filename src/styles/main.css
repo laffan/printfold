@@ -169,6 +169,31 @@ body {
   font-size: 11px;
 }
 
+.btn-icon {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-icon:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-primary);
+}
+
+.btn-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
 .btn-danger {
   background: transparent;
   border-color: var(--color-error);
@@ -575,6 +600,22 @@ body {
   margin-top: -2px;
 }
 
+/* Text file items: clean flat list style */
+.file-item-text {
+  margin-bottom: 0;
+  border-radius: 0;
+  background: transparent;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.file-item-text:hover {
+  background: var(--color-bg-hover);
+}
+
+.file-item-text.selected {
+  background: var(--color-primary);
+}
+
 /* Image file items with thumbnails */
 .file-items-container {
   display: flex;
@@ -779,9 +820,9 @@ body {
   gap: 4px;
 }
 
-.toolbar-add-items .btn {
-  padding: 4px 6px;
-  font-size: 10px;
+.toolbar-add-items .btn-icon {
+  width: 26px;
+  height: 26px;
 }
 
 .zoom-display {
@@ -1138,6 +1179,27 @@ body {
 .info-value {
   font-weight: 500;
   font-family: var(--font-mono);
+}
+
+.unit-select {
+  padding: 2px 6px;
+  font-size: 11px;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.unit-select:hover {
+  border-color: var(--color-primary);
+}
+
+.unit-select:focus {
+  outline: none;
+  border-color: var(--color-primary);
 }
 
 /* Selected page section within info panel */

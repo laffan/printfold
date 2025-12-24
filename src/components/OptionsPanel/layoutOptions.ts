@@ -11,17 +11,6 @@ import { bindNumberInput, bindCheckbox, bindMarginInput, updateMarginInputs, typ
  * Set up layout options event handlers
  */
 export function setupLayoutOptions(debounce: (fn: DebounceCallback) => void): void {
-  // Unit dropdown
-  const unitSelect = document.getElementById('opt-margin-unit') as HTMLSelectElement;
-  if (unitSelect) {
-    unitSelect.value = appState.getEditor().marginUnit;
-    unitSelect.addEventListener('change', () => {
-      const unit = unitSelect.value as MarginUnit;
-      appState.updateEditor({ marginUnit: unit });
-      updateMarginInputs(); // Update displayed values
-    });
-  }
-
   // Margins - convert from display units to points when saving
   bindMarginInput('opt-margin-top', 'top', debounce);
   bindMarginInput('opt-margin-bottom', 'bottom', debounce);
