@@ -93,13 +93,21 @@ export class FillPicker {
     const preview = document.createElement('div');
     preview.className = 'fill-preview';
     preview.style.background = this.getFillPreviewStyle();
-    preview.addEventListener('click', () => this.togglePicker());
+    preview.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.togglePicker();
+    });
     this.container.appendChild(preview);
 
     // Dropdown panel
     if (this.isOpen) {
       const panel = document.createElement('div');
       panel.className = 'fill-picker-panel';
+
+      // Stop clicks inside panel from closing it
+      panel.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
 
       // Tabs
       const tabs = document.createElement('div');
@@ -115,15 +123,16 @@ export class FillPicker {
         const tab = document.createElement('button');
         tab.className = 'fill-tab' + (this.activeTab === type || (this.activeTab === 'radialGradient' && type === 'linearGradient') ? ' active' : '');
         tab.textContent = label;
-        tab.addEventListener('click', () => {
+        tab.addEventListener('click', (e) => {
+          e.stopPropagation();
           this.activeTab = type;
-          this.render();
+          this.renderTabContent(panel);
         });
         tabs.appendChild(tab);
       });
       panel.appendChild(tabs);
 
-      // Tab content
+      // Tab content container
       const content = document.createElement('div');
       content.className = 'fill-tab-content';
 
@@ -136,8 +145,79 @@ export class FillPicker {
       }
 
       panel.appendChild(content);
-      this.container.appendChild(panel);
+
+      // Append to body for proper positioning above everything
+      document.body.appendChild(panel);
+
+      // Position the panel relative to the preview button
+      this.positionPanel(panel, preview);
     }
+  }
+
+  private renderTabContent(panel: HTMLElement): void {
+    // Find and replace the tab content
+    const oldContent = panel.querySelector('.fill-tab-content');
+    if (oldContent) {
+      oldContent.remove();
+    }
+
+    const content = document.createElement('div');
+    content.className = 'fill-tab-content';
+
+    if (this.activeTab === 'color') {
+      this.renderColorTab(content);
+    } else if (this.activeTab === 'linearGradient' || this.activeTab === 'radialGradient') {
+      this.renderGradientTab(content);
+    } else if (this.activeTab === 'pattern') {
+      this.renderPatternTab(content);
+    }
+
+    panel.appendChild(content);
+
+    // Update tab active states
+    const tabs = panel.querySelectorAll('.fill-tab');
+    tabs.forEach((tab, index) => {
+      const tabTypes: FillType[] = ['color', 'linearGradient', 'pattern'];
+      const isActive = this.activeTab === tabTypes[index] ||
+        (this.activeTab === 'radialGradient' && tabTypes[index] === 'linearGradient');
+      tab.classList.toggle('active', isActive);
+    });
+  }
+
+  private positionPanel(panel: HTMLElement, preview: HTMLElement): void {
+    const previewRect = preview.getBoundingClientRect();
+    const panelWidth = 240;
+    const panelHeight = 320; // Approximate max height
+
+    // Calculate initial position (below and aligned left with preview)
+    let left = previewRect.left;
+    let top = previewRect.bottom + 4;
+
+    // Check if panel would go off the right edge
+    if (left + panelWidth > window.innerWidth - 10) {
+      left = window.innerWidth - panelWidth - 10;
+    }
+
+    // Check if panel would go off the left edge
+    if (left < 10) {
+      left = 10;
+    }
+
+    // Check if panel would go off the bottom edge
+    if (top + panelHeight > window.innerHeight - 10) {
+      // Position above the preview instead
+      top = previewRect.top - panelHeight - 4;
+
+      // If that would go off the top, just position it at the top
+      if (top < 10) {
+        top = 10;
+      }
+    }
+
+    panel.style.position = 'fixed';
+    panel.style.left = `${left}px`;
+    panel.style.top = `${top}px`;
+    panel.style.zIndex = '10000';
   }
 
   private renderColorTab(container: HTMLElement): void {
@@ -710,13 +790,20 @@ export class FillPicker {
 
   private togglePicker(): void {
     this.isOpen = !this.isOpen;
+
+    // Remove any existing panel from body
+    this.removePanel();
+
     this.render();
 
     // Close on outside click
     if (this.isOpen) {
       const closeHandler = (e: MouseEvent) => {
-        if (!this.container.contains(e.target as Node)) {
+        const panel = document.querySelector('.fill-picker-panel');
+        if (!this.container.contains(e.target as Node) &&
+            (!panel || !panel.contains(e.target as Node))) {
           this.isOpen = false;
+          this.removePanel();
           this.render();
           document.removeEventListener('click', closeHandler);
         }
@@ -728,7 +815,15 @@ export class FillPicker {
     }
   }
 
+  private removePanel(): void {
+    const existingPanel = document.querySelector('.fill-picker-panel');
+    if (existingPanel) {
+      existingPanel.remove();
+    }
+  }
+
   destroy(): void {
+    this.removePanel();
     this.container.innerHTML = '';
   }
 }

@@ -1391,54 +1391,52 @@ body {
 }
 
 .fill-picker-panel {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  z-index: 1000;
-  margin-top: 4px;
-  padding: 12px;
+  position: fixed;
+  z-index: 10000;
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
-  min-width: 220px;
+  width: 240px;
+  overflow: hidden;
 }
 
 .fill-tabs {
   display: flex;
-  gap: 2px;
-  margin-bottom: 12px;
   background: var(--color-bg-tertiary);
-  border-radius: var(--radius-sm);
-  padding: 2px;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .fill-tab {
   flex: 1;
-  padding: 6px 8px;
-  font-size: 11px;
+  padding: 8px 12px;
+  font-size: 12px;
   font-weight: 500;
   border: none;
   background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
-  border-radius: var(--radius-sm);
   transition: background 0.15s, color 0.15s;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
 }
 
 .fill-tab:hover {
   color: var(--color-text);
+  background: var(--color-bg-hover);
 }
 
 .fill-tab.active {
-  background: var(--color-primary);
-  color: white;
+  background: var(--color-bg-secondary);
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
 }
 
 .fill-tab-content {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  padding: 12px;
 }
 
 /* Color Tab */
