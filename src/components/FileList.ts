@@ -12,6 +12,8 @@ export class FileList {
   private dropZone!: HTMLElement;
   private selectedFileId: string | null = null;
   private onFileSelect: ((file: ProjectFile | null) => void) | null = null;
+  private activeTab: 'text' | 'images' = 'text';
+  private draggedFileId: string | null = null;
 
   mount(): void {
     this.container = document.getElementById('file-list')!;
@@ -195,11 +197,62 @@ export class FileList {
     this.dropZone = dropZone;
     this.container.appendChild(dropZone);
 
-    // Add file items below drop zone
-    files.forEach(file => {
-      const item = this.createFileItem(file, project.mainDocument === file.id);
-      this.container.appendChild(item);
+    // Add tabs
+    const tabsContainer = document.createElement('div');
+    tabsContainer.className = 'file-tabs';
+
+    const textTab = document.createElement('button');
+    textTab.className = 'file-tab' + (this.activeTab === 'text' ? ' active' : '');
+    const textCount = files.filter(f => f.type === 'markdown').length;
+    textTab.textContent = `Text (${textCount})`;
+    textTab.addEventListener('click', () => {
+      this.activeTab = 'text';
+      this.render();
     });
+
+    const imagesTab = document.createElement('button');
+    imagesTab.className = 'file-tab' + (this.activeTab === 'images' ? ' active' : '');
+    const imageCount = files.filter(f => f.type === 'image').length;
+    imagesTab.textContent = `Images (${imageCount})`;
+    imagesTab.addEventListener('click', () => {
+      this.activeTab = 'images';
+      this.render();
+    });
+
+    tabsContainer.appendChild(textTab);
+    tabsContainer.appendChild(imagesTab);
+    this.container.appendChild(tabsContainer);
+
+    // File list container
+    const fileListContainer = document.createElement('div');
+    fileListContainer.className = 'file-items-container';
+
+    // Filter files based on active tab
+    const filteredFiles = files.filter(file => {
+      if (this.activeTab === 'text') {
+        return file.type === 'markdown';
+      } else {
+        return file.type === 'image';
+      }
+    });
+
+    // Add file items
+    filteredFiles.forEach(file => {
+      const item = this.createFileItem(file);
+      fileListContainer.appendChild(item);
+    });
+
+    // Show empty state if no files in this tab
+    if (filteredFiles.length === 0) {
+      const emptyState = document.createElement('div');
+      emptyState.className = 'file-list-empty';
+      emptyState.textContent = this.activeTab === 'text'
+        ? 'No text files. Drop .md files here.'
+        : 'No images. Drop image files here.';
+      fileListContainer.appendChild(emptyState);
+    }
+
+    this.container.appendChild(fileListContainer);
   }
 
   private createDropZone(): HTMLElement {
@@ -216,43 +269,95 @@ export class FileList {
     return dropZone;
   }
 
-  private createFileItem(file: ProjectFile, isMainDocument: boolean): HTMLElement {
+  private createFileItem(file: ProjectFile): HTMLElement {
     const item = document.createElement('div');
     item.className = 'file-item';
+    item.dataset.fileId = file.id;
+
     if (file.id === this.selectedFileId) {
       item.classList.add('selected');
     }
-    if (isMainDocument) {
-      item.classList.add('main-document');
-    }
 
     const icon = this.getFileIcon(file.type);
+    const isTextFile = file.type === 'markdown';
+
+    // Add drag handle for text files
+    const dragHandle = isTextFile ? '<span class="drag-handle" title="Drag to reorder">⋮⋮</span>' : '';
 
     item.innerHTML = `
+      ${dragHandle}
       <span class="file-icon">${icon}</span>
       <span class="file-name" title="${file.name}">${file.name}</span>
       <div class="file-actions">
-        ${file.type === 'markdown' && !isMainDocument ?
-          '<button class="btn btn-icon btn-set-main" title="Set as main document">★</button>' :
-          ''}
         <button class="btn btn-icon btn-remove" title="Remove file">×</button>
       </div>
     `;
 
+    // Make text files draggable
+    if (isTextFile) {
+      item.draggable = true;
+
+      item.addEventListener('dragstart', (e) => {
+        this.draggedFileId = file.id;
+        item.classList.add('dragging');
+        if (e.dataTransfer) {
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', file.id);
+        }
+      });
+
+      item.addEventListener('dragend', () => {
+        this.draggedFileId = null;
+        item.classList.remove('dragging');
+        // Remove all drag-over classes
+        this.container.querySelectorAll('.drag-over').forEach(el => {
+          el.classList.remove('drag-over');
+        });
+      });
+
+      item.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        if (this.draggedFileId && this.draggedFileId !== file.id) {
+          e.dataTransfer!.dropEffect = 'move';
+          item.classList.add('drag-over');
+        }
+      });
+
+      item.addEventListener('dragleave', () => {
+        item.classList.remove('drag-over');
+      });
+
+      item.addEventListener('drop', (e) => {
+        e.preventDefault();
+        item.classList.remove('drag-over');
+
+        if (this.draggedFileId && this.draggedFileId !== file.id) {
+          // Reorder files
+          const project = appState.getProject();
+          const textFiles = project.files.filter(f => f.type === 'markdown');
+          const draggedIndex = textFiles.findIndex(f => f.id === this.draggedFileId);
+          const dropIndex = textFiles.findIndex(f => f.id === file.id);
+
+          if (draggedIndex !== -1 && dropIndex !== -1) {
+            // Remove dragged file and insert at new position
+            const [draggedFile] = textFiles.splice(draggedIndex, 1);
+            textFiles.splice(dropIndex, 0, draggedFile);
+
+            // Update state with new order
+            appState.reorderFiles(textFiles.map(f => f.id));
+          }
+        }
+      });
+    }
+
     // Click to select
     item.addEventListener('click', (e) => {
       if ((e.target as HTMLElement).closest('.file-actions')) return;
+      if ((e.target as HTMLElement).closest('.drag-handle')) return;
 
       this.selectedFileId = file.id;
       this.render();
       this.onFileSelect?.(file);
-    });
-
-    // Set as main document
-    const setMainBtn = item.querySelector('.btn-set-main');
-    setMainBtn?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      appState.setMainDocument(file.id);
     });
 
     // Remove file

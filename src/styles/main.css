@@ -271,6 +271,15 @@ body {
   min-height: 200px;
 }
 
+.panel-preview.collapsed {
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+.panel-preview.collapsed .file-preview {
+  display: none;
+}
+
 .file-list {
   flex: 1;
   overflow-y: auto;
@@ -307,6 +316,49 @@ body {
   color: var(--color-text-muted);
 }
 
+.file-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.file-tab {
+  flex: 1;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.file-tab:hover {
+  color: var(--color-text);
+  background: var(--color-bg-hover);
+}
+
+.file-tab.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.file-items-container {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.file-list-empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
 .file-item {
   display: flex;
   align-items: center;
@@ -336,6 +388,32 @@ body {
 
 .file-item.selected.main-document::before {
   color: #fff;
+}
+
+.file-item.dragging {
+  opacity: 0.5;
+}
+
+.file-item.drag-over {
+  border-top: 2px solid var(--color-primary);
+  margin-top: -2px;
+}
+
+.drag-handle {
+  cursor: grab;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  padding: 2px 4px;
+  letter-spacing: -2px;
+  user-select: none;
+}
+
+.drag-handle:hover {
+  color: var(--color-text);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
 }
 
 .file-icon {

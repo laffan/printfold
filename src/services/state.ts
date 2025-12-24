@@ -230,6 +230,35 @@ class AppState {
     }
   }
 
+  reorderFiles(fileIds: string[]): void {
+    const prevState = this.project;
+    const fileMap = new Map(this.project.files.map(f => [f.id, f]));
+
+    // Reorder only the files that are in the provided list
+    const reorderedFiles: ProjectFile[] = [];
+    const otherFiles: ProjectFile[] = [];
+
+    // First, collect files not in the reorder list
+    for (const file of this.project.files) {
+      if (!fileIds.includes(file.id)) {
+        otherFiles.push(file);
+      }
+    }
+
+    // Then add reordered files in the new order
+    for (const id of fileIds) {
+      const file = fileMap.get(id);
+      if (file) {
+        reorderedFiles.push(file);
+      }
+    }
+
+    // Merge: text files (reordered) + other files
+    this.project = { ...this.project, files: [...reorderedFiles, ...otherFiles] };
+    this.notifyProjectListeners(prevState);
+    this.requestReflow();
+  }
+
   setMainDocument(fileId: string | null): void {
     if (this.project.mainDocument !== fileId) {
       this.updateProject({ mainDocument: fileId });

@@ -14,6 +14,12 @@ interface MarginLine {
   pageNumber: number;
 }
 
+interface MarginLabel {
+  text: Konva.Text;
+  type: 'top' | 'bottom' | 'inner' | 'outer';
+  pageNumber: number;
+}
+
 export class SpreadEditor {
   private container!: HTMLElement;
   private thumbnailContainer!: HTMLElement;
@@ -25,6 +31,7 @@ export class SpreadEditor {
   private zoomLevel = 1;
   private showMargins = true;
   private marginLines: MarginLine[] = [];
+  private marginLabels: MarginLabel[] = [];
   private isDraggingMargin = false;
   private dragMarginType: 'top' | 'bottom' | 'inner' | 'outer' | 'header' | 'footer' | null = null;
   private dragPageNumber: number | null = null;
@@ -59,10 +66,15 @@ export class SpreadEditor {
   private projectUnsubscribe: (() => void) | null = null;
 
   private setupStateListeners(): void {
-    // Listen for selectedPageNumber changes to navigate to that page
+    // Listen for editor state changes
     this.stateUnsubscribe = appState.onEditorChange((state, prevState) => {
+      // Navigate to selected page
       if (state.selectedPageNumber !== null && state.selectedPageNumber !== prevState.selectedPageNumber) {
         this.navigateToPage(state.selectedPageNumber);
+      }
+      // Re-render when margin unit changes (to update labels)
+      if (state.marginUnit !== prevState.marginUnit) {
+        this.render();
       }
     });
 
@@ -309,6 +321,7 @@ export class SpreadEditor {
     this.layer.destroyChildren();
     this.marginLayer.destroyChildren();
     this.marginLines = [];
+    this.marginLabels = [];
 
     const spread = this.getCurrentSpread();
     const pageDimensions = this.getPageDimensions();
@@ -586,6 +599,7 @@ export class SpreadEditor {
     });
     topLabel.offsetX(topLabel.width() / 2);
     this.marginLayer.add(topLabel);
+    this.marginLabels.push({ text: topLabel, type: 'top', pageNumber: pageContent.pageNumber });
 
     // Bottom margin
     const bottomRect = new Konva.Rect({
@@ -618,6 +632,7 @@ export class SpreadEditor {
     });
     bottomLabel.offsetX(bottomLabel.width() / 2);
     this.marginLayer.add(bottomLabel);
+    this.marginLabels.push({ text: bottomLabel, type: 'bottom', pageNumber: pageContent.pageNumber });
 
     // Inner margin (spine side) - always uses margins.inner
     // Recto: spine on LEFT, Verso: spine on RIGHT
@@ -655,6 +670,7 @@ export class SpreadEditor {
     innerLabel.offsetX(innerLabel.width() / 2);
     innerLabel.offsetY(innerLabel.height() / 2);
     this.marginLayer.add(innerLabel);
+    this.marginLabels.push({ text: innerLabel, type: 'inner', pageNumber: pageContent.pageNumber });
 
     // Outer margin (outside edge) - always uses margins.outer
     // Recto: outer on RIGHT, Verso: outer on LEFT
@@ -692,6 +708,7 @@ export class SpreadEditor {
     outerLabel.offsetX(outerLabel.width() / 2);
     outerLabel.offsetY(outerLabel.height() / 2);
     this.marginLayer.add(outerLabel);
+    this.marginLabels.push({ text: outerLabel, type: 'outer', pageNumber: pageContent.pageNumber });
 
     // Header/Footer rendering and drag lines (orange)
     const project = appState.getProject();
@@ -981,6 +998,8 @@ export class SpreadEditor {
           line.points([startPoints[0] + dx, startPoints[1], startPoints[2] + dx, startPoints[3]]);
         }
 
+        // Update labels and sidebar in real-time
+        this.updateMarginDuringDrag(type, currentMarginValue);
         this.marginLayer.draw();
       };
 
@@ -1210,6 +1229,38 @@ export class SpreadEditor {
         return fonts.blockquote;
       default:
         return fonts.body;
+    }
+  }
+
+  /**
+   * Update margin display during drag (labels and sidebar inputs)
+   */
+  private updateMarginDuringDrag(marginType: 'top' | 'bottom' | 'inner' | 'outer', value: number): void {
+    const unit = appState.getEditor().marginUnit;
+    const formattedValue = formatMarginValue(value, unit);
+
+    // Update all labels of this type (both pages of the spread show the same value for global margins)
+    for (const label of this.marginLabels) {
+      if (label.type === marginType) {
+        label.text.text(formattedValue);
+        // Re-center horizontal labels
+        if (marginType === 'top' || marginType === 'bottom') {
+          label.text.offsetX(label.text.width() / 2);
+        } else {
+          // Vertical labels need both offsets updated
+          label.text.offsetX(label.text.width() / 2);
+        }
+      }
+    }
+
+    // Update sidebar input
+    const inputId = `opt-margin-${marginType}`;
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    if (input) {
+      const conv = { pt: 1, 'in': 1/72, cm: 2.54/72, px: 96/72 }[unit];
+      const decimals = { pt: 0, 'in': 2, cm: 2, px: 0 }[unit];
+      const displayValue = Math.round(value * conv * Math.pow(10, decimals)) / Math.pow(10, decimals);
+      input.value = displayValue.toString();
     }
   }
 }

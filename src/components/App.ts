@@ -152,9 +152,10 @@ export class App {
   }
 
   private setupCollapsiblePanels(): void {
-    const panels = document.querySelectorAll('.panel-options');
+    // Handle options panels
+    const optionsPanels = document.querySelectorAll('.panel-options');
 
-    panels.forEach(panel => {
+    optionsPanels.forEach(panel => {
       const header = panel.querySelector('.panel-header.collapsible');
       if (header) {
         header.addEventListener('click', () => {
@@ -168,6 +169,17 @@ export class App {
         }
       }
     });
+
+    // Handle preview panel
+    const previewPanel = document.querySelector('.panel-preview');
+    if (previewPanel) {
+      const header = previewPanel.querySelector('.panel-header.collapsible');
+      if (header) {
+        header.addEventListener('click', () => {
+          previewPanel.classList.toggle('collapsed');
+        });
+      }
+    }
   }
 
   private setupStateListeners(): void {
@@ -200,8 +212,11 @@ export class App {
     // Always clear measurement cache to ensure fresh measurements with loaded fonts
     clearMeasurementCache();
 
-    const mainDoc = appState.getMainDocument();
-    if (!mainDoc) {
+    // Get all markdown files and concatenate their content in order
+    const project = appState.getProject();
+    const markdownFiles = project.files.filter(f => f.type === 'markdown');
+
+    if (markdownFiles.length === 0) {
       // Clear everything
       appState.updateProject({ signatures: [] });
       this.spreadEditor.render();
@@ -209,8 +224,11 @@ export class App {
       return;
     }
 
-    // Perform text flow
-    const result = textFlowEngine.reflow(mainDoc.content);
+    // Concatenate all markdown content with double newlines between files
+    const combinedContent = markdownFiles.map(f => f.content).join('\n\n');
+
+    // Perform text flow on combined content
+    const result = textFlowEngine.reflow(combinedContent);
 
     // Update project with flow result
     appState.updateProject({ signatures: result.signatures });
