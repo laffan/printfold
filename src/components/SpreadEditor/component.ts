@@ -262,9 +262,14 @@ export class SpreadEditor {
       this.render();
     });
 
-    // Add blank spread button - adds a new static spread
+    // Add blank spread button - adds a new static spread (2 pages)
     document.getElementById('btn-add-blank-page')?.addEventListener('click', () => {
       appState.addStaticSpread();
+    });
+
+    // Add single page button - adds a single blank page
+    document.getElementById('btn-add-single-page')?.addEventListener('click', () => {
+      appState.addStaticPage('recto');
     });
 
     // Mouse wheel zoom

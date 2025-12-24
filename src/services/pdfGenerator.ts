@@ -6,7 +6,7 @@
 import { PDFDocument, PDFPage, PDFImage, rgb, StandardFonts, PDFFont, degrees } from 'pdf-lib';
 import { appState } from './state';
 import { textFlowEngine } from './textFlow';
-import type { Signature, PageContent, FontStyle, PageItem, TextPageItem, ShapePageItem, ImagePageItem, FillConfig } from '../types';
+import type { Signature, Spread, PageContent, FontStyle, PageItem, TextPageItem, ShapePageItem, ImagePageItem, FillConfig } from '../types';
 import { SHEET_SIZES, calculateSpreadRowsPerSheet } from '../types';
 
 interface FontCache {
@@ -110,10 +110,22 @@ export class PDFGenerator {
   ): Promise<void> {
     const project = appState.getProject();
     const imposition = textFlowEngine.calculateImposition(signature);
+    const staticSpreads = project.staticSpreads || [];
 
-    // Get all pages from spreads
+    // Get all pages from spreads with their spread info
     const pages: (PageContent | null)[] = [];
+    const spreadForPage: Map<number, { spread: Spread; staticSpread?: import('../types').StaticSpread }> = new Map();
+
     for (const spread of signature.spreads) {
+      // Check if this spread corresponds to a static spread
+      const staticSpread = staticSpreads.find(s => s.id === spread.id);
+
+      if (spread.verso) {
+        spreadForPage.set(spread.verso.pageNumber, { spread, staticSpread });
+      }
+      if (spread.recto) {
+        spreadForPage.set(spread.recto.pageNumber, { spread, staticSpread });
+      }
       pages.push(spread.verso);
       pages.push(spread.recto);
     }
@@ -140,12 +152,21 @@ export class PDFGenerator {
         const leftPageIndex = sheet.front.left - 1 - (signature.signatureNumber - 1) * signature.pageCount;
         const rightPageIndex = sheet.front.right - 1 - (signature.signatureNumber - 1) * signature.pageCount;
 
-        if (leftPageIndex >= 0 && leftPageIndex < pages.length && pages[leftPageIndex]) {
-          this.drawPage(frontPage, pages[leftPageIndex]!, 0, rowY, pageWidth, pageHeight, project, false);
+        const leftPage = leftPageIndex >= 0 && leftPageIndex < pages.length ? pages[leftPageIndex] : null;
+        const rightPage = rightPageIndex >= 0 && rightPageIndex < pages.length ? pages[rightPageIndex] : null;
+
+        if (leftPage) {
+          const info = spreadForPage.get(leftPage.pageNumber);
+          const adjacentPage = info?.spread.recto || null;
+          const spanningItems = info?.staticSpread?.spanningItems;
+          this.drawPage(frontPage, leftPage, 0, rowY, pageWidth, pageHeight, project, false, adjacentPage, spanningItems);
         }
 
-        if (rightPageIndex >= 0 && rightPageIndex < pages.length && pages[rightPageIndex]) {
-          this.drawPage(frontPage, pages[rightPageIndex]!, pageWidth, rowY, pageWidth, pageHeight, project, true);
+        if (rightPage) {
+          const info = spreadForPage.get(rightPage.pageNumber);
+          const adjacentPage = info?.spread.verso || null;
+          const spanningItems = info?.staticSpread?.spanningItems;
+          this.drawPage(frontPage, rightPage, pageWidth, rowY, pageWidth, pageHeight, project, true, adjacentPage, spanningItems);
         }
       });
 
@@ -159,12 +180,21 @@ export class PDFGenerator {
         const backLeftIndex = sheet.back.left - 1 - (signature.signatureNumber - 1) * signature.pageCount;
         const backRightIndex = sheet.back.right - 1 - (signature.signatureNumber - 1) * signature.pageCount;
 
-        if (backLeftIndex >= 0 && backLeftIndex < pages.length && pages[backLeftIndex]) {
-          this.drawPage(backPage, pages[backLeftIndex]!, 0, rowY, pageWidth, pageHeight, project, true);
+        const leftPage = backLeftIndex >= 0 && backLeftIndex < pages.length ? pages[backLeftIndex] : null;
+        const rightPage = backRightIndex >= 0 && backRightIndex < pages.length ? pages[backRightIndex] : null;
+
+        if (leftPage) {
+          const info = spreadForPage.get(leftPage.pageNumber);
+          const adjacentPage = info?.spread.recto || null;
+          const spanningItems = info?.staticSpread?.spanningItems;
+          this.drawPage(backPage, leftPage, 0, rowY, pageWidth, pageHeight, project, true, adjacentPage, spanningItems);
         }
 
-        if (backRightIndex >= 0 && backRightIndex < pages.length && pages[backRightIndex]) {
-          this.drawPage(backPage, pages[backRightIndex]!, pageWidth, rowY, pageWidth, pageHeight, project, false);
+        if (rightPage) {
+          const info = spreadForPage.get(rightPage.pageNumber);
+          const adjacentPage = info?.spread.verso || null;
+          const spanningItems = info?.staticSpread?.spanningItems;
+          this.drawPage(backPage, rightPage, pageWidth, rowY, pageWidth, pageHeight, project, false, adjacentPage, spanningItems);
         }
       });
     }
@@ -181,7 +211,9 @@ export class PDFGenerator {
     width: number,
     height: number,
     project: ReturnType<typeof appState.getProject>,
-    isRecto: boolean
+    isRecto: boolean,
+    adjacentPage?: PageContent | null,
+    spreadSpanningItems?: import('../types').SpanningItem[]
   ): void {
     const { headerFooter, layoutOptions, fontOptions } = project;
     const margins = layoutOptions.margins;
@@ -197,11 +229,48 @@ export class PDFGenerator {
     const contentWidth = width - innerMargin - outerMargin;
     const contentHeight = height - margins.top - margins.bottom - headerHeight - footerHeight;
 
-    // For blank/static pages, draw items but skip regular content
+    // For blank/static pages, draw items
     if (pageContent.isBlank || pageContent.isStatic) {
+      // Draw this page's items
       if (pageContent.items && pageContent.items.length > 0) {
-        this.drawPageItems(pdfPage, pageContent.items, x, y, width, height);
+        this.drawPageItemsClipped(pdfPage, pageContent.items, x, y, width, height, 0, width);
       }
+
+      // Draw items from adjacent page that extend into this page
+      if (adjacentPage?.items && adjacentPage.items.length > 0) {
+        const crossingItems = adjacentPage.items.filter(item => {
+          if (isRecto) {
+            // This is recto, adjacent is verso - items extending right
+            return item.x + item.width > width;
+          } else {
+            // This is verso, adjacent is recto - items with negative x
+            return item.x < 0;
+          }
+        });
+
+        if (crossingItems.length > 0) {
+          // Adjust positions for adjacent items
+          const offsetX = isRecto ? -width : width;
+          this.drawPageItemsClipped(pdfPage, crossingItems, x, y, width, height, offsetX, width);
+        }
+      }
+
+      // Draw spanning items (positioned relative to full spread)
+      if (spreadSpanningItems && spreadSpanningItems.length > 0) {
+        const spanningPageItems = spreadSpanningItems.map(item => this.spanningItemToPageItem(item)).filter(Boolean) as PageItem[];
+        // For spanning items, offset depends on which page we're drawing
+        const offsetX = isRecto ? -width : 0;
+        // Only draw the portion visible on this page
+        const visibleItems = spanningPageItems.filter(item => {
+          const itemLeft = item.x + offsetX;
+          const itemRight = itemLeft + item.width;
+          return itemRight > 0 && itemLeft < width;
+        });
+        if (visibleItems.length > 0) {
+          this.drawPageItemsClipped(pdfPage, visibleItems, x, y, width, height, offsetX, width);
+        }
+      }
+
       return;
     }
 
@@ -554,6 +623,164 @@ export class PDFGenerator {
     }
 
     return fallbackColor ? this.parseColor(fallbackColor) : undefined;
+  }
+
+  /**
+   * Convert a SpanningItem to a PageItem for rendering
+   */
+  private spanningItemToPageItem(item: import('../types').SpanningItem): PageItem | null {
+    if (item.type === 'text') {
+      return {
+        ...item,
+        type: 'text',
+        content: item.content || '',
+        fontFamily: item.fontFamily || 'Arial',
+        fontSize: item.fontSize || 16,
+        fontWeight: item.fontWeight || 'normal',
+        fontStyle: item.fontStyle || 'normal',
+        color: item.color || '#000000',
+        textAlign: item.textAlign || 'left',
+      } as TextPageItem;
+    } else if (item.type === 'shape') {
+      return {
+        ...item,
+        type: 'shape',
+        shapeType: item.shapeType || 'rectangle',
+        fill: item.fill,
+        fillColor: item.fillColor,
+        strokeColor: item.strokeColor,
+        strokeWidth: item.strokeWidth,
+      } as ShapePageItem;
+    } else if (item.type === 'image') {
+      return {
+        ...item,
+        type: 'image',
+        imageFileId: item.imageFileId || '',
+      } as ImagePageItem;
+    }
+    return null;
+  }
+
+  /**
+   * Draw page items with clipping and offset support for cross-page items
+   */
+  private drawPageItemsClipped(
+    pdfPage: PDFPage,
+    items: PageItem[],
+    pageX: number,
+    pageY: number,
+    pageWidth: number,
+    pageHeight: number,
+    itemOffsetX: number,
+    clipWidth: number
+  ): void {
+    for (const item of items) {
+      // Calculate the item's position with offset
+      const adjustedX = item.x + itemOffsetX;
+
+      // Skip if completely outside the clip region
+      if (adjustedX + item.width <= 0 || adjustedX >= clipWidth) continue;
+
+      // Calculate visible portion
+      const visibleLeft = Math.max(0, adjustedX);
+      const visibleRight = Math.min(clipWidth, adjustedX + item.width);
+      const visibleWidth = visibleRight - visibleLeft;
+
+      if (visibleWidth <= 0) continue;
+
+      const opacity = item.opacity ?? 1;
+
+      // Convert from top-left origin to PDF bottom-left origin
+      const itemPdfY = pageY + pageHeight - item.y - item.height;
+
+      if (item.type === 'text') {
+        const textItem = item as TextPageItem;
+        const font = this.getTextItemFont(textItem);
+        const color = this.parseColor(textItem.color);
+        const textY = itemPdfY + item.height - textItem.fontSize;
+
+        // For text, only draw if the start is visible (simple clipping)
+        if (adjustedX >= 0) {
+          pdfPage.drawText(this.sanitizeText(textItem.content), {
+            x: pageX + adjustedX,
+            y: textY,
+            size: textItem.fontSize,
+            font,
+            color,
+            opacity,
+          });
+        }
+      } else if (item.type === 'shape') {
+        const shapeItem = item as ShapePageItem;
+        const fillColor = this.getFillColorFromConfig(shapeItem.fill, shapeItem.fillColor);
+        const strokeColor = shapeItem.strokeColor ? this.parseColor(shapeItem.strokeColor) : rgb(0, 0, 0);
+        const strokeWidth = shapeItem.strokeWidth ?? 1;
+
+        // For shapes, draw the visible clipped portion
+        if (shapeItem.shapeType === 'rectangle') {
+          pdfPage.drawRectangle({
+            x: pageX + visibleLeft,
+            y: itemPdfY,
+            width: visibleWidth,
+            height: item.height,
+            color: fillColor,
+            borderColor: strokeColor,
+            borderWidth: strokeWidth,
+            opacity,
+          });
+        } else if (shapeItem.shapeType === 'ellipse' || shapeItem.shapeType === 'circle') {
+          // For ellipse/circle, draw full shape (PDF will clip to page)
+          const centerX = pageX + adjustedX + item.width / 2;
+          const centerY = itemPdfY + item.height / 2;
+
+          if (shapeItem.shapeType === 'circle') {
+            const radius = Math.min(item.width, item.height) / 2;
+            pdfPage.drawCircle({
+              x: centerX,
+              y: centerY,
+              size: radius,
+              color: fillColor,
+              borderColor: strokeColor,
+              borderWidth: strokeWidth,
+              opacity,
+            });
+          } else {
+            pdfPage.drawEllipse({
+              x: centerX,
+              y: centerY,
+              xScale: item.width / 2,
+              yScale: item.height / 2,
+              color: fillColor,
+              borderColor: strokeColor,
+              borderWidth: strokeWidth,
+              opacity,
+            });
+          }
+        } else if (shapeItem.shapeType === 'line' || shapeItem.shapeType === 'arrow') {
+          // Lines/arrows - draw full, let PDF clip
+          pdfPage.drawLine({
+            start: { x: pageX + adjustedX, y: itemPdfY + item.height },
+            end: { x: pageX + adjustedX + item.width, y: itemPdfY },
+            color: strokeColor,
+            thickness: strokeWidth,
+            opacity,
+          });
+        }
+      } else if (item.type === 'image') {
+        // Images - simplified, draw at visible position
+        const imageItem = item as ImagePageItem;
+        const pdfImage = this.imageCache.get(imageItem.imageFileId);
+        if (pdfImage) {
+          pdfPage.drawImage(pdfImage, {
+            x: pageX + visibleLeft,
+            y: itemPdfY,
+            width: visibleWidth,
+            height: item.height,
+            opacity,
+          });
+        }
+      }
+    }
   }
 
   /**

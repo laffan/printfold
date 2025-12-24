@@ -347,18 +347,11 @@ export class App {
     const project = appState.getProject();
     const markdownFiles = project.files.filter(f => f.type === 'markdown');
 
-    if (markdownFiles.length === 0) {
-      // Clear everything
-      appState.updateProject({ signatures: [] });
-      this.spreadEditor.render();
-      this.updateDocumentInfo(appState.getProject());
-      return;
-    }
-
     // Concatenate all markdown content with double newlines between files
+    // (empty string if no markdown files - static spreads will still be processed)
     const combinedContent = markdownFiles.map(f => f.content).join('\n\n');
 
-    // Perform text flow on combined content
+    // Perform text flow on combined content (also merges static spreads)
     const result = textFlowEngine.reflow(combinedContent);
 
     // Update project with flow result

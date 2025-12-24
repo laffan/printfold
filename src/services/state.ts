@@ -380,6 +380,59 @@ class AppState {
     this.requestReflow();
   }
 
+  addStaticPage(position: 'verso' | 'recto' = 'recto'): void {
+    const prevState = this.project;
+    const staticSpreads = [...(this.project.staticSpreads || [])];
+
+    // Find the last static spread or create a new one
+    let targetSpread = staticSpreads[staticSpreads.length - 1];
+    const basePageNumber = 1000 + staticSpreads.length * 2;
+
+    // If no spreads exist, or the last spread already has a page in the requested position
+    if (!targetSpread || (position === 'verso' && targetSpread.verso) || (position === 'recto' && targetSpread.recto)) {
+      // Create a new spread with just this page
+      const newSpread: import('../types').StaticSpread = {
+        id: crypto.randomUUID(),
+        index: staticSpreads.length,
+        verso: position === 'verso' ? {
+          id: crypto.randomUUID(),
+          pageNumber: basePageNumber,
+          sections: [],
+          isBlank: true,
+          isRecto: false,
+          isStatic: true,
+          items: [],
+        } : null,
+        recto: position === 'recto' ? {
+          id: crypto.randomUUID(),
+          pageNumber: basePageNumber + 1,
+          sections: [],
+          isBlank: true,
+          isRecto: true,
+          isStatic: true,
+          items: [],
+        } : null,
+      };
+      staticSpreads.push(newSpread);
+    } else {
+      // Add page to existing spread
+      const pageNumber = position === 'verso' ? basePageNumber - 2 : basePageNumber - 1;
+      targetSpread[position] = {
+        id: crypto.randomUUID(),
+        pageNumber,
+        sections: [],
+        isBlank: true,
+        isRecto: position === 'recto',
+        isStatic: true,
+        items: [],
+      };
+    }
+
+    this.project = { ...this.project, staticSpreads };
+    this.notifyProjectListeners(prevState);
+    this.requestReflow();
+  }
+
   removeStaticSpread(spreadId: string): void {
     const prevState = this.project;
     const staticSpreads = (this.project.staticSpreads || []).filter(s => s.id !== spreadId);
