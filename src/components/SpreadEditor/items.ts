@@ -113,81 +113,30 @@ export function createItemNode(
     const imageFile = appState.getProject().files.find(f => f.id === imageItem.imageFileId);
 
     if (imageFile) {
-      // Create a placeholder rectangle first
-      const placeholder = new Konva.Rect({
+      // Load image first, then create Konva.Image
+      const img = new window.Image();
+      img.src = `data:image/png;base64,${imageFile.content}`;
+
+      const konvaImage = new Konva.Image({
         x: xOffset + item.x,
         y: item.y,
         width: item.width,
         height: item.height,
-        fill: '#f0f0f0',
-        stroke: '#cccccc',
-        strokeWidth: 1,
+        image: img,
         rotation: item.rotation || 0,
         opacity,
         draggable: true,
       });
-      placeholder.setAttr('itemId', item.id);
-      placeholder.setAttr('pageNumber', pageNumber);
-      placeholder.setAttr('xOffset', xOffset);
-      placeholder.setAttr('isImagePlaceholder', true);
+      konvaImage.setAttr('itemId', item.id);
+      konvaImage.setAttr('pageNumber', pageNumber);
+      konvaImage.setAttr('xOffset', xOffset);
 
-      // Load image asynchronously
-      const img = new window.Image();
+      // Redraw when image loads
       img.onload = () => {
-        const konvaImage = new Konva.Image({
-          x: xOffset + item.x,
-          y: item.y,
-          width: item.width,
-          height: item.height,
-          image: img,
-          rotation: item.rotation || 0,
-          opacity,
-          draggable: true,
-        });
-        konvaImage.setAttr('itemId', item.id);
-        konvaImage.setAttr('pageNumber', pageNumber);
-        konvaImage.setAttr('xOffset', xOffset);
-
-        // Copy event handlers
-        konvaImage.on('click tap', () => {
-          const position = xOffset === 0 ? 'verso' : 'recto';
-          appState.updateEditor({
-            selectedItemId: item.id,
-            selectedPageNumber: pageNumber,
-            selectedPagePosition: position,
-          });
-        });
-
-        konvaImage.on('dragend', () => {
-          const newX = konvaImage.x() - xOffset;
-          const newY = konvaImage.y();
-          appState.updateItemOnPage(pageNumber, item.id, { x: newX, y: newY });
-        });
-
-        konvaImage.on('transformend', () => {
-          const scaleX = konvaImage.scaleX();
-          const scaleY = konvaImage.scaleY();
-          const rotation = konvaImage.rotation();
-          konvaImage.scaleX(1);
-          konvaImage.scaleY(1);
-          appState.updateItemOnPage(pageNumber, item.id, {
-            width: item.width * scaleX,
-            height: item.height * scaleY,
-            x: konvaImage.x() - xOffset,
-            y: konvaImage.y(),
-            rotation,
-          });
-        });
-
-        // Replace placeholder with image
-        placeholder.destroy();
-        itemsLayer.add(konvaImage);
-        transformer.nodes([konvaImage]);
-        itemsLayer.draw();
+        itemsLayer.batchDraw();
       };
-      img.src = `data:image/png;base64,${imageFile.content}`;
 
-      node = placeholder;
+      node = konvaImage;
     }
   }
 

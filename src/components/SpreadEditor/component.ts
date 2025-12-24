@@ -324,16 +324,17 @@ export class SpreadEditor {
       this.stage.container().style.cursor = 'default';
     });
 
-    // Click on background to deselect page and items
+    // Click on background to deselect items (not pages - page selection is handled by page click areas)
     this.stage.on('click', (e) => {
-      // Only deselect if clicking directly on stage (not on a shape)
-      if (e.target === this.stage) {
-        appState.updateEditor({
-          selectedPageNumber: null,
-          selectedPagePosition: null,
-          selectedItemId: null,
-        });
-        this.render();
+      // Deselect item if clicking on stage, layer, or a non-item shape
+      const target = e.target;
+      const isStageOrLayer = target === this.stage || target.getLayer() === this.layer || target.getLayer() === this.marginLayer;
+      const isItem = target.getAttr('itemId') !== undefined;
+
+      if (isStageOrLayer && !isItem) {
+        // Only deselect the item, not the page (page selection handled by page click areas)
+        appState.updateEditor({ selectedItemId: null });
+        this.updateTransformer();
       }
     });
   }

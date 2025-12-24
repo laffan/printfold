@@ -386,19 +386,19 @@ body {
 }
 
 .panel-files {
-  flex: 0 0 auto;
-  max-height: 35%;
+  flex: 1;
+  min-height: 200px;
+  overflow: hidden;
 }
 
 .panel-files.expanded {
   flex: 1;
-  max-height: none;
 }
 
 .panel-preview {
-  flex: 0 0 20%;
+  flex: 0 0 auto;
   min-height: 100px;
-  max-height: 250px;
+  max-height: 200px;
 }
 
 .panel-preview.collapsed {
@@ -510,19 +510,28 @@ body {
 }
 
 /* Image file items with thumbnails */
+.file-items-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-content: flex-start;
+}
+
 .file-item-image {
   flex-direction: column;
   align-items: stretch;
-  padding: 8px;
+  padding: 6px;
+  width: 100px;
+  position: relative;
 }
 
 .file-thumbnail {
   width: 100%;
-  aspect-ratio: 4/3;
+  aspect-ratio: 1;
   background: var(--color-bg);
   border-radius: var(--radius-sm);
   overflow: hidden;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .file-thumbnail img {
@@ -532,7 +541,7 @@ body {
 }
 
 .file-item-image .file-name {
-  font-size: 11px;
+  font-size: 10px;
   text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -541,13 +550,9 @@ body {
 
 .file-item-image .file-actions {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: 2px;
+  right: 2px;
   opacity: 0;
-}
-
-.file-item-image {
-  position: relative;
 }
 
 .file-item-image:hover .file-actions {
