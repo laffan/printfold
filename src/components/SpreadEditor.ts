@@ -314,6 +314,11 @@ export class SpreadEditor {
       return;
     }
 
+    console.log('[SpreadEditor] render() called');
+    const project = appState.getProject();
+    console.log('[SpreadEditor] Current margins:', project.layoutOptions.margins);
+    console.log('[SpreadEditor] Signatures count:', project.signatures.length);
+
     this.layer.destroyChildren();
     this.marginLayer.destroyChildren();
     this.marginLines = [];
@@ -737,14 +742,17 @@ export class SpreadEditor {
         this.stage.off('mousemove', moveHandler);
         this.stage.off('mouseup mouseleave', upHandler);
 
+        // Get fresh project state for the update
+        const currentProject = appState.getProject();
+
         // Save the new height
         if (type === 'header') {
           appState.updateHeaderFooter({
-            header: { ...project.headerFooter.header, height: currentHeight },
+            header: { ...currentProject.headerFooter.header, height: currentHeight },
           });
         } else {
           appState.updateHeaderFooter({
-            footer: { ...project.headerFooter.footer, height: currentHeight },
+            footer: { ...currentProject.headerFooter.footer, height: currentHeight },
           });
         }
       };
@@ -839,10 +847,13 @@ export class SpreadEditor {
 
         console.log('[SpreadEditor] Margin drag ended, type:', type, 'value:', currentMarginValue);
 
+        // Get fresh project state for the update
+        const currentProject = appState.getProject();
+
         // Now apply the margin change to state (triggers reflow)
         if (this.isLocalChange) {
           // Local change - update margin override for this page only
-          const overrides = [...project.layoutOptions.marginOverrides];
+          const overrides = [...currentProject.layoutOptions.marginOverrides];
           const existingIndex = overrides.findIndex(o => o.pageNumber === pageNumber);
           const override = { pageNumber, margins: { [type]: currentMarginValue } };
 
@@ -859,9 +870,9 @@ export class SpreadEditor {
           appState.updateLayoutOptions({ marginOverrides: overrides });
         } else {
           // Global change
-          console.log('[SpreadEditor] Updating global margins');
+          console.log('[SpreadEditor] Updating global margins, current:', currentProject.layoutOptions.margins, 'new value:', currentMarginValue);
           appState.updateLayoutOptions({
-            margins: { ...project.layoutOptions.margins, [type]: currentMarginValue },
+            margins: { ...currentProject.layoutOptions.margins, [type]: currentMarginValue },
           });
         }
       };
@@ -893,6 +904,12 @@ export class SpreadEditor {
   ): void {
     const project = appState.getProject();
     let currentY = y;
+
+    // Debug: Log content dimensions and first section lines
+    if (page.sections.length > 0) {
+      const firstSection = page.sections[0] as { lines?: string[] };
+      console.log('[SpreadEditor] drawPageContent for page', page.pageNumber, '- contentWidth:', width, 'firstSectionLines:', firstSection.lines?.length || 0);
+    }
 
     for (const section of page.sections) {
       const fontStyle = this.getFontStyleForSection(section.type, section.level);

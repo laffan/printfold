@@ -198,10 +198,17 @@ export class App {
     const result = textFlowEngine.reflow(mainDoc.content);
 
     console.log('[App] Reflow complete, pages:', result.totalPages);
+    console.log('[App] First page sections:', result.signatures[0]?.spreads[0]?.verso?.sections?.length || 0);
+
     // Update project with flow result
     appState.updateProject({ signatures: result.signatures });
 
+    // Verify signatures were stored
+    const storedSigs = appState.getProject().signatures;
+    console.log('[App] Stored signatures count:', storedSigs.length);
+
     // Update spread editor
+    console.log('[App] Calling spreadEditor.render()');
     this.spreadEditor.render();
 
     // Update document info

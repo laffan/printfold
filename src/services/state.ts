@@ -301,16 +301,24 @@ class AppState {
 
   requestReflow(): void {
     console.log('[State] requestReflow called');
-    // Debounce reflow requests (reduced to 10ms for faster response)
+    // Debounce reflow requests to avoid excessive reflows during rapid changes
     if (this.reflowTimeout) {
       clearTimeout(this.reflowTimeout);
     }
+    // Use requestAnimationFrame to ensure DOM updates have completed
+    // and to batch rapid changes into a single reflow
     this.reflowTimeout = window.setTimeout(() => {
       console.log('[State] Executing reflow handlers, count:', this.reflowListeners.size);
-      for (const handler of this.reflowListeners) {
-        handler();
-      }
-    }, 10);
+      requestAnimationFrame(() => {
+        for (const handler of this.reflowListeners) {
+          try {
+            handler();
+          } catch (error) {
+            console.error('[State] Reflow handler error:', error);
+          }
+        }
+      });
+    }, 0);
   }
 
   private reflowTimeout: number | null = null;
