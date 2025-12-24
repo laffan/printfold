@@ -260,6 +260,7 @@ class AppState {
   }
 
   updateLayoutOptions(updates: Partial<LayoutOptions>): void {
+    console.log('[State] updateLayoutOptions called with:', Object.keys(updates));
     this.updateProject({
       layoutOptions: { ...this.project.layoutOptions, ...updates },
     });
@@ -300,6 +301,7 @@ class AppState {
   }
 
   requestReflow(): void {
+    console.log('[State] requestReflow called, listeners:', this.reflowListeners.size);
     // Debounce reflow requests to avoid excessive reflows during rapid changes
     if (this.reflowTimeout) {
       clearTimeout(this.reflowTimeout);
@@ -308,6 +310,7 @@ class AppState {
     // and to batch rapid changes into a single reflow
     this.reflowTimeout = window.setTimeout(() => {
       requestAnimationFrame(() => {
+        console.log('[State] Executing reflow handlers');
         for (const handler of this.reflowListeners) {
           handler();
         }
