@@ -28,7 +28,6 @@ export class SpreadEditor {
   private isDraggingMargin = false;
   private dragMarginType: 'top' | 'bottom' | 'inner' | 'outer' | 'header' | 'footer' | null = null;
   private dragPageNumber: number | null = null;
-  private isLocalChange = false;
   private stateUnsubscribe: (() => void) | null = null;
 
   mount(): void {
@@ -198,22 +197,11 @@ export class SpreadEditor {
 
   private setupKeyboardShortcuts(): void {
     document.addEventListener('keydown', (e) => {
-      // Track Cmd/Ctrl key for local margin changes
-      if (e.key === 'Meta' || e.key === 'Control') {
-        this.isLocalChange = true;
-      }
-
       // Arrow keys for navigation
       if (e.key === 'ArrowLeft') {
         this.navigateSpread(-1);
       } else if (e.key === 'ArrowRight') {
         this.navigateSpread(1);
-      }
-    });
-
-    document.addEventListener('keyup', (e) => {
-      if (e.key === 'Meta' || e.key === 'Control') {
-        this.isLocalChange = false;
       }
     });
   }
@@ -939,7 +927,7 @@ export class SpreadEditor {
         this.marginLayer.draw();
       };
 
-      const upHandler = () => {
+      const upHandler = (e: Konva.KonvaEventObject<MouseEvent>) => {
         this.isDraggingMargin = false;
         this.dragMarginType = null;
         this.dragPageNumber = null;
@@ -950,8 +938,14 @@ export class SpreadEditor {
         // Get fresh project state for the update
         const currentProject = appState.getProject();
 
+        // Check if Cmd/Ctrl is held at the moment of release for local changes
+        // This is more reliable than tracking keydown/keyup separately
+        const isLocalChange = e.evt?.metaKey || e.evt?.ctrlKey || false;
+
+        console.log('[SpreadEditor] Margin drag ended, isLocalChange:', isLocalChange, 'type:', type, 'value:', currentMarginValue);
+
         // Now apply the margin change to state (triggers reflow)
-        if (this.isLocalChange) {
+        if (isLocalChange) {
           // Local change - update margin override for this page only
           const overrides = [...currentProject.layoutOptions.marginOverrides];
           const existingIndex = overrides.findIndex(o => o.pageNumber === pageNumber);
