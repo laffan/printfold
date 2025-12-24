@@ -200,6 +200,10 @@ export class App {
 
   private performReflow(): void {
     console.log('[App] performReflow called');
+
+    // Always clear measurement cache to ensure fresh measurements with loaded fonts
+    clearMeasurementCache();
+
     const mainDoc = appState.getMainDocument();
     if (!mainDoc) {
       console.log('[App] No main document, clearing');

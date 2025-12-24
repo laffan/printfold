@@ -1022,6 +1022,7 @@ export class SpreadEditor {
 
       // Draw text content
       const lines = (section as { lines?: string[] }).lines || [section.content];
+      const textAlign = project.layoutOptions.textAlign;
 
       for (const line of lines) {
         if (currentY > y + height) break;
@@ -1035,8 +1036,10 @@ export class SpreadEditor {
           fontStyle: fontStyle.fontStyle === 'italic' ? 'italic' : 'normal',
           fill: fontStyle.color,
           width,
-          wrap: 'none',
-          ellipsis: true,
+          // For justify, we need wrap enabled; for left align, disable wrap to use pre-wrapped lines
+          wrap: textAlign === 'justify' ? 'word' : 'none',
+          align: textAlign,
+          ellipsis: textAlign !== 'justify',
         });
 
         if (fontStyle.fontWeight === 'bold') {
