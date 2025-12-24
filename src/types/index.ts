@@ -26,7 +26,48 @@ export interface PageContent {
   overflow?: DocumentSection[]; // Content that didn't fit
   isBlank: boolean;
   isRecto: boolean; // Right-hand page
+  isStatic: boolean; // Static pages don't receive text flow
+  items?: PageItem[]; // Items placed on static pages
 }
+
+// Items that can be placed on static pages
+export type PageItemType = 'text' | 'shape' | 'image';
+
+export interface PageItemBase {
+  id: string;
+  type: PageItemType;
+  x: number; // Position in points from left edge of page
+  y: number; // Position in points from top of page
+  width: number;
+  height: number;
+  rotation?: number; // Degrees
+}
+
+export interface TextPageItem extends PageItemBase {
+  type: 'text';
+  content: string;
+  fontFamily: string;
+  fontSize: number;
+  fontWeight: 'normal' | 'bold';
+  fontStyle: 'normal' | 'italic';
+  color: string;
+  textAlign: 'left' | 'center' | 'right';
+}
+
+export interface ShapePageItem extends PageItemBase {
+  type: 'shape';
+  shapeType: 'rectangle' | 'ellipse' | 'line';
+  fillColor?: string;
+  strokeColor?: string;
+  strokeWidth?: number;
+}
+
+export interface ImagePageItem extends PageItemBase {
+  type: 'image';
+  imageFileId: string; // Reference to project file
+}
+
+export type PageItem = TextPageItem | ShapePageItem | ImagePageItem;
 
 export interface Spread {
   id: string;
@@ -218,6 +259,7 @@ export function formatMarginValue(points: number, unit: MarginUnit): string {
 export interface EditorState {
   selectedPageNumber: number | null;
   selectedSpreadNumber: number | null;
+  selectedPagePosition: 'verso' | 'recto' | null; // Which page in the spread is selected
   isDraggingMargin: boolean;
   dragMarginType: 'top' | 'bottom' | 'inner' | 'outer' | null;
   isLocalMarginChange: boolean; // Cmd key held

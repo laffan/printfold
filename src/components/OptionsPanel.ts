@@ -18,12 +18,22 @@ export class OptionsPanel {
     this.setupLayoutOptions();
     this.setupHeaderFooterOptions();
     this.setupFontOptions();
+    this.setupSelectedPagePanel();
     this.initFontDropdowns();
     this.syncFromState();
 
     // Listen for state changes to update UI
     appState.onProjectChange(() => {
       this.syncFromState();
+      this.updateSelectedPagePanel();
+    });
+
+    // Listen for editor state changes (selected page)
+    appState.onEditorChange((state, prevState) => {
+      if (state.selectedPageNumber !== prevState.selectedPageNumber ||
+          state.selectedPagePosition !== prevState.selectedPagePosition) {
+        this.updateSelectedPagePanel();
+      }
     });
 
     // Start preloading fonts
@@ -497,6 +507,110 @@ export class OptionsPanel {
       clearTimeout(this.updateTimeout);
     }
     this.updateTimeout = window.setTimeout(fn, 150);
+  }
+
+  /**
+   * Set up the selected page panel event handlers
+   */
+  private setupSelectedPagePanel(): void {
+    // Remove blank page button
+    document.getElementById('btn-remove-blank-page')?.addEventListener('click', () => {
+      const editorState = appState.getEditor();
+      if (editorState.selectedPageNumber !== null) {
+        appState.removeBlankPage(editorState.selectedPageNumber);
+        // Clear selection
+        appState.updateEditor({ selectedPageNumber: null, selectedPagePosition: null });
+      }
+    });
+
+    // Remove static page button
+    document.getElementById('btn-remove-static-page')?.addEventListener('click', () => {
+      const editorState = appState.getEditor();
+      if (editorState.selectedPageNumber !== null) {
+        // For now, static pages are stored in blankPages - we'll need to update this
+        appState.removeBlankPage(editorState.selectedPageNumber);
+        appState.updateEditor({ selectedPageNumber: null, selectedPagePosition: null });
+      }
+    });
+
+    // Convert blank to static button
+    document.getElementById('btn-convert-to-static')?.addEventListener('click', () => {
+      // TODO: Implement conversion when static pages are fully supported
+      console.log('Convert to static - not yet implemented');
+    });
+
+    // Add static page after button
+    document.getElementById('btn-add-static-after')?.addEventListener('click', () => {
+      const editorState = appState.getEditor();
+      if (editorState.selectedPageNumber !== null) {
+        appState.addBlankPage(editorState.selectedPageNumber);
+      }
+    });
+  }
+
+  /**
+   * Update the selected page panel based on current selection
+   */
+  private updateSelectedPagePanel(): void {
+    const editorState = appState.getEditor();
+    const project = appState.getProject();
+    const panel = document.getElementById('selected-page-panel');
+
+    if (!panel) return;
+
+    // Hide panel if no page selected
+    if (editorState.selectedPageNumber === null || editorState.selectedPagePosition === null) {
+      panel.style.display = 'none';
+      return;
+    }
+
+    panel.style.display = 'block';
+
+    // Find the selected page
+    let selectedPage = null;
+    for (const sig of project.signatures) {
+      for (const spread of sig.spreads) {
+        if (editorState.selectedPagePosition === 'verso' &&
+            spread.verso?.pageNumber === editorState.selectedPageNumber) {
+          selectedPage = spread.verso;
+          break;
+        }
+        if (editorState.selectedPagePosition === 'recto' &&
+            spread.recto?.pageNumber === editorState.selectedPageNumber) {
+          selectedPage = spread.recto;
+          break;
+        }
+      }
+      if (selectedPage) break;
+    }
+
+    // Update info
+    document.getElementById('selected-page-number')!.textContent =
+      editorState.selectedPageNumber.toString();
+    document.getElementById('selected-page-position')!.textContent =
+      editorState.selectedPagePosition === 'verso' ? 'Left (verso)' : 'Right (recto)';
+
+    // Determine page type and show appropriate actions
+    const blankActions = document.getElementById('blank-page-actions')!;
+    const staticActions = document.getElementById('static-page-actions')!;
+    const normalActions = document.getElementById('normal-page-actions')!;
+
+    if (selectedPage?.isBlank && !selectedPage?.isStatic) {
+      document.getElementById('selected-page-type')!.textContent = 'Blank';
+      blankActions.style.display = 'flex';
+      staticActions.style.display = 'none';
+      normalActions.style.display = 'none';
+    } else if (selectedPage?.isStatic) {
+      document.getElementById('selected-page-type')!.textContent = 'Static';
+      blankActions.style.display = 'none';
+      staticActions.style.display = 'flex';
+      normalActions.style.display = 'none';
+    } else {
+      document.getElementById('selected-page-type')!.textContent = 'Content';
+      blankActions.style.display = 'none';
+      staticActions.style.display = 'none';
+      normalActions.style.display = 'flex';
+    }
   }
 
   private syncFromState(): void {

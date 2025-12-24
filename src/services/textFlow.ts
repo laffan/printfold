@@ -558,13 +558,14 @@ export class TextFlowEngine {
     return pages;
   }
 
-  private createEmptyPage(pageNumber: number, isBlank = false): PageContent {
+  private createEmptyPage(pageNumber: number, isBlank = false, isStatic = false): PageContent {
     return {
       id: crypto.randomUUID(),
       pageNumber,
       sections: [],
       isBlank,
       isRecto: pageNumber % 2 === 1,
+      isStatic,
     };
   }
 

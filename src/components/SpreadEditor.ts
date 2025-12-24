@@ -198,6 +198,18 @@ export class SpreadEditor {
       isPanning = false;
       this.stage.container().style.cursor = 'default';
     });
+
+    // Click on background to deselect page
+    this.stage.on('click', (e) => {
+      // Only deselect if clicking directly on stage (not on a shape)
+      if (e.target === this.stage) {
+        appState.updateEditor({
+          selectedPageNumber: null,
+          selectedPagePosition: null,
+        });
+        this.render();
+      }
+    });
   }
 
   private setupResizeObserver(): void {
@@ -317,6 +329,7 @@ export class SpreadEditor {
     }
 
     const project = appState.getProject();
+    const editorState = appState.getEditor();
 
     this.layer.destroyChildren();
     this.marginLayer.destroyChildren();
@@ -362,14 +375,108 @@ export class SpreadEditor {
       this.drawPageOutline(pageDimensions.width, 0, pageDimensions.width, pageDimensions.height);
     }
 
+    // Draw selected page indicator
+    this.drawSelectedPageIndicator(spread, pageDimensions, editorState);
+
+    // Add clickable areas for page selection
+    this.addPageClickAreas(spread, pageDimensions);
+
     this.layer.draw();
     this.marginLayer.draw();
     this.updateSpreadIndicator();
     this.renderThumbnails();
   }
 
+  /**
+   * Draw a dashed green border around the selected page
+   */
+  private drawSelectedPageIndicator(
+    spread: Spread,
+    pageDimensions: { width: number; height: number },
+    editorState: ReturnType<typeof appState.getEditor>
+  ): void {
+    const selectedPosition = editorState.selectedPagePosition;
+    if (!selectedPosition) return;
+
+    // Check if the selected page is in this spread
+    const isVersoSelected = selectedPosition === 'verso' &&
+      spread.verso?.pageNumber === editorState.selectedPageNumber;
+    const isRectoSelected = selectedPosition === 'recto' &&
+      spread.recto?.pageNumber === editorState.selectedPageNumber;
+
+    if (!isVersoSelected && !isRectoSelected) return;
+
+    const x = isVersoSelected ? 0 : pageDimensions.width;
+    const inset = 3;
+
+    const selectionRect = new Konva.Rect({
+      x: x + inset,
+      y: inset,
+      width: pageDimensions.width - inset * 2,
+      height: pageDimensions.height - inset * 2,
+      stroke: '#22c55e', // Green color
+      strokeWidth: 2,
+      dash: [8, 4],
+      fill: 'transparent',
+      listening: false,
+    });
+    this.marginLayer.add(selectionRect);
+  }
+
+  /**
+   * Add invisible click areas for page selection
+   */
+  private addPageClickAreas(
+    spread: Spread,
+    pageDimensions: { width: number; height: number }
+  ): void {
+    // Verso click area
+    if (spread.verso) {
+      const versoArea = new Konva.Rect({
+        x: 0,
+        y: 0,
+        width: pageDimensions.width,
+        height: pageDimensions.height,
+        fill: 'transparent',
+        listening: true,
+      });
+      versoArea.on('click', () => {
+        this.selectPage(spread.verso!.pageNumber, 'verso');
+      });
+      this.layer.add(versoArea);
+    }
+
+    // Recto click area
+    if (spread.recto) {
+      const rectoArea = new Konva.Rect({
+        x: pageDimensions.width,
+        y: 0,
+        width: pageDimensions.width,
+        height: pageDimensions.height,
+        fill: 'transparent',
+        listening: true,
+      });
+      rectoArea.on('click', () => {
+        this.selectPage(spread.recto!.pageNumber, 'recto');
+      });
+      this.layer.add(rectoArea);
+    }
+  }
+
+  /**
+   * Select a page
+   */
+  private selectPage(pageNumber: number, position: 'verso' | 'recto'): void {
+    appState.updateEditor({
+      selectedPageNumber: pageNumber,
+      selectedPagePosition: position,
+    });
+    this.render();
+  }
+
   private renderThumbnails(): void {
     const project = appState.getProject();
+    const editorState = appState.getEditor();
     const allSpreads = project.signatures.flatMap(sig => sig.spreads);
     const pageDimensions = this.getPageDimensions();
 
@@ -380,7 +487,7 @@ export class SpreadEditor {
       return;
     }
 
-    // Calculate thumbnail dimensions
+    // Calculate thumbnail dimensions - maintain actual spread aspect ratio
     const thumbWidth = 80;
     const spreadAspect = (pageDimensions.width * 2) / pageDimensions.height;
     const thumbHeight = thumbWidth / spreadAspect;
@@ -388,16 +495,13 @@ export class SpreadEditor {
     allSpreads.forEach((spread, index) => {
       const thumbDiv = document.createElement('div');
       thumbDiv.className = 'spread-thumbnail' + (index === this.currentSpreadIndex ? ' active' : '');
-      thumbDiv.addEventListener('click', () => {
-        this.currentSpreadIndex = index;
-        this.updateSpreadIndicator();
-        this.render();
-      });
 
       // Create a small canvas for the thumbnail
       const canvas = document.createElement('canvas');
       canvas.width = thumbWidth * 2; // Higher res for retina
       canvas.height = thumbHeight * 2;
+      canvas.style.width = `${thumbWidth}px`;
+      canvas.style.height = `${thumbHeight}px`;
       const ctx = canvas.getContext('2d')!;
       ctx.scale(2, 2);
 
@@ -418,39 +522,113 @@ export class SpreadEditor {
       ctx.fillStyle = '#d0d0d0';
       const contentMargin = 3;
 
-      // Verso page content
-      if (spread.verso && spread.verso.sections.length > 0) {
-        let yPos = contentMargin;
-        for (const section of spread.verso.sections) {
-          if (yPos > thumbHeight - contentMargin) break;
-          const lineCount = (section as { lines?: string[] }).lines?.length || 1;
-          for (let i = 0; i < Math.min(lineCount, 5); i++) {
+      // Verso page content - draw blank indicator or content lines
+      if (spread.verso) {
+        if (spread.verso.isBlank || spread.verso.isStatic) {
+          // Draw blank/static page indicator
+          ctx.fillStyle = '#f0f0f0';
+          ctx.fillRect(1, 1, thumbWidth / 2 - 2, thumbHeight - 2);
+          ctx.fillStyle = '#cccccc';
+          ctx.font = '6px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(spread.verso.isStatic ? 'S' : '∅', thumbWidth / 4, thumbHeight / 2 + 2);
+        } else if (spread.verso.sections.length > 0) {
+          ctx.fillStyle = '#d0d0d0';
+          let yPos = contentMargin;
+          for (const section of spread.verso.sections) {
             if (yPos > thumbHeight - contentMargin) break;
-            const lineWidth = (thumbWidth / 2 - contentMargin * 2) * (0.6 + Math.random() * 0.35);
-            ctx.fillRect(contentMargin, yPos, lineWidth, 1);
-            yPos += 2;
+            const lineCount = (section as { lines?: string[] }).lines?.length || 1;
+            for (let i = 0; i < Math.min(lineCount, 5); i++) {
+              if (yPos > thumbHeight - contentMargin) break;
+              const lineWidth = (thumbWidth / 2 - contentMargin * 2) * (0.6 + Math.random() * 0.35);
+              ctx.fillRect(contentMargin, yPos, lineWidth, 1);
+              yPos += 2;
+            }
+            yPos += 1;
           }
-          yPos += 1;
         }
       }
 
       // Recto page content
-      if (spread.recto && spread.recto.sections.length > 0) {
-        let yPos = contentMargin;
-        for (const section of spread.recto.sections) {
-          if (yPos > thumbHeight - contentMargin) break;
-          const lineCount = (section as { lines?: string[] }).lines?.length || 1;
-          for (let i = 0; i < Math.min(lineCount, 5); i++) {
+      if (spread.recto) {
+        if (spread.recto.isBlank || spread.recto.isStatic) {
+          // Draw blank/static page indicator
+          ctx.fillStyle = '#f0f0f0';
+          ctx.fillRect(thumbWidth / 2 + 1, 1, thumbWidth / 2 - 2, thumbHeight - 2);
+          ctx.fillStyle = '#cccccc';
+          ctx.font = '6px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(spread.recto.isStatic ? 'S' : '∅', thumbWidth * 3 / 4, thumbHeight / 2 + 2);
+        } else if (spread.recto.sections.length > 0) {
+          ctx.fillStyle = '#d0d0d0';
+          let yPos = contentMargin;
+          for (const section of spread.recto.sections) {
             if (yPos > thumbHeight - contentMargin) break;
-            const lineWidth = (thumbWidth / 2 - contentMargin * 2) * (0.6 + Math.random() * 0.35);
-            ctx.fillRect(thumbWidth / 2 + contentMargin, yPos, lineWidth, 1);
-            yPos += 2;
+            const lineCount = (section as { lines?: string[] }).lines?.length || 1;
+            for (let i = 0; i < Math.min(lineCount, 5); i++) {
+              if (yPos > thumbHeight - contentMargin) break;
+              const lineWidth = (thumbWidth / 2 - contentMargin * 2) * (0.6 + Math.random() * 0.35);
+              ctx.fillRect(thumbWidth / 2 + contentMargin, yPos, lineWidth, 1);
+              yPos += 2;
+            }
+            yPos += 1;
           }
-          yPos += 1;
         }
       }
 
+      // Draw selection indicator for selected page
+      const isVersoSelected = editorState.selectedPagePosition === 'verso' &&
+        spread.verso?.pageNumber === editorState.selectedPageNumber;
+      const isRectoSelected = editorState.selectedPagePosition === 'recto' &&
+        spread.recto?.pageNumber === editorState.selectedPageNumber;
+
+      if (isVersoSelected || isRectoSelected) {
+        ctx.strokeStyle = '#22c55e';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 2]);
+        const inset = 1.5;
+        if (isVersoSelected) {
+          ctx.strokeRect(inset, inset, thumbWidth / 2 - inset * 2, thumbHeight - inset * 2);
+        } else {
+          ctx.strokeRect(thumbWidth / 2 + inset, inset, thumbWidth / 2 - inset * 2, thumbHeight - inset * 2);
+        }
+        ctx.setLineDash([]);
+      }
+
       thumbDiv.appendChild(canvas);
+
+      // Create click areas for page selection (overlaid on canvas)
+      const clickContainer = document.createElement('div');
+      clickContainer.className = 'spread-thumbnail-clicks';
+      clickContainer.style.cssText = `position: absolute; top: 0; left: 0; width: 100%; height: ${thumbHeight}px; display: flex;`;
+
+      // Verso click area
+      const versoClick = document.createElement('div');
+      versoClick.style.cssText = 'flex: 1; cursor: pointer;';
+      versoClick.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.currentSpreadIndex = index;
+        if (spread.verso) {
+          this.selectPage(spread.verso.pageNumber, 'verso');
+        }
+        this.updateSpreadIndicator();
+      });
+      clickContainer.appendChild(versoClick);
+
+      // Recto click area
+      const rectoClick = document.createElement('div');
+      rectoClick.style.cssText = 'flex: 1; cursor: pointer;';
+      rectoClick.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.currentSpreadIndex = index;
+        if (spread.recto) {
+          this.selectPage(spread.recto.pageNumber, 'recto');
+        }
+        this.updateSpreadIndicator();
+      });
+      clickContainer.appendChild(rectoClick);
+
+      thumbDiv.appendChild(clickContainer);
 
       // Add label
       const label = document.createElement('div');

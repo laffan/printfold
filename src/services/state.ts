@@ -100,6 +100,7 @@ export const defaultHeaderFooter: HeaderFooterOptions = {
 export const defaultEditorState: EditorState = {
   selectedPageNumber: null,
   selectedSpreadNumber: null,
+  selectedPagePosition: null,
   isDraggingMargin: false,
   dragMarginType: null,
   isLocalMarginChange: false,
