@@ -513,8 +513,8 @@ export class OptionsPanel {
    * Set up the selected page panel event handlers
    */
   private setupSelectedPagePanel(): void {
-    // Remove blank page button
-    document.getElementById('btn-remove-blank-page')?.addEventListener('click', () => {
+    // Delete page button (for blank/static pages)
+    document.getElementById('btn-delete-page')?.addEventListener('click', () => {
       const editorState = appState.getEditor();
       if (editorState.selectedPageNumber !== null) {
         appState.removeBlankPage(editorState.selectedPageNumber);
@@ -523,24 +523,8 @@ export class OptionsPanel {
       }
     });
 
-    // Remove static page button
-    document.getElementById('btn-remove-static-page')?.addEventListener('click', () => {
-      const editorState = appState.getEditor();
-      if (editorState.selectedPageNumber !== null) {
-        // For now, static pages are stored in blankPages - we'll need to update this
-        appState.removeBlankPage(editorState.selectedPageNumber);
-        appState.updateEditor({ selectedPageNumber: null, selectedPagePosition: null });
-      }
-    });
-
-    // Convert blank to static button
-    document.getElementById('btn-convert-to-static')?.addEventListener('click', () => {
-      // TODO: Implement conversion when static pages are fully supported
-      console.log('Convert to static - not yet implemented');
-    });
-
-    // Add static page after button
-    document.getElementById('btn-add-static-after')?.addEventListener('click', () => {
+    // Add blank page after button (for content pages)
+    document.getElementById('btn-add-blank-after')?.addEventListener('click', () => {
       const editorState = appState.getEditor();
       if (editorState.selectedPageNumber !== null) {
         appState.addBlankPage(editorState.selectedPageNumber);
@@ -591,23 +575,18 @@ export class OptionsPanel {
       editorState.selectedPagePosition === 'verso' ? 'Left (verso)' : 'Right (recto)';
 
     // Determine page type and show appropriate actions
-    const blankActions = document.getElementById('blank-page-actions')!;
     const staticActions = document.getElementById('static-page-actions')!;
     const normalActions = document.getElementById('normal-page-actions')!;
 
-    if (selectedPage?.isBlank && !selectedPage?.isStatic) {
+    // Blank pages are considered "static" from user's perspective
+    const isBlankOrStatic = selectedPage?.isBlank || selectedPage?.isStatic;
+
+    if (isBlankOrStatic) {
       document.getElementById('selected-page-type')!.textContent = 'Blank';
-      blankActions.style.display = 'flex';
-      staticActions.style.display = 'none';
-      normalActions.style.display = 'none';
-    } else if (selectedPage?.isStatic) {
-      document.getElementById('selected-page-type')!.textContent = 'Static';
-      blankActions.style.display = 'none';
       staticActions.style.display = 'flex';
       normalActions.style.display = 'none';
     } else {
       document.getElementById('selected-page-type')!.textContent = 'Content';
-      blankActions.style.display = 'none';
       staticActions.style.display = 'none';
       normalActions.style.display = 'flex';
     }

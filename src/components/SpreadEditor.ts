@@ -388,7 +388,7 @@ export class SpreadEditor {
   }
 
   /**
-   * Draw a dashed green border around the selected page
+   * Draw a solid green bar below the selected page
    */
   private drawSelectedPageIndicator(
     spread: Spread,
@@ -407,20 +407,18 @@ export class SpreadEditor {
     if (!isVersoSelected && !isRectoSelected) return;
 
     const x = isVersoSelected ? 0 : pageDimensions.width;
-    const inset = 3;
+    const barHeight = 5;
 
-    const selectionRect = new Konva.Rect({
-      x: x + inset,
-      y: inset,
-      width: pageDimensions.width - inset * 2,
-      height: pageDimensions.height - inset * 2,
-      stroke: '#22c55e', // Green color
-      strokeWidth: 2,
-      dash: [8, 4],
-      fill: 'transparent',
+    // Draw solid green bar below the page
+    const selectionBar = new Konva.Rect({
+      x: x,
+      y: pageDimensions.height,
+      width: pageDimensions.width,
+      height: barHeight,
+      fill: '#22c55e', // Green color
       listening: false,
     });
-    this.marginLayer.add(selectionRect);
+    this.marginLayer.add(selectionBar);
   }
 
   /**
@@ -576,26 +574,47 @@ export class SpreadEditor {
         }
       }
 
-      // Draw selection indicator for selected page
+      // Check selection state for labels
       const isVersoSelected = editorState.selectedPagePosition === 'verso' &&
         spread.verso?.pageNumber === editorState.selectedPageNumber;
       const isRectoSelected = editorState.selectedPagePosition === 'recto' &&
         spread.recto?.pageNumber === editorState.selectedPageNumber;
 
-      if (isVersoSelected || isRectoSelected) {
-        ctx.strokeStyle = '#22c55e';
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([4, 2]);
-        const inset = 1.5;
-        if (isVersoSelected) {
-          ctx.strokeRect(inset, inset, thumbWidth / 2 - inset * 2, thumbHeight - inset * 2);
-        } else {
-          ctx.strokeRect(thumbWidth / 2 + inset, inset, thumbWidth / 2 - inset * 2, thumbHeight - inset * 2);
-        }
-        ctx.setLineDash([]);
-      }
-
       thumbDiv.appendChild(canvas);
+
+      // Create labels container with individual page numbers
+      const labelsContainer = document.createElement('div');
+      labelsContainer.className = 'spread-thumbnail-labels';
+
+      // Verso label
+      const versoLabel = document.createElement('div');
+      versoLabel.className = 'spread-thumbnail-page-label' + (isVersoSelected ? ' selected' : '');
+      versoLabel.textContent = spread.verso?.pageNumber?.toString() || '–';
+      versoLabel.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.currentSpreadIndex = index;
+        if (spread.verso) {
+          this.selectPage(spread.verso.pageNumber, 'verso');
+        }
+        this.updateSpreadIndicator();
+      });
+      labelsContainer.appendChild(versoLabel);
+
+      // Recto label
+      const rectoLabel = document.createElement('div');
+      rectoLabel.className = 'spread-thumbnail-page-label' + (isRectoSelected ? ' selected' : '');
+      rectoLabel.textContent = spread.recto?.pageNumber?.toString() || '–';
+      rectoLabel.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.currentSpreadIndex = index;
+        if (spread.recto) {
+          this.selectPage(spread.recto.pageNumber, 'recto');
+        }
+        this.updateSpreadIndicator();
+      });
+      labelsContainer.appendChild(rectoLabel);
+
+      thumbDiv.appendChild(labelsContainer);
 
       // Create click areas for page selection (overlaid on canvas)
       const clickContainer = document.createElement('div');
@@ -629,14 +648,6 @@ export class SpreadEditor {
       clickContainer.appendChild(rectoClick);
 
       thumbDiv.appendChild(clickContainer);
-
-      // Add label
-      const label = document.createElement('div');
-      label.className = 'spread-thumbnail-label';
-      const versoNum = spread.verso?.pageNumber || '–';
-      const rectoNum = spread.recto?.pageNumber || '–';
-      label.textContent = `${versoNum}–${rectoNum}`;
-      thumbDiv.appendChild(label);
 
       this.thumbnailContainer.appendChild(thumbDiv);
     });

@@ -639,16 +639,32 @@ body {
   width: 80px;
 }
 
-.spread-thumbnail-label {
+.spread-thumbnail-labels {
+  display: flex;
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
+}
+
+.spread-thumbnail-page-label {
+  flex: 1;
   background: rgba(0, 0, 0, 0.6);
   color: white;
   font-size: 9px;
   text-align: center;
-  padding: 2px;
+  padding: 2px 0;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.spread-thumbnail-page-label:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.spread-thumbnail-page-label.selected {
+  background: #22c55e;
+  color: white;
 }
 
 .konva-container {
