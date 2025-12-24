@@ -4,7 +4,11 @@
  */
 
 import { appState } from '../../services/state';
+import { createFontDropdown, FontDropdown } from '../FontDropdown';
 import type { PageItem, TextPageItem, ShapePageItem } from '../../types';
+
+// Module-level font dropdown instance for text items
+let itemFontDropdown: FontDropdown | null = null;
 
 /**
  * Set up the Edit Page panel event handlers
@@ -155,12 +159,11 @@ function setupEditPropertyInputs(updateEditSelectedSectionFn: () => void): void 
   setupColorInput('item-stroke', 'strokeColor');
   setupPropInput('item-stroke-width', 'strokeWidth');
 
-  // Text properties
-  const fontFamily = document.getElementById('item-font-family') as HTMLSelectElement;
-  fontFamily?.addEventListener('change', () => {
+  // Text properties - use custom font dropdown
+  itemFontDropdown = createFontDropdown('item-font-family', (value) => {
     const editorState = appState.getEditor();
     if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
-    appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { fontFamily: fontFamily.value });
+    appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { fontFamily: value });
   });
 
   setupPropInput('item-font-size', 'fontSize');
@@ -354,7 +357,10 @@ export function updateEditSelectedSection(): void {
     shapeProps!.style.display = 'none';
     textProps!.style.display = 'block';
 
-    (document.getElementById('item-font-family') as HTMLSelectElement).value = textItem.fontFamily;
+    // Use font dropdown if available, otherwise fall back to select
+    if (itemFontDropdown) {
+      itemFontDropdown.setValue(textItem.fontFamily);
+    }
     (document.getElementById('item-font-size') as HTMLInputElement).value = textItem.fontSize.toString();
     (document.getElementById('item-text-color') as HTMLInputElement).value = textItem.color;
 

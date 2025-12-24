@@ -124,13 +124,14 @@
           <h2>Options</h2>
         </div>
 
-        <!-- Document Info (moved to top) -->
+        <!-- Info Panel (Document + Selected Page) -->
         <div class="panel panel-info" data-panel="info">
           <div class="panel-header collapsible">
-            <h3>Document Info</h3>
+            <h3>Info</h3>
             <span class="collapse-icon">▼</span>
           </div>
           <div class="panel-content">
+            <!-- Document Info -->
             <div class="info-item">
               <span class="info-label">Pages:</span>
               <span id="info-pages" class="info-value">0</span>
@@ -146,6 +147,29 @@
             <div class="info-item">
               <span class="info-label">Sheets:</span>
               <span id="info-sheets" class="info-value">0</span>
+            </div>
+
+            <!-- Selected Page Info (shown when a page is selected) -->
+            <div id="selected-page-section" class="selected-page-section" style="display: none;">
+              <div class="section-divider"></div>
+              <div class="info-item">
+                <span class="info-label">Selected:</span>
+                <span id="selected-page-number" class="info-value">–</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Position:</span>
+                <span id="selected-page-position" class="info-value">–</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Type:</span>
+                <span id="selected-page-type" class="info-value">–</span>
+              </div>
+              <div id="static-page-actions" class="page-actions" style="display: none;">
+                <button id="btn-delete-page" class="btn btn-secondary btn-small btn-danger">Delete Page</button>
+              </div>
+              <div id="normal-page-actions" class="page-actions" style="display: none;">
+                <button id="btn-add-blank-after" class="btn btn-secondary btn-small">Add Blank Page After</button>
+              </div>
             </div>
           </div>
         </div>
@@ -431,33 +455,6 @@
                 <label for="opt-color-headings">Color</label>
                 <input type="color" id="opt-color-headings" value="#000000">
               </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Selected Page Panel -->
-        <div id="selected-page-panel" class="panel panel-selected-page" style="display: none;">
-          <div class="panel-header">
-            <h3>Selected Page</h3>
-          </div>
-          <div class="panel-content">
-            <div class="info-item">
-              <span class="info-label">Page:</span>
-              <span id="selected-page-number" class="info-value">–</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Position:</span>
-              <span id="selected-page-position" class="info-value">–</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Type:</span>
-              <span id="selected-page-type" class="info-value">–</span>
-            </div>
-            <div id="static-page-actions" class="page-actions" style="display: none;">
-              <button id="btn-delete-page" class="btn btn-secondary btn-small btn-danger">Delete Page</button>
-            </div>
-            <div id="normal-page-actions" class="page-actions" style="display: none;">
-              <button id="btn-add-blank-after" class="btn btn-secondary btn-small">Add Blank Page After</button>
             </div>
           </div>
         </div>

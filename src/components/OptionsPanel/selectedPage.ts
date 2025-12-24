@@ -23,28 +23,39 @@ export function setupSelectedPagePanel(): void {
   document.getElementById('btn-add-blank-after')?.addEventListener('click', () => {
     const editorState = appState.getEditor();
     if (editorState.selectedPageNumber !== null) {
-      appState.addBlankPage(editorState.selectedPageNumber);
+      const afterPageNumber = editorState.selectedPageNumber;
+      appState.addBlankPage(afterPageNumber);
+
+      // Auto-select the new blank page
+      // The new blank page is inserted after the current page, so it's afterPageNumber + 1
+      const newPageNumber = afterPageNumber + 1;
+      // Odd pages are recto, even pages are verso
+      const newPosition = newPageNumber % 2 === 1 ? 'recto' : 'verso';
+      appState.updateEditor({
+        selectedPageNumber: newPageNumber,
+        selectedPagePosition: newPosition,
+      });
     }
   });
 }
 
 /**
- * Update the selected page panel based on current selection
+ * Update the selected page section based on current selection
  */
 export function updateSelectedPagePanel(): void {
   const editorState = appState.getEditor();
   const project = appState.getProject();
-  const panel = document.getElementById('selected-page-panel');
+  const section = document.getElementById('selected-page-section');
 
-  if (!panel) return;
+  if (!section) return;
 
-  // Hide panel if no page selected
+  // Hide section if no page selected
   if (editorState.selectedPageNumber === null || editorState.selectedPagePosition === null) {
-    panel.style.display = 'none';
+    section.style.display = 'none';
     return;
   }
 
-  panel.style.display = 'block';
+  section.style.display = 'block';
 
   // Find the selected page
   let selectedPage = null;

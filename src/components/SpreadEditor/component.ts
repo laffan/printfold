@@ -649,18 +649,8 @@ export class SpreadEditor {
       this.layer.add(pageNum);
     }
 
+    // Skip content rendering for blank pages (items are rendered separately)
     if (pageContent.isBlank) {
-      const blankText = new Konva.Text({
-        x: x + dimensions.width / 2,
-        y: y + dimensions.height / 2,
-        text: '[Blank Page]',
-        fontSize: 12,
-        fill: '#cccccc',
-        fontStyle: 'italic',
-        align: 'center',
-      });
-      blankText.offsetX(blankText.width() / 2);
-      this.layer.add(blankText);
       return;
     }
 
