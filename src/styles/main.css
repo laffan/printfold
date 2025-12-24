@@ -838,6 +838,29 @@ body {
   color: #fff;
 }
 
+/* Font select dropdowns */
+.form-group select[id^="opt-font"],
+.form-group select[id$="-font"] {
+  font-size: 14px;
+  padding: 8px;
+  line-height: 1.4;
+}
+
+.form-group select[id^="opt-font"] option,
+.form-group select[id$="-font"] option {
+  padding: 6px 8px;
+  font-size: 14px;
+}
+
+.form-group select[id^="opt-font"] optgroup,
+.form-group select[id$="-font"] optgroup {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-style: normal;
+  color: var(--color-text-secondary);
+  padding: 8px 0 4px;
+}
+
 /* Responsive */
 @media (max-width: 1200px) {
   .app-main {

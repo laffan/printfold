@@ -4,22 +4,90 @@
  */
 
 import { appState } from '../services/state';
+import { googleFonts, GOOGLE_FONTS, SYSTEM_FONTS } from '../services/googleFonts';
 import type { OutputOptions, LayoutOptions, FontOptions, HeaderFooterOptions } from '../types';
 
 export class OptionsPanel {
   private updateTimeout: number | null = null;
+  private fontSelectIds = ['opt-font-body', 'opt-font-h1', 'opt-header-font', 'opt-footer-font'];
 
   mount(): void {
     this.setupOutputOptions();
     this.setupLayoutOptions();
     this.setupHeaderFooterOptions();
     this.setupFontOptions();
+    this.populateFontSelects();
     this.syncFromState();
 
     // Listen for state changes to update UI
     appState.onProjectChange(() => {
       this.syncFromState();
     });
+
+    // Listen for font load events to update dropdown styling
+    googleFonts.onFontLoaded(() => {
+      this.updateFontSelectStyles();
+    });
+
+    // Start preloading fonts
+    googleFonts.preloadAllFonts();
+  }
+
+  /**
+   * Populate all font select dropdowns with Google Fonts + System Fonts
+   */
+  private populateFontSelects(): void {
+    for (const selectId of this.fontSelectIds) {
+      const select = document.getElementById(selectId) as HTMLSelectElement;
+      if (!select) continue;
+
+      // Clear existing options
+      select.innerHTML = '';
+
+      // Add Google Fonts group
+      const googleGroup = document.createElement('optgroup');
+      googleGroup.label = 'Google Fonts';
+
+      for (const font of GOOGLE_FONTS) {
+        const option = document.createElement('option');
+        option.value = font.family;
+        option.textContent = font.name;
+        option.style.fontFamily = `"${font.family}", ${font.category}`;
+        googleGroup.appendChild(option);
+      }
+      select.appendChild(googleGroup);
+
+      // Add System Fonts group
+      const systemGroup = document.createElement('optgroup');
+      systemGroup.label = 'System Fonts';
+
+      for (const font of SYSTEM_FONTS) {
+        const option = document.createElement('option');
+        option.value = font.family;
+        option.textContent = font.name;
+        option.style.fontFamily = `"${font.family}", ${font.category}`;
+        systemGroup.appendChild(option);
+      }
+      select.appendChild(systemGroup);
+    }
+
+    this.updateFontSelectStyles();
+  }
+
+  /**
+   * Update font select option styles after fonts are loaded
+   */
+  private updateFontSelectStyles(): void {
+    for (const selectId of this.fontSelectIds) {
+      const select = document.getElementById(selectId) as HTMLSelectElement;
+      if (!select) continue;
+
+      // Update each option's font-family style
+      for (const option of Array.from(select.options)) {
+        const fontFamily = option.value;
+        option.style.fontFamily = googleFonts.getFontFamily(fontFamily.split(',')[0].replace(/"/g, ''));
+      }
+    }
   }
 
   private setupOutputOptions(): void {

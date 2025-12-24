@@ -15,9 +15,9 @@ import type {
 
 type StateChangeHandler<T> = (state: T, prevState: T) => void;
 
-// Default font styles
+// Default font styles - using Google Fonts
 const defaultFontStyle: FontStyle = {
-  fontFamily: 'Georgia, serif',
+  fontFamily: 'Source Serif 4',
   fontSize: 12,
   fontWeight: 'normal',
   fontStyle: 'normal',
@@ -25,9 +25,11 @@ const defaultFontStyle: FontStyle = {
 };
 
 const defaultHeadingStyle = (size: number, weight: 'bold' | 'normal' = 'bold'): FontStyle => ({
-  ...defaultFontStyle,
+  fontFamily: 'Source Sans 3',
   fontSize: size,
   fontWeight: weight,
+  fontStyle: 'normal',
+  color: '#000000',
 });
 
 // Default options
@@ -65,7 +67,7 @@ export const defaultFontOptions: FontOptions = {
   h6: defaultHeadingStyle(12, 'normal'),
   code: {
     ...defaultFontStyle,
-    fontFamily: 'Menlo, Monaco, monospace',
+    fontFamily: 'Inconsolata',
     fontSize: 10,
   },
   blockquote: {
