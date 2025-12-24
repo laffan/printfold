@@ -40,7 +40,6 @@ const measurementCache = new Map<string, number>();
  */
 export function clearMeasurementCache(): void {
   measurementCache.clear();
-  console.log('[TextFlow] Measurement cache cleared');
 }
 
 export class TextFlowEngine {
@@ -291,8 +290,6 @@ export class TextFlowEngine {
     const contentWidth = pageWidth - margins.inner - margins.outer;
     const contentHeight = pageHeight - margins.top - margins.bottom - headerHeight - footerHeight;
 
-    console.log('[TextFlow] calculatePageDimensions:', { pageWidth, margins, contentWidth, contentHeight });
-
     return { width: pageWidth, height: pageHeight, contentWidth, contentHeight };
   }
 
@@ -333,7 +330,11 @@ export class TextFlowEngine {
     const cached = measurementCache.get(cacheKey);
     if (cached !== undefined) return cached;
 
-    this.ctx.font = `${fontStyle.fontStyle} ${fontStyle.fontWeight} ${fontStyle.fontSize}px ${fontStyle.fontFamily}`;
+    // Font family names with spaces must be quoted in CSS font string
+    const quotedFamily = fontStyle.fontFamily.includes(' ')
+      ? `"${fontStyle.fontFamily}"`
+      : fontStyle.fontFamily;
+    this.ctx.font = `${fontStyle.fontStyle} ${fontStyle.fontWeight} ${fontStyle.fontSize}px ${quotedFamily}`;
     const width = this.ctx.measureText(text).width;
     measurementCache.set(cacheKey, width);
     return width;
@@ -343,6 +344,10 @@ export class TextFlowEngine {
    * Wrap text to fit within a width
    */
   private wrapText(text: string, maxWidth: number, fontStyle: FontStyle): string[] {
+    // Apply a small safety margin (2%) to account for measurement differences
+    // between Canvas 2D and Konva rendering engines
+    const safeMaxWidth = maxWidth * 0.98;
+
     const words = text.split(/\s+/);
     const lines: string[] = [];
     let currentLine = '';
@@ -351,20 +356,20 @@ export class TextFlowEngine {
       const testLine = currentLine ? `${currentLine} ${word}` : word;
       const testWidth = this.measureTextWidth(testLine, fontStyle);
 
-      if (testWidth <= maxWidth) {
+      if (testWidth <= safeMaxWidth) {
         currentLine = testLine;
       } else {
         if (currentLine) {
           lines.push(currentLine);
         }
         // Check if single word is too long
-        if (this.measureTextWidth(word, fontStyle) > maxWidth) {
+        if (this.measureTextWidth(word, fontStyle) > safeMaxWidth) {
           // Break word
           const chars = word.split('');
           let charLine = '';
           for (const char of chars) {
             const testCharLine = charLine + char;
-            if (this.measureTextWidth(testCharLine, fontStyle) <= maxWidth) {
+            if (this.measureTextWidth(testCharLine, fontStyle) <= safeMaxWidth) {
               charLine = testCharLine;
             } else {
               if (charLine) lines.push(charLine);

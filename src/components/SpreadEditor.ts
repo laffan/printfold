@@ -316,10 +316,7 @@ export class SpreadEditor {
       return;
     }
 
-    console.log('[SpreadEditor] render() called');
     const project = appState.getProject();
-    console.log('[SpreadEditor] Current margins:', project.layoutOptions.margins);
-    console.log('[SpreadEditor] Signatures count:', project.signatures.length);
 
     this.layer.destroyChildren();
     this.marginLayer.destroyChildren();
@@ -950,8 +947,6 @@ export class SpreadEditor {
         this.stage.off('mousemove', moveHandler);
         this.stage.off('mouseup mouseleave', upHandler);
 
-        console.log('[SpreadEditor] Margin drag ended, type:', type, 'value:', currentMarginValue);
-
         // Get fresh project state for the update
         const currentProject = appState.getProject();
 
@@ -971,11 +966,9 @@ export class SpreadEditor {
             overrides.push(override);
           }
 
-          console.log('[SpreadEditor] Updating local margin overrides');
           appState.updateLayoutOptions({ marginOverrides: overrides });
         } else {
           // Global change
-          console.log('[SpreadEditor] Updating global margins, current:', currentProject.layoutOptions.margins, 'new value:', currentMarginValue);
           appState.updateLayoutOptions({
             margins: { ...currentProject.layoutOptions.margins, [type]: currentMarginValue },
           });
@@ -1009,12 +1002,6 @@ export class SpreadEditor {
   ): void {
     const project = appState.getProject();
     let currentY = y;
-
-    // Debug: Log content dimensions and first section lines
-    if (page.sections.length > 0) {
-      const firstSection = page.sections[0] as { lines?: string[] };
-      console.log('[SpreadEditor] drawPageContent for page', page.pageNumber, '- contentWidth:', width, 'firstSectionLines:', firstSection.lines?.length || 0);
-    }
 
     for (const section of page.sections) {
       const fontStyle = this.getFontStyleForSection(section.type, section.level);
@@ -1129,7 +1116,8 @@ export class SpreadEditor {
       const lines = (section as { lines?: string[] }).lines || [section.content];
       const textAlign = project.layoutOptions.textAlign;
 
-      for (const line of lines) {
+      for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+        const line = lines[lineIndex];
         if (currentY > y + height) break;
 
         const text = new Konva.Text({

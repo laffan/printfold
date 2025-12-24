@@ -300,7 +300,6 @@ class AppState {
   }
 
   requestReflow(): void {
-    console.log('[State] requestReflow called');
     // Debounce reflow requests to avoid excessive reflows during rapid changes
     if (this.reflowTimeout) {
       clearTimeout(this.reflowTimeout);
@@ -308,14 +307,9 @@ class AppState {
     // Use requestAnimationFrame to ensure DOM updates have completed
     // and to batch rapid changes into a single reflow
     this.reflowTimeout = window.setTimeout(() => {
-      console.log('[State] Executing reflow handlers, count:', this.reflowListeners.size);
       requestAnimationFrame(() => {
         for (const handler of this.reflowListeners) {
-          try {
-            handler();
-          } catch (error) {
-            console.error('[State] Reflow handler error:', error);
-          }
+          handler();
         }
       });
     }, 0);
