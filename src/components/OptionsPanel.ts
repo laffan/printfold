@@ -4,19 +4,20 @@
  */
 
 import { appState } from '../services/state';
-import { googleFonts, GOOGLE_FONTS, SYSTEM_FONTS } from '../services/googleFonts';
+import { googleFonts } from '../services/googleFonts';
+import { FontDropdown, createFontDropdown } from './FontDropdown';
 import type { OutputOptions, LayoutOptions, FontOptions, HeaderFooterOptions } from '../types';
 
 export class OptionsPanel {
   private updateTimeout: number | null = null;
-  private fontSelectIds = ['opt-font-body', 'opt-font-h1', 'opt-header-font', 'opt-footer-font'];
+  private fontDropdowns: Map<string, FontDropdown> = new Map();
 
   mount(): void {
     this.setupOutputOptions();
     this.setupLayoutOptions();
     this.setupHeaderFooterOptions();
     this.setupFontOptions();
-    this.populateFontSelects();
+    this.initFontDropdowns();
     this.syncFromState();
 
     // Listen for state changes to update UI
@@ -24,70 +25,54 @@ export class OptionsPanel {
       this.syncFromState();
     });
 
-    // Listen for font load events to update dropdown styling
-    googleFonts.onFontLoaded(() => {
-      this.updateFontSelectStyles();
-    });
-
     // Start preloading fonts
     googleFonts.preloadAllFonts();
   }
 
   /**
-   * Populate all font select dropdowns with Google Fonts + System Fonts
+   * Initialize custom font dropdowns
    */
-  private populateFontSelects(): void {
-    for (const selectId of this.fontSelectIds) {
-      const select = document.getElementById(selectId) as HTMLSelectElement;
-      if (!select) continue;
+  private initFontDropdowns(): void {
+    // Body font dropdown
+    const bodyDropdown = createFontDropdown('opt-font-body', (value) => {
+      const fonts = appState.getProject().fontOptions;
+      appState.updateFontOptions({
+        body: { ...fonts.body, fontFamily: value },
+      });
+    });
+    if (bodyDropdown) this.fontDropdowns.set('opt-font-body', bodyDropdown);
 
-      // Clear existing options
-      select.innerHTML = '';
+    // Heading font dropdown
+    const headingDropdown = createFontDropdown('opt-font-h1', (value) => {
+      const fonts = appState.getProject().fontOptions;
+      appState.updateFontOptions({
+        h1: { ...fonts.h1, fontFamily: value },
+        h2: { ...fonts.h2, fontFamily: value },
+        h3: { ...fonts.h3, fontFamily: value },
+        h4: { ...fonts.h4, fontFamily: value },
+        h5: { ...fonts.h5, fontFamily: value },
+        h6: { ...fonts.h6, fontFamily: value },
+      });
+    });
+    if (headingDropdown) this.fontDropdowns.set('opt-font-h1', headingDropdown);
 
-      // Add Google Fonts group
-      const googleGroup = document.createElement('optgroup');
-      googleGroup.label = 'Google Fonts';
+    // Header font dropdown
+    const headerDropdown = createFontDropdown('opt-header-font', (value) => {
+      const header = appState.getProject().headerFooter.header;
+      appState.updateHeaderFooter({
+        header: { ...header, font: { ...header.font, fontFamily: value } },
+      });
+    });
+    if (headerDropdown) this.fontDropdowns.set('opt-header-font', headerDropdown);
 
-      for (const font of GOOGLE_FONTS) {
-        const option = document.createElement('option');
-        option.value = font.family;
-        option.textContent = font.name;
-        option.style.fontFamily = `"${font.family}", ${font.category}`;
-        googleGroup.appendChild(option);
-      }
-      select.appendChild(googleGroup);
-
-      // Add System Fonts group
-      const systemGroup = document.createElement('optgroup');
-      systemGroup.label = 'System Fonts';
-
-      for (const font of SYSTEM_FONTS) {
-        const option = document.createElement('option');
-        option.value = font.family;
-        option.textContent = font.name;
-        option.style.fontFamily = `"${font.family}", ${font.category}`;
-        systemGroup.appendChild(option);
-      }
-      select.appendChild(systemGroup);
-    }
-
-    this.updateFontSelectStyles();
-  }
-
-  /**
-   * Update font select option styles after fonts are loaded
-   */
-  private updateFontSelectStyles(): void {
-    for (const selectId of this.fontSelectIds) {
-      const select = document.getElementById(selectId) as HTMLSelectElement;
-      if (!select) continue;
-
-      // Update each option's font-family style
-      for (const option of Array.from(select.options)) {
-        const fontFamily = option.value;
-        option.style.fontFamily = googleFonts.getFontFamily(fontFamily.split(',')[0].replace(/"/g, ''));
-      }
-    }
+    // Footer font dropdown
+    const footerDropdown = createFontDropdown('opt-footer-font', (value) => {
+      const footer = appState.getProject().headerFooter.footer;
+      appState.updateHeaderFooter({
+        footer: { ...footer, font: { ...footer.font, fontFamily: value } },
+      });
+    });
+    if (footerDropdown) this.fontDropdowns.set('opt-footer-font', footerDropdown);
   }
 
   private setupOutputOptions(): void {
@@ -260,14 +245,7 @@ export class OptionsPanel {
       });
     });
 
-    // Header font options
-    this.bindSelect('opt-header-font', (value) => {
-      const header = appState.getProject().headerFooter.header;
-      appState.updateHeaderFooter({
-        header: { ...header, font: { ...header.font, fontFamily: value } },
-      });
-    });
-
+    // Header font options (font family handled by custom dropdown)
     this.bindNumberInput('opt-header-font-size', (value) => {
       const header = appState.getProject().headerFooter.header;
       appState.updateHeaderFooter({
@@ -282,14 +260,7 @@ export class OptionsPanel {
       });
     });
 
-    // Footer font options
-    this.bindSelect('opt-footer-font', (value) => {
-      const footer = appState.getProject().headerFooter.footer;
-      appState.updateHeaderFooter({
-        footer: { ...footer, font: { ...footer.font, fontFamily: value } },
-      });
-    });
-
+    // Footer font options (font family handled by custom dropdown)
     this.bindNumberInput('opt-footer-font-size', (value) => {
       const footer = appState.getProject().headerFooter.footer;
       appState.updateHeaderFooter({
@@ -306,13 +277,7 @@ export class OptionsPanel {
   }
 
   private setupFontOptions(): void {
-    // Body font
-    this.bindSelect('opt-font-body', (value) => {
-      const fonts = appState.getProject().fontOptions;
-      appState.updateFontOptions({
-        body: { ...fonts.body, fontFamily: value },
-      });
-    });
+    // Body font family handled by custom dropdown
 
     // Body size
     this.bindNumberInput('opt-font-size-body', (value) => {
@@ -340,18 +305,7 @@ export class OptionsPanel {
       appState.updateLayoutOptions({ textAlign: checked ? 'justify' : 'left' });
     });
 
-    // Heading font
-    this.bindSelect('opt-font-h1', (value) => {
-      const fonts = appState.getProject().fontOptions;
-      appState.updateFontOptions({
-        h1: { ...fonts.h1, fontFamily: value },
-        h2: { ...fonts.h2, fontFamily: value },
-        h3: { ...fonts.h3, fontFamily: value },
-        h4: { ...fonts.h4, fontFamily: value },
-        h5: { ...fonts.h5, fontFamily: value },
-        h6: { ...fonts.h6, fontFamily: value },
-      });
-    });
+    // Heading font family handled by custom dropdown
 
     // H1 size
     this.bindNumberInput('opt-font-size-h1', (value) => {
@@ -486,24 +440,24 @@ export class OptionsPanel {
     this.setInputValue('opt-footer-recto-center', project.headerFooter.footer.recto.center);
     this.setInputValue('opt-footer-recto-right', project.headerFooter.footer.recto.right);
 
-    // Font options
-    this.setSelectValue('opt-font-body', project.fontOptions.body.fontFamily);
+    // Font options (font families use custom dropdowns)
+    this.fontDropdowns.get('opt-font-body')?.setValue(project.fontOptions.body.fontFamily);
     this.setInputValue('opt-font-size-body', project.fontOptions.body.fontSize.toString());
     this.setColorValue('opt-color-body', project.fontOptions.body.color);
     this.setInputValue('opt-line-height-fonts', project.layoutOptions.lineHeight.toString());
     this.setCheckboxValue('opt-justify', project.layoutOptions.textAlign === 'justify');
 
-    this.setSelectValue('opt-font-h1', project.fontOptions.h1.fontFamily);
+    this.fontDropdowns.get('opt-font-h1')?.setValue(project.fontOptions.h1.fontFamily);
     this.setInputValue('opt-font-size-h1', project.fontOptions.h1.fontSize.toString());
     this.setInputValue('opt-font-size-h2', project.fontOptions.h2.fontSize.toString());
     this.setInputValue('opt-font-size-h3', project.fontOptions.h3.fontSize.toString());
     this.setColorValue('opt-color-headings', project.fontOptions.h1.color);
 
-    // Header/footer font options
-    this.setSelectValue('opt-header-font', project.headerFooter.header.font.fontFamily);
+    // Header/footer font options (font families use custom dropdowns)
+    this.fontDropdowns.get('opt-header-font')?.setValue(project.headerFooter.header.font.fontFamily);
     this.setInputValue('opt-header-font-size', project.headerFooter.header.font.fontSize.toString());
     this.setColorValue('opt-header-color', project.headerFooter.header.font.color);
-    this.setSelectValue('opt-footer-font', project.headerFooter.footer.font.fontFamily);
+    this.fontDropdowns.get('opt-footer-font')?.setValue(project.headerFooter.footer.font.fontFamily);
     this.setInputValue('opt-footer-font-size', project.headerFooter.footer.font.fontSize.toString());
     this.setColorValue('opt-footer-color', project.headerFooter.footer.font.color);
   }
