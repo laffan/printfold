@@ -954,18 +954,18 @@ export class OptionsPanel {
   }
 
   /**
-   * Update the Edit Page panel visibility
+   * Update the Edit Page panel visibility and toolbar add buttons
    */
   private updateEditPagePanel(): void {
     const editorState = appState.getEditor();
     const project = appState.getProject();
     const panel = document.getElementById('edit-page-panel');
-
-    if (!panel) return;
+    const toolbarAddItems = document.getElementById('toolbar-add-items');
 
     // Hide if no page selected
     if (editorState.selectedPageNumber === null) {
-      panel.style.display = 'none';
+      if (panel) panel.style.display = 'none';
+      if (toolbarAddItems) toolbarAddItems.style.display = 'none';
       return;
     }
 
@@ -987,9 +987,17 @@ export class OptionsPanel {
       if (selectedPage) break;
     }
 
-    // Show panel only for static/blank pages
+    // Show add items in toolbar for static/blank pages
     const isBlankOrStatic = selectedPage?.isBlank || selectedPage?.isStatic;
-    panel.style.display = isBlankOrStatic ? 'block' : 'none';
+    if (toolbarAddItems) {
+      toolbarAddItems.style.display = isBlankOrStatic ? 'flex' : 'none';
+    }
+
+    // Panel visibility is now controlled by item selection (updateEditSelectedSection)
+    // We only show the panel when an item is selected
+    if (panel && !isBlankOrStatic) {
+      panel.style.display = 'none';
+    }
   }
 
   /**
@@ -997,6 +1005,7 @@ export class OptionsPanel {
    */
   private updateEditSelectedSection(): void {
     const editorState = appState.getEditor();
+    const panel = document.getElementById('edit-page-panel');
     const section = document.getElementById('edit-selected-section');
     const shapeProps = document.getElementById('shape-properties');
     const textProps = document.getElementById('text-properties');
@@ -1006,6 +1015,7 @@ export class OptionsPanel {
     // Hide if no item selected
     if (!editorState.selectedItemId || !editorState.selectedPageNumber) {
       section.style.display = 'none';
+      if (panel) panel.style.display = 'none';
       return;
     }
 
@@ -1013,9 +1023,12 @@ export class OptionsPanel {
     const item = appState.getItemFromPage(editorState.selectedPageNumber, editorState.selectedItemId);
     if (!item) {
       section.style.display = 'none';
+      if (panel) panel.style.display = 'none';
       return;
     }
 
+    // Show panel and section
+    if (panel) panel.style.display = 'block';
     section.style.display = 'block';
 
     // Update common properties

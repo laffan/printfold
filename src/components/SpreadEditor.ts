@@ -700,8 +700,22 @@ export class SpreadEditor {
 
       // Handle drag end to update position
       node.on('dragend', () => {
-        const newX = node!.x() - xOffset;
-        const newY = node!.y();
+        let newX = node!.x() - xOffset;
+        let newY = node!.y();
+
+        // For centered shapes, convert back from center position to top-left
+        if (item.type === 'shape') {
+          const shapeItem = item as ShapePageItem;
+          if (shapeItem.shapeType === 'ellipse') {
+            newX -= item.width / 2;
+            newY -= item.height / 2;
+          } else if (shapeItem.shapeType === 'circle') {
+            const radius = Math.min(item.width, item.height) / 2;
+            newX -= radius;
+            newY -= radius;
+          }
+        }
+
         appState.updateItemOnPage(pageNumber, item.id, { x: newX, y: newY });
       });
 
@@ -717,8 +731,8 @@ export class SpreadEditor {
 
         let newWidth = item.width * scaleX;
         let newHeight = item.height * scaleY;
-        const newX = node!.x() - xOffset;
-        const newY = node!.y();
+        let newX = node!.x() - xOffset;
+        let newY = node!.y();
 
         // For ellipse, we need to handle differently since it's centered
         if (item.type === 'shape' && (item as ShapePageItem).shapeType === 'ellipse') {
@@ -727,6 +741,9 @@ export class SpreadEditor {
           newHeight = ellipse.radiusY() * 2 * scaleY;
           ellipse.radiusX(newWidth / 2);
           ellipse.radiusY(newHeight / 2);
+          // Convert from center to top-left
+          newX -= newWidth / 2;
+          newY -= newHeight / 2;
         }
 
         // For circle, update both width and height to maintain aspect
@@ -736,6 +753,9 @@ export class SpreadEditor {
           circle.radius(newRadius);
           newWidth = newRadius * 2;
           newHeight = newRadius * 2;
+          // Convert from center to top-left
+          newX -= newRadius;
+          newY -= newRadius;
         }
 
         appState.updateItemOnPage(pageNumber, item.id, {

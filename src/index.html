@@ -78,13 +78,23 @@
                 <button id="btn-zoom-fit" class="btn btn-icon" title="Fit to View">⊡</button>
               </div>
               <div class="toolbar-group">
-                <button id="btn-add-blank-page" class="btn btn-secondary btn-small">+ Blank Page</button>
+                <button id="btn-add-blank-page" class="btn btn-secondary btn-small">+ Blank</button>
               </div>
               <div class="toolbar-group">
                 <label class="toolbar-label">
                   <input type="checkbox" id="chk-show-margins">
                   <span>Show Margins</span>
                 </label>
+              </div>
+              <div class="toolbar-spacer"></div>
+              <div id="toolbar-add-items" class="toolbar-group toolbar-add-items" style="display: none;">
+                <button id="btn-add-text" class="btn btn-secondary btn-small">+ Text</button>
+                <button id="btn-add-rect" class="btn btn-secondary btn-small">+ Rect</button>
+                <button id="btn-add-ellipse" class="btn btn-secondary btn-small">+ Ellipse</button>
+                <button id="btn-add-circle" class="btn btn-secondary btn-small">+ Circle</button>
+                <button id="btn-add-line" class="btn btn-secondary btn-small">+ Line</button>
+                <button id="btn-add-arrow" class="btn btn-secondary btn-small">+ Arrow</button>
+                <button id="btn-add-image" class="btn btn-secondary btn-small">+ Image</button>
               </div>
             </div>
             <div id="spread-editor" class="spread-editor">
@@ -112,6 +122,32 @@
       <section class="column column-options">
         <div class="column-header">
           <h2>Options</h2>
+        </div>
+
+        <!-- Document Info (moved to top) -->
+        <div class="panel panel-info" data-panel="info">
+          <div class="panel-header collapsible">
+            <h3>Document Info</h3>
+            <span class="collapse-icon">▼</span>
+          </div>
+          <div class="panel-content">
+            <div class="info-item">
+              <span class="info-label">Pages:</span>
+              <span id="info-pages" class="info-value">0</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Spreads:</span>
+              <span id="info-spreads" class="info-value">0</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Signatures:</span>
+              <span id="info-signatures" class="info-value">0</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Sheets:</span>
+              <span id="info-sheets" class="info-value">0</span>
+            </div>
+          </div>
         </div>
 
         <!-- Output Options -->
@@ -429,27 +465,9 @@
         <!-- Edit Page Panel (for static pages) -->
         <div id="edit-page-panel" class="panel panel-edit-page" style="display: none;">
           <div class="panel-header">
-            <h3>Edit Page</h3>
+            <h3>Edit Selected</h3>
           </div>
-          <div class="panel-content">
-            <!-- Add Section -->
-            <div class="edit-section">
-              <h4 class="edit-section-header">Add</h4>
-              <div class="add-buttons">
-                <button id="btn-add-text" class="btn btn-secondary btn-small">+ Text</button>
-                <button id="btn-add-rect" class="btn btn-secondary btn-small">+ Rect</button>
-                <button id="btn-add-ellipse" class="btn btn-secondary btn-small">+ Ellipse</button>
-                <button id="btn-add-circle" class="btn btn-secondary btn-small">+ Circle</button>
-                <button id="btn-add-line" class="btn btn-secondary btn-small">+ Line</button>
-                <button id="btn-add-arrow" class="btn btn-secondary btn-small">+ Arrow</button>
-                <button id="btn-add-image" class="btn btn-secondary btn-small">+ Image</button>
-              </div>
-            </div>
-
-            <!-- Edit Selected Section -->
-            <div id="edit-selected-section" class="edit-section" style="display: none;">
-              <h4 class="edit-section-header">Edit Selected</h4>
-
+          <div id="edit-selected-section" class="panel-content" style="display: none;">
               <!-- Common properties -->
               <div class="edit-properties">
                 <div class="form-group inline-sizes">
@@ -560,32 +578,6 @@
                 <button id="btn-duplicate-item" class="btn btn-secondary btn-small">Duplicate</button>
                 <button id="btn-delete-item" class="btn btn-secondary btn-small btn-danger">Delete</button>
               </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Document Info -->
-        <div class="panel panel-info">
-          <div class="panel-header">
-            <h3>Document Info</h3>
-          </div>
-          <div class="panel-content">
-            <div class="info-item">
-              <span class="info-label">Pages:</span>
-              <span id="info-pages" class="info-value">0</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Spreads:</span>
-              <span id="info-spreads" class="info-value">0</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Signatures:</span>
-              <span id="info-signatures" class="info-value">0</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Sheets:</span>
-              <span id="info-sheets" class="info-value">0</span>
-            </div>
           </div>
         </div>
       </section>

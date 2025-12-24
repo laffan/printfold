@@ -651,6 +651,19 @@ body {
   accent-color: var(--color-primary);
 }
 
+.toolbar-spacer {
+  flex: 1;
+}
+
+.toolbar-add-items {
+  gap: 4px;
+}
+
+.toolbar-add-items .btn {
+  padding: 4px 6px;
+  font-size: 10px;
+}
+
 .zoom-display {
   font-size: 11px;
   font-family: var(--font-mono);
@@ -793,7 +806,7 @@ body {
 }
 
 .panel-info {
-  margin-top: auto;
+  flex: 0 0 auto;
 }
 
 /* Forms */
