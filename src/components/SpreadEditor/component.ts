@@ -8,7 +8,7 @@ import { appState } from '../../services/state';
 import type { Spread, PageContent, Margins, PageItem, ImagePageItem, FillConfig } from '../../types';
 import { SHEET_SIZES } from '../../types';
 import type { MarginLine, MarginLabel } from './types';
-import { createItemNode, renderPageItems } from './items';
+import { createItemNode, renderPageItems, renderSpanningItems } from './items';
 import { renderThumbnails } from './thumbnails';
 import { drawMarginGuides, getMarginsForPage } from './margins';
 import { drawPageContent } from './content';
@@ -699,6 +699,23 @@ export class SpreadEditor {
       renderPageItems(
         spread.recto,
         pageDimensions.width,
+        pageDimensions,
+        this.itemNodes,
+        this.itemsLayer,
+        this.zoomLevel,
+        this.stage,
+        this.transformer,
+        () => this.updateTransformer()
+      );
+    }
+
+    // Check if this spread is a static spread and render spanning items
+    const staticSpreads = project.staticSpreads || [];
+    const staticSpread = staticSpreads.find(s => s.id === spread.id);
+    if (staticSpread?.spanningItems && staticSpread.spanningItems.length > 0) {
+      renderSpanningItems(
+        staticSpread.spanningItems,
+        staticSpread.id,
         pageDimensions,
         this.itemNodes,
         this.itemsLayer,

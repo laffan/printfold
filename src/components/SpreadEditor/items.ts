@@ -5,7 +5,7 @@
 
 import Konva from 'konva';
 import { appState } from '../../services/state';
-import type { PageContent, PageItem, TextPageItem, ShapePageItem, ImagePageItem, FillConfig } from '../../types';
+import type { PageContent, PageItem, TextPageItem, ShapePageItem, ImagePageItem, FillConfig, SpanningItem } from '../../types';
 
 /**
  * Apply fill config to a Konva shape
@@ -449,4 +449,85 @@ export function renderPageItems(
       itemsLayer.add(node);
     }
   }
+}
+
+/**
+ * Render spanning items that bridge across verso and recto
+ * Spanning items have x position relative to the full spread width
+ */
+export function renderSpanningItems(
+  spanningItems: SpanningItem[],
+  spreadId: string,
+  pageDimensions: { width: number; height: number },
+  itemNodes: Map<string, Konva.Node>,
+  itemsLayer: Konva.Layer,
+  zoomLevel: number,
+  stage: Konva.Stage,
+  transformer: Konva.Transformer,
+  updateTransformerFn: () => void
+): void {
+  if (!spanningItems || spanningItems.length === 0) return;
+
+  for (const item of spanningItems) {
+    // Convert spanning item to PageItem format for createItemNode
+    // Spanning items use x=0 as the left edge of verso
+    const pageItem = convertSpanningToPageItem(item);
+    if (!pageItem) continue;
+
+    // xOffset is 0 since spanning items are positioned relative to the full spread
+    const node = createItemNode(pageItem, 0, -1, zoomLevel, stage, itemsLayer, transformer, updateTransformerFn);
+    if (node) {
+      // Store with a special prefix to identify as spanning
+      node.setAttr('isSpanningItem', true);
+      node.setAttr('spreadId', spreadId);
+      itemNodes.set(item.id, node);
+      itemsLayer.add(node);
+
+      // Update drag handling for spanning items
+      node.off('dragend');
+      node.on('dragend', () => {
+        const newPos = node.position();
+        appState.updateSpanningItem(spreadId, item.id, {
+          x: newPos.x / zoomLevel,
+          y: newPos.y / zoomLevel,
+        });
+      });
+    }
+  }
+}
+
+/**
+ * Convert a SpanningItem to a PageItem for rendering
+ */
+function convertSpanningToPageItem(item: SpanningItem): PageItem | null {
+  if (item.type === 'text') {
+    return {
+      ...item,
+      type: 'text',
+      content: item.content || '',
+      fontFamily: item.fontFamily || 'Arial',
+      fontSize: item.fontSize || 16,
+      fontWeight: item.fontWeight || 'normal',
+      fontStyle: item.fontStyle || 'normal',
+      color: item.color || '#000000',
+      textAlign: item.textAlign || 'left',
+    } as TextPageItem;
+  } else if (item.type === 'shape') {
+    return {
+      ...item,
+      type: 'shape',
+      shapeType: item.shapeType || 'rectangle',
+      fill: item.fill,
+      fillColor: item.fillColor,
+      strokeColor: item.strokeColor,
+      strokeWidth: item.strokeWidth,
+    } as ShapePageItem;
+  } else if (item.type === 'image') {
+    return {
+      ...item,
+      type: 'image',
+      imageFileId: item.imageFileId || '',
+    } as ImagePageItem;
+  }
+  return null;
 }

@@ -398,6 +398,52 @@ class AppState {
     return this.project.staticSpreads || [];
   }
 
+  // Spanning items (items that bridge across verso and recto)
+  addSpanningItemToSpread(spreadId: string, item: import('../types').SpanningItem): void {
+    const prevState = this.project;
+    const staticSpreads = (this.project.staticSpreads || []).map(spread => {
+      if (spread.id !== spreadId) return spread;
+      return {
+        ...spread,
+        spanningItems: [...(spread.spanningItems || []), item],
+      };
+    });
+    this.project = { ...this.project, staticSpreads };
+    this.notifyProjectListeners(prevState);
+  }
+
+  updateSpanningItem(spreadId: string, itemId: string, updates: Partial<import('../types').SpanningItem>): void {
+    const prevState = this.project;
+    const staticSpreads = (this.project.staticSpreads || []).map(spread => {
+      if (spread.id !== spreadId) return spread;
+      return {
+        ...spread,
+        spanningItems: (spread.spanningItems || []).map(item =>
+          item.id === itemId ? { ...item, ...updates } as import('../types').SpanningItem : item
+        ),
+      };
+    });
+    this.project = { ...this.project, staticSpreads };
+    this.notifyProjectListeners(prevState);
+  }
+
+  deleteSpanningItem(spreadId: string, itemId: string): void {
+    const prevState = this.project;
+    const staticSpreads = (this.project.staticSpreads || []).map(spread => {
+      if (spread.id !== spreadId) return spread;
+      return {
+        ...spread,
+        spanningItems: (spread.spanningItems || []).filter(item => item.id !== itemId),
+      };
+    });
+    this.project = { ...this.project, staticSpreads };
+    this.notifyProjectListeners(prevState);
+
+    if (this.editor.selectedItemId === itemId) {
+      this.updateEditor({ selectedItemId: null });
+    }
+  }
+
   // Page items (for static pages)
   addItemToPage(pageNumber: number, item: PageItem): void {
     const prevState = this.project;
