@@ -427,6 +427,89 @@ class AppState {
     return null;
   }
 
+  /**
+   * Move item to the front (highest z-index) on its page
+   */
+  bringItemToFront(pageNumber: number, itemId: string): void {
+    this.reorderItemInPage(pageNumber, itemId, 'front');
+  }
+
+  /**
+   * Move item to the back (lowest z-index) on its page
+   */
+  sendItemToBack(pageNumber: number, itemId: string): void {
+    this.reorderItemInPage(pageNumber, itemId, 'back');
+  }
+
+  /**
+   * Move item one step forward in z-order
+   */
+  moveItemForward(pageNumber: number, itemId: string): void {
+    this.reorderItemInPage(pageNumber, itemId, 'forward');
+  }
+
+  /**
+   * Move item one step backward in z-order
+   */
+  moveItemBackward(pageNumber: number, itemId: string): void {
+    this.reorderItemInPage(pageNumber, itemId, 'backward');
+  }
+
+  /**
+   * Internal helper to reorder items on a page
+   */
+  private reorderItemInPage(pageNumber: number, itemId: string, direction: 'front' | 'back' | 'forward' | 'backward'): void {
+    const prevState = this.project;
+
+    const signatures = this.project.signatures.map(sig => ({
+      ...sig,
+      spreads: sig.spreads.map(spread => {
+        const updatePage = (page: typeof spread.verso) => {
+          if (!page || page.pageNumber !== pageNumber || !page.items) return page;
+
+          const items = [...page.items];
+          const index = items.findIndex(item => item.id === itemId);
+          if (index === -1) return page;
+
+          const [item] = items.splice(index, 1);
+
+          switch (direction) {
+            case 'front':
+              items.push(item);
+              break;
+            case 'back':
+              items.unshift(item);
+              break;
+            case 'forward':
+              if (index < items.length) {
+                items.splice(index + 1, 0, item);
+              } else {
+                items.push(item);
+              }
+              break;
+            case 'backward':
+              if (index > 0) {
+                items.splice(index - 1, 0, item);
+              } else {
+                items.unshift(item);
+              }
+              break;
+          }
+
+          return { ...page, items };
+        };
+        return {
+          ...spread,
+          verso: updatePage(spread.verso),
+          recto: updatePage(spread.recto),
+        };
+      }),
+    }));
+
+    this.project = { ...this.project, signatures };
+    this.notifyProjectListeners(prevState);
+  }
+
   // Reflow
   onReflowRequest(handler: () => void): () => void {
     this.reflowListeners.add(handler);

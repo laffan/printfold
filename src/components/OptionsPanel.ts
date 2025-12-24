@@ -729,6 +729,16 @@ export class OptionsPanel {
       this.addItemToCurrentPage('line');
     });
 
+    // Add Circle button
+    document.getElementById('btn-add-circle')?.addEventListener('click', () => {
+      this.addItemToCurrentPage('circle');
+    });
+
+    // Add Arrow button
+    document.getElementById('btn-add-arrow')?.addEventListener('click', () => {
+      this.addItemToCurrentPage('arrow');
+    });
+
     // Add Image button
     document.getElementById('btn-add-image')?.addEventListener('click', () => {
       // Create file input to select image
@@ -771,6 +781,35 @@ export class OptionsPanel {
       }
     });
 
+    // Z-order buttons
+    document.getElementById('btn-bring-front')?.addEventListener('click', () => {
+      const editorState = appState.getEditor();
+      if (editorState.selectedPageNumber && editorState.selectedItemId) {
+        appState.bringItemToFront(editorState.selectedPageNumber, editorState.selectedItemId);
+      }
+    });
+
+    document.getElementById('btn-send-back')?.addEventListener('click', () => {
+      const editorState = appState.getEditor();
+      if (editorState.selectedPageNumber && editorState.selectedItemId) {
+        appState.sendItemToBack(editorState.selectedPageNumber, editorState.selectedItemId);
+      }
+    });
+
+    document.getElementById('btn-move-forward')?.addEventListener('click', () => {
+      const editorState = appState.getEditor();
+      if (editorState.selectedPageNumber && editorState.selectedItemId) {
+        appState.moveItemForward(editorState.selectedPageNumber, editorState.selectedItemId);
+      }
+    });
+
+    document.getElementById('btn-move-backward')?.addEventListener('click', () => {
+      const editorState = appState.getEditor();
+      if (editorState.selectedPageNumber && editorState.selectedItemId) {
+        appState.moveItemBackward(editorState.selectedPageNumber, editorState.selectedItemId);
+      }
+    });
+
     // Property input handlers
     this.setupEditPropertyInputs();
   }
@@ -798,6 +837,7 @@ export class OptionsPanel {
     setupPropInput('item-width', 'width');
     setupPropInput('item-height', 'height');
     setupPropInput('item-rotation', 'rotation');
+    setupPropInput('item-opacity', 'opacity');
 
     // Shape properties
     const setupColorInput = (id: string, prop: string) => {
@@ -866,17 +906,22 @@ export class OptionsPanel {
   /**
    * Add an item to the currently selected static page
    */
-  private addItemToCurrentPage(itemType: 'text' | 'rectangle' | 'ellipse' | 'line'): void {
+  private addItemToCurrentPage(itemType: 'text' | 'rectangle' | 'ellipse' | 'circle' | 'line' | 'arrow'): void {
     const editorState = appState.getEditor();
     if (!editorState.selectedPageNumber) return;
+
+    // Determine dimensions based on shape type
+    const isLinear = itemType === 'line' || itemType === 'arrow';
+    const isCircular = itemType === 'circle';
 
     const baseItem = {
       id: crypto.randomUUID(),
       x: 50,
       y: 50,
-      width: 100,
-      height: itemType === 'line' ? 2 : (itemType === 'text' ? 30 : 80),
+      width: isLinear ? 100 : (isCircular ? 60 : 100),
+      height: isLinear ? 2 : (itemType === 'text' ? 30 : (isCircular ? 60 : 80)),
       rotation: 0,
+      opacity: 1,
     };
 
     let item: PageItem;
@@ -898,9 +943,9 @@ export class OptionsPanel {
         ...baseItem,
         type: 'shape',
         shapeType: itemType,
-        fillColor: itemType === 'line' ? undefined : '#cccccc',
+        fillColor: isLinear ? undefined : '#cccccc',
         strokeColor: '#000000',
-        strokeWidth: 1,
+        strokeWidth: isLinear ? 2 : 1,
       } as ShapePageItem;
     }
 
@@ -979,6 +1024,7 @@ export class OptionsPanel {
     (document.getElementById('item-width') as HTMLInputElement).value = Math.round(item.width).toString();
     (document.getElementById('item-height') as HTMLInputElement).value = Math.round(item.height).toString();
     (document.getElementById('item-rotation') as HTMLInputElement).value = (item.rotation || 0).toString();
+    (document.getElementById('item-opacity') as HTMLInputElement).value = (item.opacity ?? 1).toString();
 
     // Show/hide type-specific properties
     if (item.type === 'shape') {

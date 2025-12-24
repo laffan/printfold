@@ -437,9 +437,11 @@
               <h4 class="edit-section-header">Add</h4>
               <div class="add-buttons">
                 <button id="btn-add-text" class="btn btn-secondary btn-small">+ Text</button>
-                <button id="btn-add-rect" class="btn btn-secondary btn-small">+ Rectangle</button>
+                <button id="btn-add-rect" class="btn btn-secondary btn-small">+ Rect</button>
                 <button id="btn-add-ellipse" class="btn btn-secondary btn-small">+ Ellipse</button>
+                <button id="btn-add-circle" class="btn btn-secondary btn-small">+ Circle</button>
                 <button id="btn-add-line" class="btn btn-secondary btn-small">+ Line</button>
+                <button id="btn-add-arrow" class="btn btn-secondary btn-small">+ Arrow</button>
                 <button id="btn-add-image" class="btn btn-secondary btn-small">+ Image</button>
               </div>
             </div>
@@ -470,11 +472,15 @@
                     <input type="number" id="item-height" step="1" min="1">
                   </label>
                 </div>
-                <div class="form-group">
+                <div class="form-group inline-sizes">
                   <label>
                     <span>Rotation</span>
                     <input type="number" id="item-rotation" step="1" min="-360" max="360" value="0">
                     <span class="unit">°</span>
+                  </label>
+                  <label>
+                    <span>Opacity</span>
+                    <input type="number" id="item-opacity" step="0.1" min="0" max="1" value="1">
                   </label>
                 </div>
               </div>
@@ -535,6 +541,17 @@
                     <button id="item-bold" class="btn btn-icon btn-small" title="Bold"><b>B</b></button>
                     <button id="item-italic" class="btn btn-icon btn-small" title="Italic"><i>I</i></button>
                   </div>
+                </div>
+              </div>
+
+              <!-- Z-Order -->
+              <div class="form-group">
+                <label>Layer Order</label>
+                <div class="btn-group">
+                  <button id="btn-bring-front" class="btn btn-icon btn-small" title="Bring to Front">⬆⬆</button>
+                  <button id="btn-move-forward" class="btn btn-icon btn-small" title="Move Forward">⬆</button>
+                  <button id="btn-move-backward" class="btn btn-icon btn-small" title="Move Backward">⬇</button>
+                  <button id="btn-send-back" class="btn btn-icon btn-small" title="Send to Back">⬇⬇</button>
                 </div>
               </div>
 

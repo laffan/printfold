@@ -41,6 +41,8 @@ export interface PageItemBase {
   width: number;
   height: number;
   rotation?: number; // Degrees
+  opacity?: number; // 0-1, defaults to 1
+  zIndex?: number; // Layer order
 }
 
 export interface TextPageItem extends PageItemBase {
@@ -56,7 +58,7 @@ export interface TextPageItem extends PageItemBase {
 
 export interface ShapePageItem extends PageItemBase {
   type: 'shape';
-  shapeType: 'rectangle' | 'ellipse' | 'line';
+  shapeType: 'rectangle' | 'ellipse' | 'circle' | 'line' | 'arrow';
   fillColor?: string;
   strokeColor?: string;
   strokeWidth?: number;
