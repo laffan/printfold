@@ -6,7 +6,7 @@
 import { PDFDocument, PDFPage, rgb, StandardFonts, PDFFont, degrees } from 'pdf-lib';
 import { appState } from './state';
 import { textFlowEngine } from './textFlow';
-import type { Signature, PageContent, FontStyle } from '../types';
+import type { Signature, PageContent, FontStyle, PageItem, TextPageItem, ShapePageItem } from '../types';
 import { SHEET_SIZES, calculateSpreadRowsPerSheet } from '../types';
 
 interface FontCache {
@@ -193,8 +193,11 @@ export class PDFGenerator {
     const contentWidth = width - innerMargin - outerMargin;
     const contentHeight = height - margins.top - margins.bottom - headerHeight - footerHeight;
 
-    if (pageContent.isBlank) {
-      // Don't draw anything for blank pages
+    // For blank/static pages, draw items but skip regular content
+    if (pageContent.isBlank || pageContent.isStatic) {
+      if (pageContent.items && pageContent.items.length > 0) {
+        this.drawPageItems(pdfPage, pageContent.items, x, y, width, height);
+      }
       return;
     }
 
@@ -523,5 +526,148 @@ export class PDFGenerator {
       return rgb(r, g, b);
     }
     return rgb(0, 0, 0);
+  }
+
+  /**
+   * Draw page items (shapes, text) on a static/blank page
+   */
+  private drawPageItems(
+    pdfPage: PDFPage,
+    items: PageItem[],
+    pageX: number,
+    pageY: number,
+    pageWidth: number,
+    pageHeight: number
+  ): void {
+    for (const item of items) {
+      const opacity = item.opacity ?? 1;
+
+      // Convert from top-left origin to PDF bottom-left origin
+      // Item y is from top of page, PDF y is from bottom
+      const itemPdfY = pageY + pageHeight - item.y - item.height;
+
+      if (item.type === 'text') {
+        const textItem = item as TextPageItem;
+        const font = this.getTextItemFont(textItem);
+        const color = this.parseColor(textItem.color);
+
+        // Draw text (PDF text draws from baseline, adjust for that)
+        const textY = itemPdfY + item.height - textItem.fontSize;
+
+        pdfPage.drawText(this.sanitizeText(textItem.content), {
+          x: pageX + item.x,
+          y: textY,
+          size: textItem.fontSize,
+          font,
+          color,
+          opacity,
+        });
+      } else if (item.type === 'shape') {
+        const shapeItem = item as ShapePageItem;
+        const fillColor = shapeItem.fillColor ? this.parseColor(shapeItem.fillColor) : undefined;
+        const strokeColor = shapeItem.strokeColor ? this.parseColor(shapeItem.strokeColor) : rgb(0, 0, 0);
+        const strokeWidth = shapeItem.strokeWidth ?? 1;
+
+        if (shapeItem.shapeType === 'rectangle') {
+          pdfPage.drawRectangle({
+            x: pageX + item.x,
+            y: itemPdfY,
+            width: item.width,
+            height: item.height,
+            color: fillColor,
+            borderColor: strokeColor,
+            borderWidth: strokeWidth,
+            opacity,
+            rotate: item.rotation ? degrees(item.rotation) : undefined,
+          });
+        } else if (shapeItem.shapeType === 'ellipse') {
+          // pdf-lib doesn't have native ellipse, approximate with a scaled circle path
+          // For now, draw as a rectangle with note - proper ellipse would need custom path
+          const centerX = pageX + item.x + item.width / 2;
+          const centerY = itemPdfY + item.height / 2;
+
+          // Draw ellipse using the ellipse method
+          pdfPage.drawEllipse({
+            x: centerX,
+            y: centerY,
+            xScale: item.width / 2,
+            yScale: item.height / 2,
+            color: fillColor,
+            borderColor: strokeColor,
+            borderWidth: strokeWidth,
+            opacity,
+          });
+        } else if (shapeItem.shapeType === 'circle') {
+          const radius = Math.min(item.width, item.height) / 2;
+          const centerX = pageX + item.x + radius;
+          const centerY = itemPdfY + radius;
+
+          pdfPage.drawCircle({
+            x: centerX,
+            y: centerY,
+            size: radius,
+            color: fillColor,
+            borderColor: strokeColor,
+            borderWidth: strokeWidth,
+            opacity,
+          });
+        } else if (shapeItem.shapeType === 'line' || shapeItem.shapeType === 'arrow') {
+          // Lines go from (x, y) to (x + width, y) with rotation
+          const startX = pageX + item.x;
+          const startY = itemPdfY + item.height / 2;
+          const endX = startX + item.width;
+          const endY = startY;
+
+          pdfPage.drawLine({
+            start: { x: startX, y: startY },
+            end: { x: endX, y: endY },
+            thickness: strokeWidth,
+            color: strokeColor,
+            opacity,
+          });
+
+          // Draw arrowhead for arrow type
+          if (shapeItem.shapeType === 'arrow') {
+            const arrowSize = 8;
+            // Simple arrowhead pointing right
+            pdfPage.drawLine({
+              start: { x: endX, y: endY },
+              end: { x: endX - arrowSize, y: endY + arrowSize / 2 },
+              thickness: strokeWidth,
+              color: strokeColor,
+              opacity,
+            });
+            pdfPage.drawLine({
+              start: { x: endX, y: endY },
+              end: { x: endX - arrowSize, y: endY - arrowSize / 2 },
+              thickness: strokeWidth,
+              color: strokeColor,
+              opacity,
+            });
+          }
+        }
+      }
+      // Note: Image items would need async embedding, skipped for now
+    }
+  }
+
+  /**
+   * Get font for text item (simplified - uses standard fonts)
+   */
+  private getTextItemFont(textItem: TextPageItem): PDFFont {
+    if (!this.fontCache) {
+      throw new Error('Font cache not initialized');
+    }
+
+    if (textItem.fontWeight === 'bold' && textItem.fontStyle === 'italic') {
+      return this.fontCache.boldItalic;
+    }
+    if (textItem.fontWeight === 'bold') {
+      return this.fontCache.bold;
+    }
+    if (textItem.fontStyle === 'italic') {
+      return this.fontCache.italic;
+    }
+    return this.fontCache.regular;
   }
 }
