@@ -730,7 +730,12 @@ export class SpreadEditor {
 
     const node = this.itemNodes.get(editorState.selectedItemId);
     if (node) {
-      this.transformer.nodes([node]);
+      // Don't attach transformer to images that are still loading
+      if (node.getAttr('imageLoading')) {
+        this.transformer.nodes([]);
+      } else {
+        this.transformer.nodes([node]);
+      }
     } else {
       this.transformer.nodes([]);
     }

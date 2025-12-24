@@ -52,6 +52,7 @@ export class App {
     this.setupTabs();
     this.setupCollapsiblePanels();
     this.setupStateListeners();
+    this.setupResizers();
 
     // Initial reflow if there's content
     this.performReflow();
@@ -183,6 +184,128 @@ export class App {
         });
       }
     }
+  }
+
+  private setupResizers(): void {
+    // Column resizers (horizontal dragging)
+    const columnResizers = document.querySelectorAll('.column-resizer');
+    columnResizers.forEach(resizer => {
+      this.setupColumnResizer(resizer as HTMLElement);
+    });
+
+    // Panel resizers (vertical dragging)
+    const panelResizers = document.querySelectorAll('.panel-resizer');
+    panelResizers.forEach(resizer => {
+      this.setupPanelResizer(resizer as HTMLElement);
+    });
+  }
+
+  private setupColumnResizer(resizer: HTMLElement): void {
+    const resizerType = resizer.dataset.resizer;
+    let prevSibling: HTMLElement | null = null;
+    let nextSibling: HTMLElement | null = null;
+
+    // Get the columns on either side
+    if (resizerType === 'input-editor') {
+      prevSibling = document.querySelector('.column-input');
+      nextSibling = document.querySelector('.column-editor');
+    } else if (resizerType === 'editor-options') {
+      prevSibling = document.querySelector('.column-editor');
+      nextSibling = document.querySelector('.column-options');
+    }
+
+    if (!prevSibling || !nextSibling) return;
+
+    let startX = 0;
+    let startPrevWidth = 0;
+    let startNextWidth = 0;
+
+    const onMouseMove = (e: MouseEvent) => {
+      const dx = e.clientX - startX;
+
+      // Calculate new widths
+      const newPrevWidth = Math.max(200, startPrevWidth + dx);
+      const newNextWidth = Math.max(200, startNextWidth - dx);
+
+      prevSibling!.style.flex = `0 0 ${newPrevWidth}px`;
+      nextSibling!.style.flex = resizerType === 'input-editor' ? '1' : `0 0 ${newNextWidth}px`;
+
+      if (resizerType === 'editor-options') {
+        nextSibling!.style.flex = `0 0 ${newNextWidth}px`;
+      }
+    };
+
+    const onMouseUp = () => {
+      resizer.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    resizer.addEventListener('mousedown', (e: MouseEvent) => {
+      e.preventDefault();
+      startX = e.clientX;
+      startPrevWidth = prevSibling!.offsetWidth;
+      startNextWidth = nextSibling!.offsetWidth;
+      resizer.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    });
+  }
+
+  private setupPanelResizer(resizer: HTMLElement): void {
+    const resizerType = resizer.dataset.resizer;
+    let prevSibling: HTMLElement | null = null;
+    let nextSibling: HTMLElement | null = null;
+
+    if (resizerType === 'files-preview') {
+      prevSibling = document.querySelector('.panel-files');
+      nextSibling = document.querySelector('.panel-preview');
+    }
+
+    if (!prevSibling || !nextSibling) return;
+
+    let startY = 0;
+    let startPrevHeight = 0;
+    let startNextHeight = 0;
+
+    const onMouseMove = (e: MouseEvent) => {
+      const dy = e.clientY - startY;
+
+      // Calculate new heights
+      const newPrevHeight = Math.max(100, startPrevHeight + dy);
+      const newNextHeight = Math.max(50, startNextHeight - dy);
+
+      prevSibling!.style.flex = `0 0 ${newPrevHeight}px`;
+      prevSibling!.style.minHeight = `${newPrevHeight}px`;
+      prevSibling!.style.maxHeight = 'none';
+      nextSibling!.style.flex = `0 0 ${newNextHeight}px`;
+      nextSibling!.style.minHeight = `${newNextHeight}px`;
+      nextSibling!.style.maxHeight = 'none';
+    };
+
+    const onMouseUp = () => {
+      resizer.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    resizer.addEventListener('mousedown', (e: MouseEvent) => {
+      e.preventDefault();
+      startY = e.clientY;
+      startPrevHeight = prevSibling!.offsetHeight;
+      startNextHeight = nextSibling!.offsetHeight;
+      resizer.classList.add('dragging');
+      document.body.style.cursor = 'row-resize';
+      document.body.style.userSelect = 'none';
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    });
   }
 
   private setupStateListeners(): void {

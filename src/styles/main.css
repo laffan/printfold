@@ -295,12 +295,65 @@ body {
 
 /* Main Layout */
 .app-main {
-  display: grid;
-  grid-template-columns: 1fr 2fr 300px;
-  gap: var(--panel-gap);
+  display: flex;
   flex: 1;
   padding: var(--panel-gap);
+  gap: 0;
   overflow: hidden;
+}
+
+/* Column Resizers */
+.column-resizer {
+  width: 8px;
+  cursor: col-resize;
+  background: transparent;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.column-resizer::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-border);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.column-resizer:hover::after,
+.column-resizer.dragging::after {
+  opacity: 1;
+  background: var(--color-primary);
+}
+
+/* Panel Resizers (horizontal) */
+.panel-resizer {
+  height: 8px;
+  cursor: row-resize;
+  background: transparent;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.panel-resizer::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--color-border);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.panel-resizer:hover::after,
+.panel-resizer.dragging::after {
+  opacity: 1;
+  background: var(--color-primary);
 }
 
 /* Columns */
@@ -310,6 +363,19 @@ body {
   gap: var(--panel-gap);
   min-width: var(--column-min-width);
   overflow: hidden;
+}
+
+.column-input {
+  flex: 0 0 280px;
+}
+
+.column-editor {
+  flex: 1;
+  min-width: 400px;
+}
+
+.column-options {
+  flex: 0 0 300px;
 }
 
 .column-header {

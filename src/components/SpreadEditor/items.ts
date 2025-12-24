@@ -130,10 +130,16 @@ export function createItemNode(
       konvaImage.setAttr('itemId', item.id);
       konvaImage.setAttr('pageNumber', pageNumber);
       konvaImage.setAttr('xOffset', xOffset);
+      konvaImage.setAttr('imageLoading', true);
 
-      // Redraw when image loads
+      // Redraw when image loads and update transformer
       img.onload = () => {
+        konvaImage.setAttr('imageLoading', false);
         itemsLayer.batchDraw();
+        // If this item is selected, update the transformer
+        if (appState.getEditor().selectedItemId === item.id) {
+          updateTransformerFn();
+        }
       };
 
       node = konvaImage;
