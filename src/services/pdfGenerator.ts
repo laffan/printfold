@@ -3,10 +3,10 @@
  * Generates print-ready PDFs using pdf-lib with booklet imposition
  */
 
-import { PDFDocument, PDFPage, rgb, StandardFonts, PDFFont, degrees } from 'pdf-lib';
+import { PDFDocument, PDFPage, PDFImage, rgb, StandardFonts, PDFFont, degrees } from 'pdf-lib';
 import { appState } from './state';
 import { textFlowEngine } from './textFlow';
-import type { Signature, PageContent, FontStyle, PageItem, TextPageItem, ShapePageItem } from '../types';
+import type { Signature, PageContent, FontStyle, PageItem, TextPageItem, ShapePageItem, ImagePageItem } from '../types';
 import { SHEET_SIZES, calculateSpreadRowsPerSheet } from '../types';
 
 interface FontCache {
@@ -19,6 +19,7 @@ interface FontCache {
 
 export class PDFGenerator {
   private fontCache: FontCache | null = null;
+  private imageCache: Map<string, PDFImage> = new Map();
 
   /**
    * Sanitize text for WinAnsi encoding (removes emojis and non-Latin characters)
@@ -55,6 +56,9 @@ export class PDFGenerator {
       boldItalic: await pdfDoc.embedFont(StandardFonts.TimesRomanBoldItalic),
       mono: await pdfDoc.embedFont(StandardFonts.Courier),
     };
+
+    // Embed images used in static pages
+    await this.embedImages(pdfDoc, project);
 
     // Get sheet dimensions
     const sheetSize = SHEET_SIZES[project.outputOptions.sheetSize];
@@ -646,8 +650,74 @@ export class PDFGenerator {
             });
           }
         }
+      } else if (item.type === 'image') {
+        const imageItem = item as ImagePageItem;
+        const pdfImage = this.imageCache.get(imageItem.imageFileId);
+
+        if (pdfImage) {
+          pdfPage.drawImage(pdfImage, {
+            x: pageX + item.x,
+            y: itemPdfY,
+            width: item.width,
+            height: item.height,
+            opacity,
+            rotate: item.rotation ? degrees(item.rotation) : undefined,
+          });
+        }
       }
-      // Note: Image items would need async embedding, skipped for now
+    }
+  }
+
+  /**
+   * Embed all images used in static pages
+   */
+  private async embedImages(pdfDoc: PDFDocument, project: ReturnType<typeof appState.getProject>): Promise<void> {
+    this.imageCache.clear();
+
+    // Collect all image file IDs from static pages
+    const imageFileIds = new Set<string>();
+    for (const sig of project.signatures) {
+      for (const spread of sig.spreads) {
+        const pages = [spread.verso, spread.recto].filter(Boolean);
+        for (const page of pages) {
+          if ((page?.isBlank || page?.isStatic) && page?.items) {
+            for (const item of page.items) {
+              if (item.type === 'image') {
+                const imageItem = item as ImagePageItem;
+                imageFileIds.add(imageItem.imageFileId);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Embed each image
+    for (const fileId of imageFileIds) {
+      const file = project.files.find(f => f.id === fileId);
+      if (!file || file.type !== 'image' || !file.isBase64) continue;
+
+      try {
+        const imageData = Uint8Array.from(atob(file.content), c => c.charCodeAt(0));
+
+        // Try to embed as PNG first, then JPEG
+        let pdfImage: PDFImage | null = null;
+        try {
+          pdfImage = await pdfDoc.embedPng(imageData);
+        } catch {
+          try {
+            pdfImage = await pdfDoc.embedJpg(imageData);
+          } catch {
+            console.warn(`Failed to embed image: ${file.name}`);
+          }
+        }
+
+        if (pdfImage) {
+          this.imageCache.set(fileId, pdfImage);
+        }
+      } catch (error) {
+        console.warn(`Error processing image ${file.name}:`, error);
+      }
     }
   }
 

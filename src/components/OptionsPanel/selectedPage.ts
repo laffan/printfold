@@ -35,6 +35,11 @@ export function setupSelectedPagePanel(): void {
         selectedPageNumber: newPageNumber,
         selectedPagePosition: newPosition,
       });
+
+      // Dispatch event to navigate to the new page's spread
+      window.dispatchEvent(new CustomEvent('navigate-to-page', {
+        detail: { pageNumber: newPageNumber }
+      }));
     }
   });
 }

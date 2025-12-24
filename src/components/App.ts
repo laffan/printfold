@@ -209,6 +209,11 @@ export class App {
         fontReflowTimeout = null;
       }, 100);
     });
+
+    // Listen for navigation requests
+    window.addEventListener('navigate-to-page', ((e: CustomEvent<{ pageNumber: number }>) => {
+      this.spreadEditor.navigateToPage(e.detail.pageNumber);
+    }) as EventListener);
   }
 
   private performReflow(): void {

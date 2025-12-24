@@ -5,7 +5,7 @@
 
 import Konva from 'konva';
 import { appState } from '../../services/state';
-import type { Spread, PageContent, Margins, PageItem } from '../../types';
+import type { Spread, PageContent, Margins, PageItem, ImagePageItem } from '../../types';
 import { SHEET_SIZES } from '../../types';
 import type { MarginLine, MarginLabel } from './types';
 import { createItemNode, renderPageItems } from './items';
@@ -71,9 +71,117 @@ export class SpreadEditor {
     this.setupResizeObserver();
     this.setupKeyboardShortcuts();
     this.setupStateListeners();
+    this.setupImageDropZone();
 
     // Initial render
     this.render();
+  }
+
+  /**
+   * Set up drop zone for dragging images from file list
+   */
+  private setupImageDropZone(): void {
+    const container = this.container;
+
+    container.addEventListener('dragover', (e) => {
+      const dt = e.dataTransfer;
+      if (dt?.types.includes('application/x-printfold-image')) {
+        e.preventDefault();
+        e.dataTransfer!.dropEffect = 'copy';
+        container.classList.add('drop-target');
+      }
+    });
+
+    container.addEventListener('dragleave', (e) => {
+      // Only remove class if leaving the container entirely
+      if (!container.contains(e.relatedTarget as Node)) {
+        container.classList.remove('drop-target');
+      }
+    });
+
+    container.addEventListener('drop', (e) => {
+      container.classList.remove('drop-target');
+      const dt = e.dataTransfer;
+      if (!dt?.types.includes('application/x-printfold-image')) return;
+
+      e.preventDefault();
+      const fileId = dt.getData('application/x-printfold-image');
+      if (!fileId) return;
+
+      // Check if a static/blank page is selected
+      const editorState = appState.getEditor();
+      if (!editorState.selectedPageNumber) {
+        // Try to find which page was dropped on based on position
+        const rect = container.getBoundingClientRect();
+        const dropX = e.clientX - rect.left;
+        const pageWidth = this.getPageDimensions().width * this.zoomLevel;
+        const spreadWidth = pageWidth * 2;
+        const stageX = this.stage.x();
+
+        // Determine if drop is on verso or recto
+        const relativeX = (dropX - stageX) / this.zoomLevel;
+        const isRecto = relativeX > pageWidth;
+
+        // Get current spread
+        const spread = this.getCurrentSpread();
+        if (spread) {
+          const page = isRecto ? spread.recto : spread.verso;
+          if (page && (page.isBlank || page.isStatic)) {
+            // Import and dispatch event to add image
+            this.addImageToPage(fileId, page.pageNumber, isRecto ? 'recto' : 'verso');
+          }
+        }
+      } else {
+        // Use the already selected page
+        this.addImageToPage(fileId, editorState.selectedPageNumber, editorState.selectedPagePosition || 'recto');
+      }
+    });
+  }
+
+  /**
+   * Add an image from file list to a specific page
+   */
+  private addImageToPage(fileId: string, pageNumber: number, position: 'verso' | 'recto'): void {
+    const file = appState.getProject().files.find(f => f.id === fileId);
+    if (!file || file.type !== 'image') return;
+
+    // Check if the page is blank/static
+    const project = appState.getProject();
+    let targetPage = null;
+    for (const sig of project.signatures) {
+      for (const spread of sig.spreads) {
+        const page = position === 'verso' ? spread.verso : spread.recto;
+        if (page && page.pageNumber === pageNumber) {
+          targetPage = page;
+          break;
+        }
+      }
+      if (targetPage) break;
+    }
+
+    if (!targetPage || (!targetPage.isBlank && !targetPage.isStatic)) return;
+
+    // Select the page
+    appState.updateEditor({
+      selectedPageNumber: pageNumber,
+      selectedPagePosition: position,
+    });
+
+    // Add the image item
+    const item: ImagePageItem = {
+      id: crypto.randomUUID(),
+      type: 'image',
+      x: 50,
+      y: 50,
+      width: 150,
+      height: 100,
+      rotation: 0,
+      opacity: 1,
+      imageFileId: fileId,
+    };
+
+    appState.addItemToPage(pageNumber, item);
+    appState.updateEditor({ selectedItemId: item.id });
   }
 
   private setupStateListeners(): void {
@@ -361,9 +469,32 @@ export class SpreadEditor {
 
     if (totalSpreads === 0) return;
 
-    this.currentSpreadIndex = Math.max(0, Math.min(totalSpreads - 1, this.currentSpreadIndex + delta));
-    this.updateSpreadIndicator();
-    this.render();
+    const newIndex = Math.max(0, Math.min(totalSpreads - 1, this.currentSpreadIndex + delta));
+
+    // Only update if actually changing spreads
+    if (newIndex !== this.currentSpreadIndex) {
+      this.currentSpreadIndex = newIndex;
+      // Clear item selection when navigating to a different spread
+      appState.updateEditor({ selectedItemId: null });
+      this.updateSpreadIndicator();
+      this.render();
+    }
+  }
+
+  /**
+   * Navigate to a specific spread by index
+   */
+  navigateToSpread(spreadIndex: number): void {
+    const project = appState.getProject();
+    const totalSpreads = project.signatures.reduce((sum, sig) => sum + sig.spreads.length, 0);
+
+    if (spreadIndex >= 0 && spreadIndex < totalSpreads) {
+      this.currentSpreadIndex = spreadIndex;
+      // Clear item selection when navigating
+      appState.updateEditor({ selectedItemId: null });
+      this.updateSpreadIndicator();
+      this.render();
+    }
   }
 
   private updateSpreadIndicator(): void {

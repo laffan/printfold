@@ -5,7 +5,7 @@
 
 import { appState } from '../../services/state';
 import { createFontDropdown, FontDropdown } from '../FontDropdown';
-import type { PageItem, TextPageItem, ShapePageItem } from '../../types';
+import type { PageItem, TextPageItem, ShapePageItem, ImagePageItem, ProjectFile } from '../../types';
 
 // Module-level font dropdown instance for text items
 let itemFontDropdown: FontDropdown | null = null;
@@ -49,12 +49,11 @@ export function setupEditPagePanel(updateEditSelectedSectionFn: () => void): voi
     // Create file input to select image
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/*';
+    input.accept = 'image/png,image/jpeg,image/webp,image/gif';
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
-        // TODO: Handle image upload and add to page
-        console.log('Image selected:', file.name);
+        await addImageToCurrentPage(file);
       }
     };
     input.click();
@@ -252,6 +251,77 @@ function addItemToCurrentPage(itemType: 'text' | 'rectangle' | 'ellipse' | 'circ
       strokeWidth: isLinear ? 2 : 1,
     } as ShapePageItem;
   }
+
+  appState.addItemToPage(editorState.selectedPageNumber, item);
+  appState.updateEditor({ selectedItemId: item.id });
+}
+
+/**
+ * Add an image file to the currently selected static page
+ */
+async function addImageToCurrentPage(file: File): Promise<void> {
+  const editorState = appState.getEditor();
+  if (!editorState.selectedPageNumber) return;
+
+  // Read file as base64
+  const content = await new Promise<string>((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(',')[1];
+      resolve(base64);
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // Add file to project files
+  const projectFile: ProjectFile = {
+    id: crypto.randomUUID(),
+    name: file.name,
+    type: 'image',
+    content,
+    isBase64: true,
+    lastModified: file.lastModified,
+  };
+  appState.addFiles([projectFile]);
+
+  // Create image item on the page
+  const item: ImagePageItem = {
+    id: crypto.randomUUID(),
+    type: 'image',
+    x: 50,
+    y: 50,
+    width: 150,
+    height: 100,
+    rotation: 0,
+    opacity: 1,
+    imageFileId: projectFile.id,
+  };
+
+  appState.addItemToPage(editorState.selectedPageNumber, item);
+  appState.updateEditor({ selectedItemId: item.id });
+}
+
+/**
+ * Add an image from an existing project file to the current page
+ */
+export function addImageFromFileToPage(fileId: string): void {
+  const editorState = appState.getEditor();
+  if (!editorState.selectedPageNumber) return;
+
+  const file = appState.getProject().files.find(f => f.id === fileId);
+  if (!file || file.type !== 'image') return;
+
+  const item: ImagePageItem = {
+    id: crypto.randomUUID(),
+    type: 'image',
+    x: 50,
+    y: 50,
+    width: 150,
+    height: 100,
+    rotation: 0,
+    opacity: 1,
+    imageFileId: fileId,
+  };
 
   appState.addItemToPage(editorState.selectedPageNumber, item);
   appState.updateEditor({ selectedItemId: item.id });

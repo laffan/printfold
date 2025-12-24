@@ -5,7 +5,7 @@
 
 import Konva from 'konva';
 import { appState } from '../../services/state';
-import type { PageContent, PageItem, TextPageItem, ShapePageItem } from '../../types';
+import type { PageContent, PageItem, TextPageItem, ShapePageItem, ImagePageItem } from '../../types';
 
 /**
  * Create a Konva node for a page item
@@ -108,6 +108,87 @@ export function createItemNode(
       opacity,
       draggable: true,
     });
+  } else if (item.type === 'image') {
+    const imageItem = item as ImagePageItem;
+    const imageFile = appState.getProject().files.find(f => f.id === imageItem.imageFileId);
+
+    if (imageFile) {
+      // Create a placeholder rectangle first
+      const placeholder = new Konva.Rect({
+        x: xOffset + item.x,
+        y: item.y,
+        width: item.width,
+        height: item.height,
+        fill: '#f0f0f0',
+        stroke: '#cccccc',
+        strokeWidth: 1,
+        rotation: item.rotation || 0,
+        opacity,
+        draggable: true,
+      });
+      placeholder.setAttr('itemId', item.id);
+      placeholder.setAttr('pageNumber', pageNumber);
+      placeholder.setAttr('xOffset', xOffset);
+      placeholder.setAttr('isImagePlaceholder', true);
+
+      // Load image asynchronously
+      const img = new window.Image();
+      img.onload = () => {
+        const konvaImage = new Konva.Image({
+          x: xOffset + item.x,
+          y: item.y,
+          width: item.width,
+          height: item.height,
+          image: img,
+          rotation: item.rotation || 0,
+          opacity,
+          draggable: true,
+        });
+        konvaImage.setAttr('itemId', item.id);
+        konvaImage.setAttr('pageNumber', pageNumber);
+        konvaImage.setAttr('xOffset', xOffset);
+
+        // Copy event handlers
+        konvaImage.on('click tap', () => {
+          const position = xOffset === 0 ? 'verso' : 'recto';
+          appState.updateEditor({
+            selectedItemId: item.id,
+            selectedPageNumber: pageNumber,
+            selectedPagePosition: position,
+          });
+        });
+
+        konvaImage.on('dragend', () => {
+          const newX = konvaImage.x() - xOffset;
+          const newY = konvaImage.y();
+          appState.updateItemOnPage(pageNumber, item.id, { x: newX, y: newY });
+        });
+
+        konvaImage.on('transformend', () => {
+          const scaleX = konvaImage.scaleX();
+          const scaleY = konvaImage.scaleY();
+          const rotation = konvaImage.rotation();
+          konvaImage.scaleX(1);
+          konvaImage.scaleY(1);
+          appState.updateItemOnPage(pageNumber, item.id, {
+            width: item.width * scaleX,
+            height: item.height * scaleY,
+            x: konvaImage.x() - xOffset,
+            y: konvaImage.y(),
+            rotation,
+          });
+        });
+
+        // Replace placeholder with image
+        placeholder.destroy();
+        itemsLayer.add(konvaImage);
+        transformer.nodes([konvaImage]);
+        itemsLayer.draw();
+      };
+      img.src = `data:image/png;base64,${imageFile.content}`;
+
+      node = placeholder;
+    }
   }
 
   if (node) {
@@ -115,9 +196,16 @@ export function createItemNode(
     node.setAttr('pageNumber', pageNumber);
     node.setAttr('xOffset', xOffset);
 
-    // Handle click to select
+    // Handle click to select item and its page
     node.on('click tap', () => {
-      appState.updateEditor({ selectedItemId: item.id });
+      // Determine page position (verso or recto) based on xOffset
+      // xOffset is 0 for verso, pageWidth for recto
+      const position = xOffset === 0 ? 'verso' : 'recto';
+      appState.updateEditor({
+        selectedItemId: item.id,
+        selectedPageNumber: pageNumber,
+        selectedPagePosition: position,
+      });
     });
 
     // Handle double-click for text editing
