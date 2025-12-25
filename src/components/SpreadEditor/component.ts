@@ -706,6 +706,24 @@ export class SpreadEditor {
     this.itemNodes.forEach(node => node.destroy());
     this.itemNodes.clear();
 
+    // Also clear any stale children from itemsLayer (except transformer)
+    const children = this.itemsLayer.getChildren();
+    children.forEach(child => {
+      if (child !== this.transformer) {
+        child.destroy();
+      }
+    });
+
+    // Detach transformer from any stale nodes
+    this.transformer.nodes([]);
+
+    // Clean up any lingering text editing textareas
+    const container = this.stage.container().parentElement;
+    if (container) {
+      const textareas = container.querySelectorAll('textarea');
+      textareas.forEach(ta => ta.remove());
+    }
+
     // Render items on verso page
     if (spread.verso?.items) {
       renderPageItems(

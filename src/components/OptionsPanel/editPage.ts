@@ -527,13 +527,19 @@ export function updateEditSelectedSection(): void {
   if (panel) panel.style.display = 'block';
   section.style.display = 'block';
 
+  // Helper to safely set input values
+  const setInputValue = (id: string, value: string) => {
+    const input = document.getElementById(id) as HTMLInputElement | null;
+    if (input) input.value = value;
+  };
+
   // Update common properties
-  (document.getElementById('item-x') as HTMLInputElement).value = Math.round(item.x).toString();
-  (document.getElementById('item-y') as HTMLInputElement).value = Math.round(item.y).toString();
-  (document.getElementById('item-width') as HTMLInputElement).value = Math.round(item.width).toString();
-  (document.getElementById('item-height') as HTMLInputElement).value = Math.round(item.height).toString();
-  (document.getElementById('item-rotation') as HTMLInputElement).value = (item.rotation || 0).toString();
-  (document.getElementById('item-opacity') as HTMLInputElement).value = (item.opacity ?? 1).toString();
+  setInputValue('item-x', Math.round(item.x).toString());
+  setInputValue('item-y', Math.round(item.y).toString());
+  setInputValue('item-width', Math.round(item.width).toString());
+  setInputValue('item-height', Math.round(item.height).toString());
+  setInputValue('item-rotation', (item.rotation || 0).toString());
+  setInputValue('item-opacity', (item.opacity ?? 1).toString());
 
   // Show the effects section
   const effectsSection = document.getElementById('effects-section');
@@ -561,8 +567,8 @@ export function updateEditSelectedSection(): void {
   const itemStrokeSection = document.getElementById('item-stroke-section');
   if (itemHasStroke) itemHasStroke.checked = hasStroke;
   if (itemStrokeSection) itemStrokeSection.style.display = hasStroke ? 'block' : 'none';
-  (document.getElementById('item-stroke') as HTMLInputElement).value = strokeColor;
-  (document.getElementById('item-stroke-width') as HTMLInputElement).value = strokeWidth.toString();
+  setInputValue('item-stroke', strokeColor);
+  setInputValue('item-stroke-width', strokeWidth.toString());
 
   // Update shadow toggle and properties
   const hasShadow = item.hasShadow ?? false;
@@ -570,11 +576,11 @@ export function updateEditSelectedSection(): void {
   const itemShadowSection = document.getElementById('item-shadow-section');
   if (itemHasShadow) itemHasShadow.checked = hasShadow;
   if (itemShadowSection) itemShadowSection.style.display = hasShadow ? 'block' : 'none';
-  (document.getElementById('item-shadow-color') as HTMLInputElement).value = item.shadowColor || '#000000';
-  (document.getElementById('item-shadow-blur') as HTMLInputElement).value = (item.shadowBlur ?? 5).toString();
-  (document.getElementById('item-shadow-offset-x') as HTMLInputElement).value = (item.shadowOffsetX ?? 3).toString();
-  (document.getElementById('item-shadow-offset-y') as HTMLInputElement).value = (item.shadowOffsetY ?? 3).toString();
-  (document.getElementById('item-shadow-opacity') as HTMLInputElement).value = (item.shadowOpacity ?? 0.5).toString();
+  setInputValue('item-shadow-color', item.shadowColor || '#000000');
+  setInputValue('item-shadow-blur', (item.shadowBlur ?? 5).toString());
+  setInputValue('item-shadow-offset-x', (item.shadowOffsetX ?? 3).toString());
+  setInputValue('item-shadow-offset-y', (item.shadowOffsetY ?? 3).toString());
+  setInputValue('item-shadow-opacity', (item.shadowOpacity ?? 0.5).toString());
 
   // Update array toggle and properties
   const arrayCount = item.arrayCount || 1;
@@ -583,9 +589,9 @@ export function updateEditSelectedSection(): void {
   const itemArraySection = document.getElementById('item-array-section');
   if (itemHasArray) itemHasArray.checked = hasArray;
   if (itemArraySection) itemArraySection.style.display = hasArray ? 'block' : 'none';
-  (document.getElementById('item-array-count') as HTMLInputElement).value = arrayCount.toString();
-  (document.getElementById('item-array-offset-x') as HTMLInputElement).value = (item.arrayOffsetX || 20).toString();
-  (document.getElementById('item-array-offset-y') as HTMLInputElement).value = (item.arrayOffsetY || 20).toString();
+  setInputValue('item-array-count', arrayCount.toString());
+  setInputValue('item-array-offset-x', (item.arrayOffsetX || 20).toString());
+  setInputValue('item-array-offset-y', (item.arrayOffsetY || 20).toString());
 
   // Update array instances list
   updateArrayInstancesList(item);
@@ -639,8 +645,8 @@ export function updateEditSelectedSection(): void {
       }
     }
 
-    (document.getElementById('item-stroke') as HTMLInputElement).value = shapeItem.strokeColor || '#000000';
-    (document.getElementById('item-stroke-width') as HTMLInputElement).value = (shapeItem.strokeWidth || 1).toString();
+    setInputValue('item-stroke', shapeItem.strokeColor || '#000000');
+    setInputValue('item-stroke-width', (shapeItem.strokeWidth || 1).toString());
   } else if (item.type === 'text') {
     const textItem = item as TextPageItem;
     shapeProps!.style.display = 'none';
@@ -650,7 +656,7 @@ export function updateEditSelectedSection(): void {
     if (itemFontDropdown) {
       itemFontDropdown.setValue(textItem.fontFamily);
     }
-    (document.getElementById('item-font-size') as HTMLInputElement).value = textItem.fontSize.toString();
+    setInputValue('item-font-size', textItem.fontSize.toString());
 
     // Update fill toggle (default: true for text)
     const hasFill = textItem.hasFill ?? true;
@@ -693,8 +699,8 @@ export function updateEditSelectedSection(): void {
     }
 
     // Update stroke properties
-    (document.getElementById('text-stroke-color') as HTMLInputElement).value = textItem.strokeColor || '#000000';
-    (document.getElementById('text-stroke-width') as HTMLInputElement).value = (textItem.strokeWidth || 1).toString();
+    setInputValue('text-stroke-color', textItem.strokeColor || '#000000');
+    setInputValue('text-stroke-width', (textItem.strokeWidth || 1).toString());
 
     // Update align button states
     ['left', 'center', 'right'].forEach(align => {
