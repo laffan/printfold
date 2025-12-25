@@ -303,6 +303,15 @@ export async function renderPageToImage(
       for (const item of page.items) {
         const node = createRenderNode(item, 0, SCALE_FACTOR, imageLoadPromises);
         if (node) {
+          // Apply shadow if enabled
+          if (item.hasShadow) {
+            node.shadowEnabled(true);
+            node.shadowColor(item.shadowColor || '#000000');
+            node.shadowBlur((item.shadowBlur ?? 5) * SCALE_FACTOR);
+            node.shadowOffsetX((item.shadowOffsetX ?? 3) * SCALE_FACTOR);
+            node.shadowOffsetY((item.shadowOffsetY ?? 3) * SCALE_FACTOR);
+            node.shadowOpacity(item.shadowOpacity ?? 0.5);
+          }
           layer.add(node);
         }
       }
@@ -325,6 +334,15 @@ export async function renderPageToImage(
         const offsetX = page.isRecto ? -pageWidth : pageWidth;
         const node = createRenderNode(item, offsetX, SCALE_FACTOR, imageLoadPromises);
         if (node) {
+          // Apply shadow if enabled
+          if (item.hasShadow) {
+            node.shadowEnabled(true);
+            node.shadowColor(item.shadowColor || '#000000');
+            node.shadowBlur((item.shadowBlur ?? 5) * SCALE_FACTOR);
+            node.shadowOffsetX((item.shadowOffsetX ?? 3) * SCALE_FACTOR);
+            node.shadowOffsetY((item.shadowOffsetY ?? 3) * SCALE_FACTOR);
+            node.shadowOpacity(item.shadowOpacity ?? 0.5);
+          }
           layer.add(node);
         }
       }

@@ -50,6 +50,7 @@ export class App {
     // Set up event listeners
     this.setupHeaderButtons();
     this.setupTabs();
+    this.setupOptionsTabs();
     this.setupCollapsiblePanels();
     this.setupStateListeners();
     this.setupResizers();
@@ -148,6 +149,28 @@ export class App {
         } else if (tabName === 'preview') {
           this.pdfPreview.refresh();
         }
+      });
+    });
+  }
+
+  private setupOptionsTabs(): void {
+    const tabButtons = document.querySelectorAll('.options-tabs .tab-btn');
+    const tabPanels = document.querySelectorAll('.options-tab-content > .tab-panel');
+
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tabName = btn.getAttribute('data-tab');
+
+        // Update button states
+        tabButtons.forEach(b => {
+          b.classList.toggle('active', b === btn);
+        });
+
+        // Update panel visibility
+        tabPanels.forEach(panel => {
+          const isActive = panel.id === `tab-${tabName}`;
+          panel.classList.toggle('active', isActive);
+        });
       });
     });
   }

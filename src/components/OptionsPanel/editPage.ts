@@ -250,6 +250,47 @@ function setupEditPropertyInputs(updateEditSelectedSectionFn: () => void): void 
     }
   });
 
+  // === Effects Section Handlers ===
+
+  // Unified stroke toggle (for all item types)
+  const itemHasStroke = document.getElementById('item-has-stroke') as HTMLInputElement;
+  const itemStrokeSection = document.getElementById('item-stroke-section');
+  itemHasStroke?.addEventListener('change', () => {
+    const editorState = appState.getEditor();
+    if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+    appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { hasStroke: itemHasStroke.checked });
+    if (itemStrokeSection) itemStrokeSection.style.display = itemHasStroke.checked ? 'block' : 'none';
+  });
+
+  // Shadow toggle
+  const itemHasShadow = document.getElementById('item-has-shadow') as HTMLInputElement;
+  const itemShadowSection = document.getElementById('item-shadow-section');
+  itemHasShadow?.addEventListener('change', () => {
+    const editorState = appState.getEditor();
+    if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+    appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { hasShadow: itemHasShadow.checked });
+    if (itemShadowSection) itemShadowSection.style.display = itemHasShadow.checked ? 'block' : 'none';
+  });
+
+  // Shadow properties
+  setupColorInput('item-shadow-color', 'shadowColor');
+  setupPropInput('item-shadow-blur', 'shadowBlur');
+  setupPropInput('item-shadow-offset-x', 'shadowOffsetX');
+  setupPropInput('item-shadow-offset-y', 'shadowOffsetY');
+  setupPropInput('item-shadow-opacity', 'shadowOpacity');
+
+  // Array toggle
+  const itemHasArray = document.getElementById('item-has-array') as HTMLInputElement;
+  const itemArraySection = document.getElementById('item-array-section');
+  itemHasArray?.addEventListener('change', () => {
+    const editorState = appState.getEditor();
+    if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+    // Set arrayCount to 2 when enabled, 1 when disabled
+    const newArrayCount = itemHasArray.checked ? 2 : 1;
+    appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { arrayCount: newArrayCount });
+    if (itemArraySection) itemArraySection.style.display = itemHasArray.checked ? 'block' : 'none';
+  });
+
   // Array duplication inputs
   setupPropInput('item-array-count', 'arrayCount');
   setupPropInput('item-array-offset-x', 'arrayOffsetX');
@@ -456,6 +497,8 @@ export function updateEditSelectedSection(): void {
   // Hide if no item selected
   if (!editorState.selectedItemId || !editorState.selectedPageNumber) {
     section.style.display = 'none';
+    const effectsSection = document.getElementById('effects-section');
+    if (effectsSection) effectsSection.style.display = 'none';
     if (panel) panel.style.display = 'none';
     return;
   }
@@ -480,8 +523,55 @@ export function updateEditSelectedSection(): void {
   (document.getElementById('item-rotation') as HTMLInputElement).value = (item.rotation || 0).toString();
   (document.getElementById('item-opacity') as HTMLInputElement).value = (item.opacity ?? 1).toString();
 
-  // Update array properties (common to all items)
-  (document.getElementById('item-array-count') as HTMLInputElement).value = (item.arrayCount || 1).toString();
+  // Show the effects section
+  const effectsSection = document.getElementById('effects-section');
+  if (effectsSection) effectsSection.style.display = 'block';
+
+  // Get stroke properties based on item type
+  let hasStroke = false;
+  let strokeColor = '#000000';
+  let strokeWidth = 1;
+
+  if (item.type === 'shape') {
+    const shapeItem = item as ShapePageItem;
+    hasStroke = shapeItem.hasStroke ?? true;
+    strokeColor = shapeItem.strokeColor || '#000000';
+    strokeWidth = shapeItem.strokeWidth || 1;
+  } else if (item.type === 'text') {
+    const textItem = item as TextPageItem;
+    hasStroke = textItem.hasStroke ?? false;
+    strokeColor = textItem.strokeColor || '#000000';
+    strokeWidth = textItem.strokeWidth || 1;
+  }
+
+  // Update unified stroke toggle
+  const itemHasStroke = document.getElementById('item-has-stroke') as HTMLInputElement;
+  const itemStrokeSection = document.getElementById('item-stroke-section');
+  if (itemHasStroke) itemHasStroke.checked = hasStroke;
+  if (itemStrokeSection) itemStrokeSection.style.display = hasStroke ? 'block' : 'none';
+  (document.getElementById('item-stroke') as HTMLInputElement).value = strokeColor;
+  (document.getElementById('item-stroke-width') as HTMLInputElement).value = strokeWidth.toString();
+
+  // Update shadow toggle and properties
+  const hasShadow = item.hasShadow ?? false;
+  const itemHasShadow = document.getElementById('item-has-shadow') as HTMLInputElement;
+  const itemShadowSection = document.getElementById('item-shadow-section');
+  if (itemHasShadow) itemHasShadow.checked = hasShadow;
+  if (itemShadowSection) itemShadowSection.style.display = hasShadow ? 'block' : 'none';
+  (document.getElementById('item-shadow-color') as HTMLInputElement).value = item.shadowColor || '#000000';
+  (document.getElementById('item-shadow-blur') as HTMLInputElement).value = (item.shadowBlur ?? 5).toString();
+  (document.getElementById('item-shadow-offset-x') as HTMLInputElement).value = (item.shadowOffsetX ?? 3).toString();
+  (document.getElementById('item-shadow-offset-y') as HTMLInputElement).value = (item.shadowOffsetY ?? 3).toString();
+  (document.getElementById('item-shadow-opacity') as HTMLInputElement).value = (item.shadowOpacity ?? 0.5).toString();
+
+  // Update array toggle and properties
+  const arrayCount = item.arrayCount || 1;
+  const hasArray = arrayCount > 1;
+  const itemHasArray = document.getElementById('item-has-array') as HTMLInputElement;
+  const itemArraySection = document.getElementById('item-array-section');
+  if (itemHasArray) itemHasArray.checked = hasArray;
+  if (itemArraySection) itemArraySection.style.display = hasArray ? 'block' : 'none';
+  (document.getElementById('item-array-count') as HTMLInputElement).value = arrayCount.toString();
   (document.getElementById('item-array-offset-x') as HTMLInputElement).value = (item.arrayOffsetX || 20).toString();
   (document.getElementById('item-array-offset-y') as HTMLInputElement).value = (item.arrayOffsetY || 20).toString();
 

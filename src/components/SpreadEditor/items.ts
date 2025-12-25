@@ -203,7 +203,7 @@ export function createItemNode(
 
     // Apply fill if enabled
     if (hasFill) {
-      applyFillToShape(textNode, textItem.fill, textItem.color, item.width, textNode.height());
+      applyFillToShape(textNode, textItem.fill, textItem.color, item.width, item.height || textNode.height());
     }
 
     // Apply stroke if enabled
@@ -255,6 +255,16 @@ export function createItemNode(
     node.setAttr('itemId', item.id);
     node.setAttr('pageNumber', pageNumber);
     node.setAttr('xOffset', xOffset);
+
+    // Apply shadow if enabled
+    if (item.hasShadow) {
+      node.shadowEnabled(true);
+      node.shadowColor(item.shadowColor || '#000000');
+      node.shadowBlur(item.shadowBlur ?? 5);
+      node.shadowOffsetX(item.shadowOffsetX ?? 3);
+      node.shadowOffsetY(item.shadowOffsetY ?? 3);
+      node.shadowOpacity(item.shadowOpacity ?? 0.5);
+    }
 
     // Handle click to select item and its page
     node.on('click tap', () => {
@@ -489,22 +499,28 @@ export function renderPageItems(
       itemsLayer.add(node);
 
       // Create array duplicates (non-interactive visual copies)
-      for (let i = 1; i < arrayCount; i++) {
-        const duplicatedItem = {
-          ...item,
-          id: `${item.id}-array-${i}`,
-          x: item.x + (arrayOffsetX * i),
-          y: item.y + (arrayOffsetY * i),
-        };
-        const duplicateNode = createItemNode(duplicatedItem, xOffset, page.pageNumber, zoomLevel, stage, itemsLayer, transformer, updateTransformerFn);
-        if (duplicateNode) {
-          // Make array duplicates non-interactive
-          duplicateNode.draggable(false);
-          duplicateNode.setAttr('isArrayDuplicate', true);
-          duplicateNode.setAttr('parentItemId', item.id);
-          // Remove click handler - duplicates shouldn't be selectable
-          duplicateNode.off('click tap');
-          itemsLayer.add(duplicateNode);
+      if (arrayCount > 1 && arrayCount <= 50) {
+        for (let i = 1; i < arrayCount; i++) {
+          const duplicatedItem: PageItem = {
+            ...item,
+            id: `${item.id}-array-${i}`,
+            x: item.x + (arrayOffsetX * i),
+            y: item.y + (arrayOffsetY * i),
+            // Explicitly remove array properties from duplicates to prevent recursion
+            arrayCount: undefined,
+            arrayOffsetX: undefined,
+            arrayOffsetY: undefined,
+          } as PageItem;
+          const duplicateNode = createItemNode(duplicatedItem, xOffset, page.pageNumber, zoomLevel, stage, itemsLayer, transformer, updateTransformerFn);
+          if (duplicateNode) {
+            // Make array duplicates non-interactive
+            duplicateNode.draggable(false);
+            duplicateNode.setAttr('isArrayDuplicate', true);
+            duplicateNode.setAttr('parentItemId', item.id);
+            // Remove all event handlers - duplicates shouldn't be interactive
+            duplicateNode.off('click tap dragstart dragmove dragend transform transformend dblclick');
+            itemsLayer.add(duplicateNode);
+          }
         }
       }
     }

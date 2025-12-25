@@ -964,7 +964,96 @@ body {
 /* Options Column */
 .column-options {
   max-width: 300px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Options Tabs */
+.options-tabs {
+  display: flex;
+  gap: 0;
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 10px 6px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tab-btn:hover {
+  color: var(--color-text);
+  background: var(--color-bg-hover);
+}
+
+.tab-btn.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+  background: var(--color-bg-tertiary);
+}
+
+.options-tab-content {
+  flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--color-bg-secondary);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+.options-tab-content > .tab-panel {
+  display: none;
+  padding: 12px;
+}
+
+.options-tab-content > .tab-panel.active {
+  display: block;
+}
+
+/* Options sections */
+.options-section {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.options-section:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.options-section .section-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 10px 0;
+}
+
+/* Add items grid */
+.add-items-grid {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.add-items-grid .btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  font-size: 14px;
 }
 
 .panel-options {

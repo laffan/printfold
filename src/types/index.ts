@@ -125,6 +125,13 @@ export interface PageItemBase {
   rotation?: number; // Degrees
   opacity?: number; // 0-1, defaults to 1
   zIndex?: number; // Layer order
+  // Shadow properties
+  hasShadow?: boolean;
+  shadowColor?: string;
+  shadowBlur?: number;
+  shadowOffsetX?: number;
+  shadowOffsetY?: number;
+  shadowOpacity?: number;
   // Array duplication properties
   arrayCount?: number; // Number of duplicates (1 = no duplication)
   arrayOffsetX?: number; // X offset between each duplicate
