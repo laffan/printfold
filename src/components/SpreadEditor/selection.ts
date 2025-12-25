@@ -175,10 +175,10 @@ function getNodeBoundsInStage(node: Konva.Node): { x: number; y: number; width: 
   // For groups (array items), get the group's bounds
   if (className === 'Group') {
     const group = node as Konva.Group;
-    const rect = group.getClientRect({ relativeTo: group.getStage() });
-    // Convert back to stage coordinates
     const stage = group.getStage();
     if (stage) {
+      const rect = group.getClientRect({ relativeTo: stage });
+      // Convert back to stage coordinates
       const scale = stage.scaleX();
       const stagePos = stage.position();
       return {
@@ -188,7 +188,13 @@ function getNodeBoundsInStage(node: Konva.Node): { x: number; y: number; width: 
         height: rect.height / scale,
       };
     }
-    return rect;
+    // Fallback if no stage
+    return {
+      x: group.x(),
+      y: group.y(),
+      width: group.width() || 100,
+      height: group.height() || 100,
+    };
   }
 
   // For regular shapes (Rect, Text, Image), position and size are direct
