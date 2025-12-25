@@ -1110,6 +1110,38 @@ class AppState {
   }
 
   /**
+   * Duplicate selected items at the same position (for Option+drag)
+   * The originals stay in place, duplicates are created and selected
+   */
+  duplicateItemsAtPosition(): PageItem[] {
+    const pageNumber = this.editor.selectedPageNumber;
+    if (pageNumber === null) return [];
+
+    const items = this.getSelectedItems();
+    if (items.length === 0) return [];
+
+    const duplicatedItems: PageItem[] = [];
+    const newIds: string[] = [];
+
+    for (const item of items) {
+      const newItem: PageItem = {
+        ...JSON.parse(JSON.stringify(item)),
+        id: crypto.randomUUID(),
+        // Same position - the duplicates will be dragged
+        x: item.x,
+        y: item.y,
+      };
+      duplicatedItems.push(newItem);
+      newIds.push(newItem.id);
+      this.addItemToPage(pageNumber, newItem);
+    }
+
+    // Select the duplicated items - they will be the ones being dragged
+    this.selectItems(newIds);
+    return duplicatedItems;
+  }
+
+  /**
    * Align selected items
    */
   alignItems(alignment: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom'): void {

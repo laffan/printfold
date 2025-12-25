@@ -83,13 +83,23 @@ export function createSelectionMarquee(
   function endMarquee(): void {
     if (!marquee.isActive) return;
 
-    const box = marquee.rect.getClientRect();
+    // Get marquee bounds in stage coordinates
+    const marqueeBox = {
+      x: marquee.rect.x(),
+      y: marquee.rect.y(),
+      width: marquee.rect.width(),
+      height: marquee.rect.height(),
+    };
     const selectedIds: string[] = [];
 
-    // Check which items intersect with the marquee
+    // Check which items intersect with the marquee using stage coordinates
     itemNodes.forEach((node, id) => {
-      const itemBox = node.getClientRect();
-      if (intersects(box, itemBox)) {
+      // Skip array instance nodes
+      if (node.getAttr('isArrayMember')) return;
+
+      // Get the node's bounding box in stage coordinates
+      const nodeBox = getNodeBoundsInStage(node);
+      if (intersects(marqueeBox, nodeBox)) {
         selectedIds.push(id);
       }
     });
@@ -117,6 +127,76 @@ export function createSelectionMarquee(
     endMarquee,
     cancelMarquee,
     isActive,
+  };
+}
+
+/**
+ * Get a node's bounding box in stage coordinates
+ */
+function getNodeBoundsInStage(node: Konva.Node): { x: number; y: number; width: number; height: number } {
+  const className = node.getClassName();
+
+  // For ellipse and circle, calculate bounds from center
+  if (className === 'Ellipse') {
+    const ellipse = node as Konva.Ellipse;
+    const radiusX = ellipse.radiusX();
+    const radiusY = ellipse.radiusY();
+    return {
+      x: ellipse.x() - radiusX,
+      y: ellipse.y() - radiusY,
+      width: radiusX * 2,
+      height: radiusY * 2,
+    };
+  }
+
+  if (className === 'Circle') {
+    const circle = node as Konva.Circle;
+    const radius = circle.radius();
+    return {
+      x: circle.x() - radius,
+      y: circle.y() - radius,
+      width: radius * 2,
+      height: radius * 2,
+    };
+  }
+
+  // For Line and Arrow, use the points to get bounds
+  if (className === 'Line' || className === 'Arrow') {
+    const line = node as Konva.Line;
+    const points = line.points();
+    const x = line.x();
+    const y = line.y();
+    // Assuming horizontal line [0, 0, width, 0]
+    const width = points.length >= 2 ? Math.abs(points[2] - points[0]) : 0;
+    const height = 10; // Give some height for easier selection
+    return { x, y: y - 5, width, height };
+  }
+
+  // For groups (array items), get the group's bounds
+  if (className === 'Group') {
+    const group = node as Konva.Group;
+    const rect = group.getClientRect({ relativeTo: group.getStage() });
+    // Convert back to stage coordinates
+    const stage = group.getStage();
+    if (stage) {
+      const scale = stage.scaleX();
+      const stagePos = stage.position();
+      return {
+        x: (rect.x - stagePos.x) / scale,
+        y: (rect.y - stagePos.y) / scale,
+        width: rect.width / scale,
+        height: rect.height / scale,
+      };
+    }
+    return rect;
+  }
+
+  // For regular shapes (Rect, Text, Image), position and size are direct
+  return {
+    x: node.x(),
+    y: node.y(),
+    width: node.width(),
+    height: node.height(),
   };
 }
 

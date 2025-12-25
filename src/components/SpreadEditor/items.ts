@@ -292,53 +292,109 @@ export function createItemNode(
       });
     }
 
-    // Handle Option+drag to duplicate
+    // Multi-item drag state
     let isDuplicateDrag = false;
-    let originalItemIds: string[] = [];
+    let dragStartPositions: Map<string, { x: number; y: number }> = new Map();
+    let initialDragPos = { x: 0, y: 0 };
 
     node.on('dragstart', (e) => {
       const editorState = appState.getEditor();
       const isAltKey = e.evt?.altKey || false;
+      const selectedIds = editorState.selectedItemIds;
+
+      // Store initial position of the dragged node
+      initialDragPos = { x: node!.x(), y: node!.y() };
 
       // If Alt/Option key is held and this item is selected, duplicate all selected items
-      if (isAltKey && editorState.selectedItemIds.includes(item.id)) {
+      if (isAltKey && selectedIds.includes(item.id)) {
         isDuplicateDrag = true;
-        originalItemIds = [...editorState.selectedItemIds];
+        // Duplicate at same position (not offset) - the duplicates become the moving items
+        const duplicates = appState.duplicateItemsAtPosition();
+        // The duplicates are now selected and will move with the cursor
+      }
 
-        // Duplicate all selected items and select the duplicates
-        appState.duplicateSelectedItems();
+      // If this item is part of a multi-selection, store positions of all selected items
+      if (selectedIds.includes(item.id) && selectedIds.length > 1) {
+        dragStartPositions.clear();
+        for (const id of selectedIds) {
+          const otherNode = itemsLayer.findOne((n: Konva.Node) => n.getAttr('itemId') === id);
+          if (otherNode && id !== item.id) {
+            dragStartPositions.set(id, { x: otherNode.x(), y: otherNode.y() });
+          }
+        }
       }
     });
 
-    // Handle drag move to keep transformer in sync
+    // Handle drag move - synchronize all selected items
     node.on('dragmove', () => {
+      const editorState = appState.getEditor();
+      const selectedIds = editorState.selectedItemIds;
+
+      // If multi-selection, move all other selected items by the same delta
+      if (selectedIds.includes(item.id) && selectedIds.length > 1) {
+        const dx = node!.x() - initialDragPos.x;
+        const dy = node!.y() - initialDragPos.y;
+
+        dragStartPositions.forEach((startPos, id) => {
+          const otherNode = itemsLayer.findOne((n: Konva.Node) => n.getAttr('itemId') === id);
+          if (otherNode) {
+            otherNode.x(startPos.x + dx);
+            otherNode.y(startPos.y + dy);
+          }
+        });
+      }
+
       // Force transformer to update during drag
       itemsLayer.batchDraw();
     });
 
-    // Handle drag end to update position
+    // Handle drag end to update positions
     node.on('dragend', () => {
+      const editorState = appState.getEditor();
+      const selectedIds = editorState.selectedItemIds;
+
+      // Calculate the final delta
+      const dx = node!.x() - initialDragPos.x;
+      const dy = node!.y() - initialDragPos.y;
+
       // Reset duplicate drag state
       isDuplicateDrag = false;
-      originalItemIds = [];
 
-      let newX = node!.x() - xOffset;
-      let newY = node!.y();
-
-      // For centered shapes, convert back from center position to top-left
-      if (item.type === 'shape') {
-        const shapeItem = item as ShapePageItem;
-        if (shapeItem.shapeType === 'ellipse') {
-          newX -= item.width / 2;
-          newY -= item.height / 2;
-        } else if (shapeItem.shapeType === 'circle') {
-          const radius = Math.min(item.width, item.height) / 2;
-          newX -= radius;
-          newY -= radius;
+      // Update all selected items' positions
+      if (selectedIds.includes(item.id) && selectedIds.length > 1) {
+        // Update positions for all selected items
+        for (const id of selectedIds) {
+          const currentItem = appState.getItemFromPage(pageNumber, id);
+          if (currentItem) {
+            appState.updateItemOnPage(pageNumber, id, {
+              x: currentItem.x + dx,
+              y: currentItem.y + dy,
+            });
+          }
         }
+      } else {
+        // Single item drag
+        let newX = node!.x() - xOffset;
+        let newY = node!.y();
+
+        // For centered shapes, convert back from center position to top-left
+        if (item.type === 'shape') {
+          const shapeItem = item as ShapePageItem;
+          if (shapeItem.shapeType === 'ellipse') {
+            newX -= item.width / 2;
+            newY -= item.height / 2;
+          } else if (shapeItem.shapeType === 'circle') {
+            const radius = Math.min(item.width, item.height) / 2;
+            newX -= radius;
+            newY -= radius;
+          }
+        }
+
+        appState.updateItemOnPage(pageNumber, item.id, { x: newX, y: newY });
       }
 
-      appState.updateItemOnPage(pageNumber, item.id, { x: newX, y: newY });
+      // Clear drag state
+      dragStartPositions.clear();
     });
 
     // Handle transform end to update size/rotation

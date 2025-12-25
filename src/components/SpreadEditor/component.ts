@@ -211,6 +211,20 @@ export class SpreadEditor {
    */
   private onMarqueeSelectionComplete(itemIds: string[]): void {
     if (itemIds.length > 0) {
+      // Get the page info from the first selected item's node
+      const firstNode = this.itemNodes.get(itemIds[0]);
+      if (firstNode) {
+        const pageNumber = firstNode.getAttr('pageNumber');
+        const xOffset = firstNode.getAttr('xOffset');
+        const position = xOffset === 0 ? 'verso' : 'recto';
+
+        // Set page context before selecting items
+        appState.updateEditor({
+          selectedPageNumber: pageNumber,
+          selectedPagePosition: position,
+        });
+      }
+
       appState.selectItems(itemIds);
       switchToSelectedTab();
     } else {
