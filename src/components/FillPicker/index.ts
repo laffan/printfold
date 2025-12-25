@@ -44,6 +44,16 @@ export class FillPicker {
   private panelElement: HTMLElement | null = null;
   private closeHandler: ((e: MouseEvent) => void) | null = null;
 
+  // Throttled update for gradient changes during slider interactions
+  private gradientUpdateTimeout: number | null = null;
+  private throttledUpdateGradient = () => {
+    if (this.gradientUpdateTimeout !== null) return;
+    this.gradientUpdateTimeout = window.setTimeout(() => {
+      this.gradientUpdateTimeout = null;
+      this.updateGradient();
+    }, 50); // Update at most every 50ms during slider drag
+  };
+
   constructor(
     container: HTMLElement,
     initialFill: FillConfig,
@@ -434,22 +444,35 @@ export class FillPicker {
 
       handle.addEventListener('mousedown', (e) => {
         e.preventDefault();
+        e.stopPropagation();
         const rect = stopsContainer.getBoundingClientRect();
+        this.selectedStopIndex = index;
+
+        // Track the stop being dragged
+        const draggedStop = this.gradientStops[index];
 
         const onMove = (e: MouseEvent) => {
           const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-          this.gradientStops[index].offset = x;
-          // Sort stops by offset
-          this.gradientStops.sort((a, b) => a.offset - b.offset);
-          this.selectedStopIndex = this.gradientStops.findIndex(s => s === this.gradientStops.find(st => st.offset === x));
+          draggedStop.offset = x;
+
+          // Update handle position directly without re-rendering
+          handle.style.left = `${x * 100}%`;
+
+          // Redraw gradient canvas (lightweight operation)
           this.drawGradientCanvas();
-          this.render();
-          this.updateGradient();
         };
 
         const onUp = () => {
           document.removeEventListener('mousemove', onMove);
           document.removeEventListener('mouseup', onUp);
+
+          // Sort stops by offset now that dragging is complete
+          this.gradientStops.sort((a, b) => a.offset - b.offset);
+          this.selectedStopIndex = this.gradientStops.indexOf(draggedStop);
+
+          // Update state and re-render only once at the end
+          this.updateGradient();
+          this.renderTabContent(this.panelElement!);
         };
 
         document.addEventListener('mousemove', onMove);
@@ -528,6 +551,10 @@ export class FillPicker {
       angleInput.addEventListener('input', () => {
         this.gradientAngle = parseInt(angleInput.value);
         angleValue.textContent = `${this.gradientAngle}°`;
+        this.throttledUpdateGradient();
+      });
+      angleInput.addEventListener('change', () => {
+        // Ensure final value is saved when slider is released
         this.updateGradient();
       });
 
@@ -552,6 +579,9 @@ export class FillPicker {
       centerXInput.value = (this.radialCenterX * 100).toString();
       centerXInput.addEventListener('input', () => {
         this.radialCenterX = parseInt(centerXInput.value) / 100;
+        this.throttledUpdateGradient();
+      });
+      centerXInput.addEventListener('change', () => {
         this.updateGradient();
       });
 
@@ -564,6 +594,9 @@ export class FillPicker {
       centerYInput.value = (this.radialCenterY * 100).toString();
       centerYInput.addEventListener('input', () => {
         this.radialCenterY = parseInt(centerYInput.value) / 100;
+        this.throttledUpdateGradient();
+      });
+      centerYInput.addEventListener('change', () => {
         this.updateGradient();
       });
 
@@ -853,6 +886,10 @@ export class FillPicker {
   }
 
   destroy(): void {
+    if (this.gradientUpdateTimeout !== null) {
+      clearTimeout(this.gradientUpdateTimeout);
+      this.gradientUpdateTimeout = null;
+    }
     this.removePanel();
     this.container.innerHTML = '';
   }
