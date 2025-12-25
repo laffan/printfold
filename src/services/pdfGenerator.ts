@@ -157,16 +157,20 @@ export class PDFGenerator {
 
         if (leftPage) {
           const info = spreadForPage.get(leftPage.pageNumber);
-          const adjacentPage = info?.spread.recto || null;
+          // Get adjacent page from the same spread based on what the page actually is
+          const adjacentPage = leftPage.isRecto ? info?.spread.verso : info?.spread.recto;
           const spanningItems = info?.staticSpread?.spanningItems;
-          this.drawPage(frontPage, leftPage, 0, rowY, pageWidth, pageHeight, project, false, adjacentPage, spanningItems);
+          // Pass the page's actual isRecto value for correct cross-page item detection
+          this.drawPage(frontPage, leftPage, 0, rowY, pageWidth, pageHeight, project, leftPage.isRecto, adjacentPage, spanningItems);
         }
 
         if (rightPage) {
           const info = spreadForPage.get(rightPage.pageNumber);
-          const adjacentPage = info?.spread.verso || null;
+          // Get adjacent page from the same spread based on what the page actually is
+          const adjacentPage = rightPage.isRecto ? info?.spread.verso : info?.spread.recto;
           const spanningItems = info?.staticSpread?.spanningItems;
-          this.drawPage(frontPage, rightPage, pageWidth, rowY, pageWidth, pageHeight, project, true, adjacentPage, spanningItems);
+          // Pass the page's actual isRecto value for correct cross-page item detection
+          this.drawPage(frontPage, rightPage, pageWidth, rowY, pageWidth, pageHeight, project, rightPage.isRecto, adjacentPage, spanningItems);
         }
       });
 
@@ -185,16 +189,20 @@ export class PDFGenerator {
 
         if (leftPage) {
           const info = spreadForPage.get(leftPage.pageNumber);
-          const adjacentPage = info?.spread.recto || null;
+          // Get adjacent page from the same spread based on what the page actually is
+          const adjacentPage = leftPage.isRecto ? info?.spread.verso : info?.spread.recto;
           const spanningItems = info?.staticSpread?.spanningItems;
-          this.drawPage(backPage, leftPage, 0, rowY, pageWidth, pageHeight, project, true, adjacentPage, spanningItems);
+          // Pass the page's actual isRecto value for correct cross-page item detection
+          this.drawPage(backPage, leftPage, 0, rowY, pageWidth, pageHeight, project, leftPage.isRecto, adjacentPage, spanningItems);
         }
 
         if (rightPage) {
           const info = spreadForPage.get(rightPage.pageNumber);
-          const adjacentPage = info?.spread.verso || null;
+          // Get adjacent page from the same spread based on what the page actually is
+          const adjacentPage = rightPage.isRecto ? info?.spread.verso : info?.spread.recto;
           const spanningItems = info?.staticSpread?.spanningItems;
-          this.drawPage(backPage, rightPage, pageWidth, rowY, pageWidth, pageHeight, project, false, adjacentPage, spanningItems);
+          // Pass the page's actual isRecto value for correct cross-page item detection
+          this.drawPage(backPage, rightPage, pageWidth, rowY, pageWidth, pageHeight, project, rightPage.isRecto, adjacentPage, spanningItems);
         }
       });
     }
