@@ -500,6 +500,99 @@ class AppState {
     return this.project.staticSpreads || [];
   }
 
+  /**
+   * Reorder static pages by moving them to a new position
+   * @param sourcePageNumbers - Page numbers of the static pages being dragged
+   * @param targetSpreadIndex - The spread index where pages should be moved
+   * @param isSpreadDrag - Whether both pages of a spread are being dragged together
+   */
+  reorderStaticPages(sourcePageNumbers: number[], targetSpreadIndex: number, isSpreadDrag: boolean): void {
+    const prevState = this.project;
+    const staticSpreads = [...(this.project.staticSpreads || [])];
+
+    if (staticSpreads.length === 0 || sourcePageNumbers.length === 0) return;
+
+    // Find the source static spread containing these pages
+    // Static pages have high page numbers (1000+), need to map back to spread index
+    let sourceSpreadIndex = -1;
+    for (let i = 0; i < staticSpreads.length; i++) {
+      const spread = staticSpreads[i];
+      if (spread.verso && sourcePageNumbers.includes(spread.verso.pageNumber)) {
+        sourceSpreadIndex = i;
+        break;
+      }
+      if (spread.recto && sourcePageNumbers.includes(spread.recto.pageNumber)) {
+        sourceSpreadIndex = i;
+        break;
+      }
+    }
+
+    if (sourceSpreadIndex === -1) {
+      // Source isn't a static spread (might be trying to drag markdown content)
+      return;
+    }
+
+    // Calculate the target index within static spreads
+    // targetSpreadIndex is the global spread index (content spreads + static spreads)
+    // We need to convert it to static spread index
+    const allSpreads = this.project.signatures.flatMap(sig => sig.spreads);
+    const contentSpreadCount = allSpreads.filter(s =>
+      !s.verso?.isStatic || !s.recto?.isStatic || s.verso?.pageNumber === 0
+    ).length;
+
+    // Count how many spreads are pure static (both verso and recto are static, not back cover)
+    let staticSpreadStartIndex = 0;
+    for (const sig of this.project.signatures) {
+      for (const spread of sig.spreads) {
+        const isStaticSpread = spread.verso?.isStatic && spread.recto?.isStatic && spread.verso?.pageNumber !== 0;
+        if (!isStaticSpread) {
+          staticSpreadStartIndex++;
+        }
+      }
+    }
+
+    // The target is within static spreads
+    const targetStaticIndex = Math.max(0, targetSpreadIndex - staticSpreadStartIndex);
+
+    if (targetStaticIndex >= staticSpreads.length) {
+      // Target is beyond static spreads, do nothing
+      return;
+    }
+
+    // Check if target is also a static spread
+    const targetSpread = staticSpreads[targetStaticIndex];
+    const isTargetStatic = targetSpread && (targetSpread.verso?.isStatic || targetSpread.recto?.isStatic);
+
+    if (!isTargetStatic) {
+      // Target is not static, can't drop there (in future could insert and reflow text)
+      return;
+    }
+
+    // Perform the swap
+    if (sourceSpreadIndex !== targetStaticIndex) {
+      // Remove source spread and insert at target position
+      const [movedSpread] = staticSpreads.splice(sourceSpreadIndex, 1);
+
+      // Adjust target index if source was before target
+      const adjustedTargetIndex = sourceSpreadIndex < targetStaticIndex
+        ? targetStaticIndex - 1
+        : targetStaticIndex;
+
+      staticSpreads.splice(adjustedTargetIndex, 0, movedSpread);
+
+      // Reindex all spreads
+      staticSpreads.forEach((spread, index) => {
+        spread.index = index;
+      });
+
+      this.project = { ...this.project, staticSpreads };
+      this.notifyProjectListeners(prevState);
+
+      // Trigger reflow to update page numbers
+      this.requestReflow();
+    }
+  }
+
   // Spanning items (items that bridge across verso and recto)
   addSpanningItemToSpread(spreadId: string, item: import('../types').SpanningItem): void {
     const prevState = this.project;

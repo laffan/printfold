@@ -4,7 +4,12 @@
  */
 
 import { appState } from '../../services/state';
-import type { Spread } from '../../types';
+import type { Spread, PageContent } from '../../types';
+
+// Track drag state
+let draggedPageNumbers: number[] = [];
+let dragSourceSpreadIndex: number = -1;
+let isDraggingSpread: boolean = false;
 
 /**
  * Render all spread thumbnails
@@ -175,6 +180,11 @@ export function renderThumbnails(
     const isRectoSelected = editorState.selectedPagePosition === 'recto' &&
       spread.recto?.pageNumber === editorState.selectedPageNumber;
 
+    // Check if pages are static (draggable)
+    const isVersoStatic = spread.verso?.isStatic ?? false;
+    const isRectoStatic = spread.recto?.isStatic ?? false;
+    const isFullStaticSpread = isVersoStatic && isRectoStatic;
+
     thumbDiv.appendChild(canvas);
 
     // Create labels container with individual page numbers
@@ -192,6 +202,10 @@ export function renderThumbnails(
       versoLabel.style.color = '#dc2626';
       versoLabel.style.fontWeight = 'bold';
     }
+    // Add dark orange background for static pages
+    if (isVersoStatic && !isBackCover) {
+      versoLabel.classList.add('static-page-label');
+    }
     versoLabel.addEventListener('click', (e) => {
       e.stopPropagation();
       setCurrentSpreadIndex(spreadIndex);
@@ -206,6 +220,10 @@ export function renderThumbnails(
     const rectoLabel = document.createElement('div');
     rectoLabel.className = 'spread-thumbnail-page-label' + (isRectoSelected ? ' selected' : '');
     rectoLabel.textContent = spread.recto?.pageNumber?.toString() || '–';
+    // Add dark orange background for static pages
+    if (isRectoStatic) {
+      rectoLabel.classList.add('static-page-label');
+    }
     rectoLabel.addEventListener('click', (e) => {
       e.stopPropagation();
       setCurrentSpreadIndex(spreadIndex);
@@ -217,6 +235,100 @@ export function renderThumbnails(
     labelsContainer.appendChild(rectoLabel);
 
     thumbDiv.appendChild(labelsContainer);
+
+    // Make static pages draggable
+    if (isVersoStatic || isRectoStatic) {
+      thumbDiv.setAttribute('draggable', 'true');
+      thumbDiv.classList.add('draggable-thumbnail');
+
+      // Drag start
+      thumbDiv.addEventListener('dragstart', (e) => {
+        e.stopPropagation();
+        const shiftHeld = e.shiftKey;
+
+        // Determine which pages to drag
+        draggedPageNumbers = [];
+        isDraggingSpread = false;
+
+        if (shiftHeld && isFullStaticSpread) {
+          // Shift held: drag both pages together
+          if (spread.verso) draggedPageNumbers.push(spread.verso.pageNumber);
+          if (spread.recto) draggedPageNumbers.push(spread.recto.pageNumber);
+          isDraggingSpread = true;
+        } else if (isFullStaticSpread) {
+          // For full static spread without shift, drag both
+          if (spread.verso) draggedPageNumbers.push(spread.verso.pageNumber);
+          if (spread.recto) draggedPageNumbers.push(spread.recto.pageNumber);
+          isDraggingSpread = true;
+        } else {
+          // Mixed spread or single static - drag only static pages
+          if (isVersoStatic && spread.verso) draggedPageNumbers.push(spread.verso.pageNumber);
+          if (isRectoStatic && spread.recto) draggedPageNumbers.push(spread.recto.pageNumber);
+        }
+
+        dragSourceSpreadIndex = spreadIndex;
+
+        e.dataTransfer!.effectAllowed = 'move';
+        e.dataTransfer!.setData('application/x-printfold-page', JSON.stringify({
+          pageNumbers: draggedPageNumbers,
+          sourceSpreadIndex: spreadIndex,
+          isSpread: isDraggingSpread
+        }));
+
+        thumbDiv.classList.add('dragging');
+      });
+
+      // Drag end
+      thumbDiv.addEventListener('dragend', () => {
+        thumbDiv.classList.remove('dragging');
+        draggedPageNumbers = [];
+        dragSourceSpreadIndex = -1;
+        isDraggingSpread = false;
+
+        // Remove all drop indicators
+        thumbnailContainer.querySelectorAll('.drop-target, .drop-before, .drop-after').forEach(el => {
+          el.classList.remove('drop-target', 'drop-before', 'drop-after');
+        });
+      });
+    }
+
+    // Drop target handling for all thumbnails
+    thumbDiv.addEventListener('dragover', (e) => {
+      if (draggedPageNumbers.length === 0) return;
+      e.preventDefault();
+      e.dataTransfer!.dropEffect = 'move';
+
+      // Don't allow dropping on self
+      if (spreadIndex === dragSourceSpreadIndex) return;
+
+      // Add visual feedback
+      thumbDiv.classList.add('drop-target');
+    });
+
+    thumbDiv.addEventListener('dragleave', () => {
+      thumbDiv.classList.remove('drop-target', 'drop-before', 'drop-after');
+    });
+
+    thumbDiv.addEventListener('drop', (e) => {
+      e.preventDefault();
+      thumbDiv.classList.remove('drop-target', 'drop-before', 'drop-after');
+
+      const dataStr = e.dataTransfer?.getData('application/x-printfold-page');
+      if (!dataStr) return;
+
+      const data = JSON.parse(dataStr);
+      const sourcePageNumbers: number[] = data.pageNumbers;
+      const isSpreadDrag: boolean = data.isSpread;
+
+      if (sourcePageNumbers.length === 0) return;
+
+      // Determine target page(s)
+      const targetVerso = spread.verso;
+      const targetRecto = spread.recto;
+
+      // Perform the reorder
+      appState.reorderStaticPages(sourcePageNumbers, spreadIndex, isSpreadDrag);
+    });
 
     // Create click areas for page selection (overlaid on canvas)
     const clickContainer = document.createElement('div');

@@ -912,6 +912,46 @@ body {
   color: white;
 }
 
+/* Static page label - dark orange background to indicate draggable */
+.spread-thumbnail-page-label.static-page-label {
+  background: #c2410c;
+  color: white;
+}
+
+.spread-thumbnail-page-label.static-page-label:hover {
+  background: #9a3412;
+}
+
+.spread-thumbnail-page-label.static-page-label.selected {
+  background: #22c55e;
+  color: white;
+}
+
+/* Draggable thumbnail styling */
+.spread-thumbnail.draggable-thumbnail {
+  cursor: grab;
+}
+
+.spread-thumbnail.draggable-thumbnail:active {
+  cursor: grabbing;
+}
+
+.spread-thumbnail.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+/* Drop target styling - orange outline */
+.spread-thumbnail.drop-target {
+  border-color: #ea580c !important;
+  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.4) !important;
+}
+
+.spread-thumbnail.drop-target canvas {
+  outline: 2px solid #ea580c;
+  outline-offset: -2px;
+}
+
 .konva-container {
   flex: 1;
   height: 100%;
