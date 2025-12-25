@@ -185,6 +185,7 @@ function createRenderNode(
     const imageItem = item as ImagePageItem;
     const file = appState.getProject().files.find(f => f.id === imageItem.imageFileId);
     if (file) {
+      // Create a placeholder node that will be updated when image loads
       const konvaImage = new Konva.Image({
         x,
         y,
@@ -192,7 +193,8 @@ function createRenderNode(
         height,
         rotation: item.rotation || 0,
         opacity,
-      });
+        image: undefined,
+      } as Konva.ImageConfig);
 
       const loadPromise = new Promise<void>((resolve) => {
         const img = new window.Image();
