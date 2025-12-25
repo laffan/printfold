@@ -6,12 +6,14 @@
 import { appState } from '../../services/state';
 import { createFontDropdown, FontDropdown } from '../FontDropdown';
 import { createFillPicker, FillPicker } from '../FillPicker';
-import type { PageItem, TextPageItem, ShapePageItem, ImagePageItem, ProjectFile, FillConfig } from '../../types';
+import type { PageItem, TextPageItem, ShapePageItem, ImagePageItem, ProjectFile, FillConfig, ArrayInstance } from '../../types';
 
 // Module-level instances
 let itemFontDropdown: FontDropdown | null = null;
 let itemFillPicker: FillPicker | null = null;
+let textFillPicker: FillPicker | null = null;
 let pageBackgroundPicker: FillPicker | null = null;
+const instanceFillPickers: Map<number, FillPicker> = new Map();
 
 /**
  * Set up the Edit Page panel event handlers
@@ -157,9 +159,28 @@ function setupEditPropertyInputs(updateEditSelectedSectionFn: () => void): void 
     });
   };
 
-  // Fill picker for shapes (handled separately)
+  // Shape stroke properties
   setupColorInput('item-stroke', 'strokeColor');
   setupPropInput('item-stroke-width', 'strokeWidth');
+
+  // Shape fill/stroke toggle handlers
+  const shapeHasFill = document.getElementById('shape-has-fill') as HTMLInputElement;
+  const shapeFillSection = document.getElementById('shape-fill-section');
+  shapeHasFill?.addEventListener('change', () => {
+    const editorState = appState.getEditor();
+    if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+    appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { hasFill: shapeHasFill.checked });
+    if (shapeFillSection) shapeFillSection.style.display = shapeHasFill.checked ? 'block' : 'none';
+  });
+
+  const shapeHasStroke = document.getElementById('shape-has-stroke') as HTMLInputElement;
+  const shapeStrokeSection = document.getElementById('shape-stroke-section');
+  shapeHasStroke?.addEventListener('change', () => {
+    const editorState = appState.getEditor();
+    if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+    appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { hasStroke: shapeHasStroke.checked });
+    if (shapeStrokeSection) shapeStrokeSection.style.display = shapeHasStroke.checked ? 'block' : 'none';
+  });
 
   // Text properties - use custom font dropdown
   itemFontDropdown = createFontDropdown('item-font-family', (value) => {
@@ -169,7 +190,29 @@ function setupEditPropertyInputs(updateEditSelectedSectionFn: () => void): void 
   });
 
   setupPropInput('item-font-size', 'fontSize');
-  setupColorInput('item-text-color', 'color');
+
+  // Text fill/stroke toggle handlers
+  const textHasFill = document.getElementById('text-has-fill') as HTMLInputElement;
+  const textFillSection = document.getElementById('text-fill-section');
+  textHasFill?.addEventListener('change', () => {
+    const editorState = appState.getEditor();
+    if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+    appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { hasFill: textHasFill.checked });
+    if (textFillSection) textFillSection.style.display = textHasFill.checked ? 'block' : 'none';
+  });
+
+  const textHasStroke = document.getElementById('text-has-stroke') as HTMLInputElement;
+  const textStrokeSection = document.getElementById('text-stroke-section');
+  textHasStroke?.addEventListener('change', () => {
+    const editorState = appState.getEditor();
+    if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+    appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { hasStroke: textHasStroke.checked });
+    if (textStrokeSection) textStrokeSection.style.display = textHasStroke.checked ? 'block' : 'none';
+  });
+
+  // Text stroke properties
+  setupColorInput('text-stroke-color', 'strokeColor');
+  setupPropInput('text-stroke-width', 'strokeWidth');
 
   // Text align buttons
   ['left', 'center', 'right'].forEach(align => {
@@ -207,6 +250,63 @@ function setupEditPropertyInputs(updateEditSelectedSectionFn: () => void): void 
       updateEditSelectedSectionFn();
     }
   });
+
+  // === Effects Section Handlers ===
+
+  // Unified stroke toggle (for all item types)
+  const itemHasStroke = document.getElementById('item-has-stroke') as HTMLInputElement;
+  const itemStrokeSection = document.getElementById('item-stroke-section');
+  itemHasStroke?.addEventListener('change', () => {
+    const editorState = appState.getEditor();
+    if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+    appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { hasStroke: itemHasStroke.checked });
+    if (itemStrokeSection) itemStrokeSection.style.display = itemHasStroke.checked ? 'block' : 'none';
+  });
+
+  // Shadow toggle
+  const itemHasShadow = document.getElementById('item-has-shadow') as HTMLInputElement;
+  const itemShadowSection = document.getElementById('item-shadow-section');
+  itemHasShadow?.addEventListener('change', () => {
+    const editorState = appState.getEditor();
+    if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+    appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { hasShadow: itemHasShadow.checked });
+    if (itemShadowSection) itemShadowSection.style.display = itemHasShadow.checked ? 'block' : 'none';
+  });
+
+  // Shadow properties
+  setupColorInput('item-shadow-color', 'shadowColor');
+  setupPropInput('item-shadow-blur', 'shadowBlur');
+  setupPropInput('item-shadow-offset-x', 'shadowOffsetX');
+  setupPropInput('item-shadow-offset-y', 'shadowOffsetY');
+  setupPropInput('item-shadow-opacity', 'shadowOpacity');
+
+  // Array toggle
+  const itemHasArray = document.getElementById('item-has-array') as HTMLInputElement;
+  const itemArraySection = document.getElementById('item-array-section');
+  itemHasArray?.addEventListener('change', () => {
+    const editorState = appState.getEditor();
+    if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+    // Set arrayCount to 2 when enabled, 1 when disabled
+    const newArrayCount = itemHasArray.checked ? 2 : 1;
+    appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { arrayCount: newArrayCount });
+    if (itemArraySection) itemArraySection.style.display = itemHasArray.checked ? 'block' : 'none';
+  });
+
+  // Array duplication inputs
+  const arrayCountInput = document.getElementById('item-array-count') as HTMLInputElement;
+  arrayCountInput?.addEventListener('input', () => {
+    const editorState = appState.getEditor();
+    if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+    const value = parseInt(arrayCountInput.value, 10);
+    if (!isNaN(value) && value >= 1 && value <= 50) {
+      appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { arrayCount: value });
+      // Refresh the instances list
+      const item = appState.getItemFromPage(editorState.selectedPageNumber, editorState.selectedItemId);
+      if (item) updateArrayInstancesList(item);
+    }
+  });
+  setupPropInput('item-array-offset-x', 'arrayOffsetX');
+  setupPropInput('item-array-offset-y', 'arrayOffsetY');
 }
 
 /**
@@ -409,6 +509,8 @@ export function updateEditSelectedSection(): void {
   // Hide if no item selected
   if (!editorState.selectedItemId || !editorState.selectedPageNumber) {
     section.style.display = 'none';
+    const effectsSection = document.getElementById('effects-section');
+    if (effectsSection) effectsSection.style.display = 'none';
     if (panel) panel.style.display = 'none';
     return;
   }
@@ -433,11 +535,83 @@ export function updateEditSelectedSection(): void {
   (document.getElementById('item-rotation') as HTMLInputElement).value = (item.rotation || 0).toString();
   (document.getElementById('item-opacity') as HTMLInputElement).value = (item.opacity ?? 1).toString();
 
+  // Show the effects section
+  const effectsSection = document.getElementById('effects-section');
+  if (effectsSection) effectsSection.style.display = 'block';
+
+  // Get stroke properties based on item type
+  let hasStroke = false;
+  let strokeColor = '#000000';
+  let strokeWidth = 1;
+
+  if (item.type === 'shape') {
+    const shapeItem = item as ShapePageItem;
+    hasStroke = shapeItem.hasStroke ?? true;
+    strokeColor = shapeItem.strokeColor || '#000000';
+    strokeWidth = shapeItem.strokeWidth || 1;
+  } else if (item.type === 'text') {
+    const textItem = item as TextPageItem;
+    hasStroke = textItem.hasStroke ?? false;
+    strokeColor = textItem.strokeColor || '#000000';
+    strokeWidth = textItem.strokeWidth || 1;
+  }
+
+  // Update unified stroke toggle
+  const itemHasStroke = document.getElementById('item-has-stroke') as HTMLInputElement;
+  const itemStrokeSection = document.getElementById('item-stroke-section');
+  if (itemHasStroke) itemHasStroke.checked = hasStroke;
+  if (itemStrokeSection) itemStrokeSection.style.display = hasStroke ? 'block' : 'none';
+  (document.getElementById('item-stroke') as HTMLInputElement).value = strokeColor;
+  (document.getElementById('item-stroke-width') as HTMLInputElement).value = strokeWidth.toString();
+
+  // Update shadow toggle and properties
+  const hasShadow = item.hasShadow ?? false;
+  const itemHasShadow = document.getElementById('item-has-shadow') as HTMLInputElement;
+  const itemShadowSection = document.getElementById('item-shadow-section');
+  if (itemHasShadow) itemHasShadow.checked = hasShadow;
+  if (itemShadowSection) itemShadowSection.style.display = hasShadow ? 'block' : 'none';
+  (document.getElementById('item-shadow-color') as HTMLInputElement).value = item.shadowColor || '#000000';
+  (document.getElementById('item-shadow-blur') as HTMLInputElement).value = (item.shadowBlur ?? 5).toString();
+  (document.getElementById('item-shadow-offset-x') as HTMLInputElement).value = (item.shadowOffsetX ?? 3).toString();
+  (document.getElementById('item-shadow-offset-y') as HTMLInputElement).value = (item.shadowOffsetY ?? 3).toString();
+  (document.getElementById('item-shadow-opacity') as HTMLInputElement).value = (item.shadowOpacity ?? 0.5).toString();
+
+  // Update array toggle and properties
+  const arrayCount = item.arrayCount || 1;
+  const hasArray = arrayCount > 1;
+  const itemHasArray = document.getElementById('item-has-array') as HTMLInputElement;
+  const itemArraySection = document.getElementById('item-array-section');
+  if (itemHasArray) itemHasArray.checked = hasArray;
+  if (itemArraySection) itemArraySection.style.display = hasArray ? 'block' : 'none';
+  (document.getElementById('item-array-count') as HTMLInputElement).value = arrayCount.toString();
+  (document.getElementById('item-array-offset-x') as HTMLInputElement).value = (item.arrayOffsetX || 20).toString();
+  (document.getElementById('item-array-offset-y') as HTMLInputElement).value = (item.arrayOffsetY || 20).toString();
+
+  // Update array instances list
+  updateArrayInstancesList(item);
+
   // Show/hide type-specific properties
   if (item.type === 'shape') {
     const shapeItem = item as ShapePageItem;
     shapeProps!.style.display = 'block';
     textProps!.style.display = 'none';
+
+    // Determine default fill/stroke based on shape type
+    const isLinear = shapeItem.shapeType === 'line' || shapeItem.shapeType === 'arrow';
+    const hasFill = shapeItem.hasFill ?? !isLinear;
+    const hasStroke = shapeItem.hasStroke ?? true;
+
+    // Update fill toggle
+    const shapeHasFillCheckbox = document.getElementById('shape-has-fill') as HTMLInputElement;
+    const shapeFillSection = document.getElementById('shape-fill-section');
+    if (shapeHasFillCheckbox) shapeHasFillCheckbox.checked = hasFill;
+    if (shapeFillSection) shapeFillSection.style.display = hasFill ? 'block' : 'none';
+
+    // Update stroke toggle
+    const shapeHasStrokeCheckbox = document.getElementById('shape-has-stroke') as HTMLInputElement;
+    const shapeStrokeSection = document.getElementById('shape-stroke-section');
+    if (shapeHasStrokeCheckbox) shapeHasStrokeCheckbox.checked = hasStroke;
+    if (shapeStrokeSection) shapeStrokeSection.style.display = hasStroke ? 'block' : 'none';
 
     // Set up fill picker
     const fillPickerContainer = document.getElementById('item-fill-picker');
@@ -477,7 +651,50 @@ export function updateEditSelectedSection(): void {
       itemFontDropdown.setValue(textItem.fontFamily);
     }
     (document.getElementById('item-font-size') as HTMLInputElement).value = textItem.fontSize.toString();
-    (document.getElementById('item-text-color') as HTMLInputElement).value = textItem.color;
+
+    // Update fill toggle (default: true for text)
+    const hasFill = textItem.hasFill ?? true;
+    const textHasFillCheckbox = document.getElementById('text-has-fill') as HTMLInputElement;
+    const textFillSection = document.getElementById('text-fill-section');
+    if (textHasFillCheckbox) textHasFillCheckbox.checked = hasFill;
+    if (textFillSection) textFillSection.style.display = hasFill ? 'block' : 'none';
+
+    // Update stroke toggle (default: false for text)
+    const hasStroke = textItem.hasStroke ?? false;
+    const textHasStrokeCheckbox = document.getElementById('text-has-stroke') as HTMLInputElement;
+    const textStrokeSection = document.getElementById('text-stroke-section');
+    if (textHasStrokeCheckbox) textHasStrokeCheckbox.checked = hasStroke;
+    if (textStrokeSection) textStrokeSection.style.display = hasStroke ? 'block' : 'none';
+
+    // Set up text fill picker
+    const textFillPickerContainer = document.getElementById('text-fill-picker');
+    if (textFillPickerContainer) {
+      // Get current fill, falling back to color for backwards compatibility
+      const currentFill: FillConfig = textItem.fill || {
+        type: 'color',
+        color: textItem.color || '#000000'
+      };
+
+      if (textFillPicker) {
+        textFillPicker.setFill(currentFill);
+      } else {
+        textFillPicker = createFillPicker(textFillPickerContainer, currentFill, (fill) => {
+          const editorState = appState.getEditor();
+          if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+
+          // Update fill property
+          appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, {
+            fill,
+            // Also update color for backwards compatibility
+            color: fill.type === 'color' ? (fill.color || '#000000') : '#000000'
+          });
+        });
+      }
+    }
+
+    // Update stroke properties
+    (document.getElementById('text-stroke-color') as HTMLInputElement).value = textItem.strokeColor || '#000000';
+    (document.getElementById('text-stroke-width') as HTMLInputElement).value = (textItem.strokeWidth || 1).toString();
 
     // Update align button states
     ['left', 'center', 'right'].forEach(align => {
@@ -517,5 +734,75 @@ function setupPageBackgroundPicker(pageNumber: number): void {
       if (!editorState.selectedPageNumber) return;
       appState.updatePageBackground(editorState.selectedPageNumber, fill);
     });
+  }
+}
+
+/**
+ * Update the array instances list UI
+ */
+function updateArrayInstancesList(item: PageItem): void {
+  const container = document.getElementById('array-instances-list');
+  if (!container) return;
+
+  const arrayCount = item.arrayCount || 1;
+  const arrayInstances = item.arrayInstances || [];
+
+  // Clear existing pickers
+  instanceFillPickers.forEach(picker => picker.destroy?.());
+  instanceFillPickers.clear();
+  container.innerHTML = '';
+
+  // Don't show list if array count is 1 or less
+  if (arrayCount <= 1) return;
+
+  // Get the default fill from the item
+  let defaultFill: FillConfig = { type: 'color', color: '#cccccc' };
+  if (item.type === 'shape') {
+    const shapeItem = item as ShapePageItem;
+    defaultFill = shapeItem.fill || { type: 'color', color: shapeItem.fillColor || '#cccccc' };
+  } else if (item.type === 'text') {
+    const textItem = item as TextPageItem;
+    defaultFill = textItem.fill || { type: 'color', color: textItem.color || '#000000' };
+  }
+
+  // Create instance items
+  for (let i = 0; i < arrayCount; i++) {
+    const instanceConfig = arrayInstances.find(inst => inst.index === i);
+    const instanceFill = instanceConfig?.fill || defaultFill;
+
+    const instanceItem = document.createElement('div');
+    instanceItem.className = 'array-instance-item';
+    instanceItem.innerHTML = `
+      <span class="array-instance-label">Instance ${i + 1}</span>
+      <div class="array-instance-fill" id="instance-fill-${i}"></div>
+    `;
+    container.appendChild(instanceItem);
+
+    // Create fill picker for this instance
+    const fillContainer = instanceItem.querySelector(`#instance-fill-${i}`) as HTMLElement;
+    if (fillContainer) {
+      const picker = createFillPicker(fillContainer, instanceFill, (fill) => {
+        const editorState = appState.getEditor();
+        if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+
+        // Get current item and update its arrayInstances
+        const currentItem = appState.getItemFromPage(editorState.selectedPageNumber, editorState.selectedItemId);
+        if (!currentItem) return;
+
+        const currentInstances = [...(currentItem.arrayInstances || [])];
+        const existingIndex = currentInstances.findIndex(inst => inst.index === i);
+
+        if (existingIndex >= 0) {
+          currentInstances[existingIndex] = { ...currentInstances[existingIndex], fill };
+        } else {
+          currentInstances.push({ index: i, fill });
+        }
+
+        appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, {
+          arrayInstances: currentInstances
+        });
+      });
+      instanceFillPickers.set(i, picker);
+    }
   }
 }

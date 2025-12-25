@@ -245,6 +245,46 @@ try {
 }
 ```
 
+## Creep Compensation
+
+When booklets are folded, inner sheets extend slightly past outer sheets due to paper thickness. This is called "creep" or "pushout." Creep compensation progressively narrows inner pages so all edges align when trimmed.
+
+### Configuration
+
+```typescript
+outputOptions: {
+  creepEnabled: boolean;      // Enable/disable creep compensation
+  creepPerSheet: number;      // Points to reduce per nested sheet (default: 4.5pt = 0.0625")
+}
+```
+
+### How It Works
+
+For a signature with N sheets:
+- Outermost sheet (sheet 1): Full page width
+- Sheet 2: Reduced by `creepPerSheet`
+- Sheet N: Reduced by `creepPerSheet * (N-1)`
+
+Example for 8-page signature (2 sheets) with 4.5pt creep:
+```
+Sheet 1 (pages 1, 8, 2, 7): Full width
+Sheet 2 (pages 3, 6, 4, 5): Width - 4.5pt
+```
+
+### Crop Mark Adjustment
+
+When creep is enabled with "Fill available space" mode, crop marks are positioned per-row based on each spread's calculated width, ensuring accurate trimming for different-width sheets.
+
+### Typical Values
+
+| Paper Type | Creep per Sheet |
+|------------|-----------------|
+| Bond (20lb) | 0.0625" (4.5pt) |
+| Text (70lb) | 0.04" (2.9pt) |
+| Cover (80lb) | 0.08" (5.8pt) |
+
+**Note:** The actual implementation of creep adjustment is pending. Currently, the UI and settings are in place but page width adjustment is not yet applied during PDF generation.
+
 ## Limitations
 
 1. **Fonts**: Uses standard PDF fonts only (no custom font embedding)

@@ -179,8 +179,32 @@ interface PageItemBase {
   rotation?: number;     // Degrees
   opacity?: number;      // 0-1, defaults to 1
   zIndex?: number;       // Layer order
+  // Shadow properties
+  hasShadow?: boolean;
+  shadowColor?: string;
+  shadowBlur?: number;
+  shadowOffsetX?: number;
+  shadowOffsetY?: number;
+  shadowOpacity?: number;
+  // Array duplication properties
+  arrayCount?: number;       // Number of instances (1 = no duplication)
+  arrayOffsetX?: number;     // X offset between instances
+  arrayOffsetY?: number;     // Y offset between instances
+  arrayInstances?: ArrayInstance[];  // Per-instance overrides
 }
 ```
+
+### ArrayInstance
+
+```typescript
+interface ArrayInstance {
+  index: number;         // Instance index (0-based)
+  fill?: FillConfig;     // Override fill for this instance
+  opacity?: number;      // Override opacity for this instance
+}
+```
+
+When array is enabled (`arrayCount > 1`), items are rendered as a Konva.Group containing all instances. Each instance can have its own fill configuration through the `arrayInstances` array.
 
 ### TextPageItem
 
@@ -192,8 +216,13 @@ interface TextPageItem extends PageItemBase {
   fontSize: number;
   fontWeight: 'normal' | 'bold';
   fontStyle: 'normal' | 'italic';
-  color: string;
+  color: string;         // Deprecated: use fill
   textAlign: 'left' | 'center' | 'right';
+  fill?: FillConfig;     // Supports gradients and patterns
+  hasFill?: boolean;     // Whether fill is enabled (default: true)
+  strokeColor?: string;
+  strokeWidth?: number;
+  hasStroke?: boolean;   // Whether stroke is enabled (default: false)
 }
 ```
 
@@ -205,8 +234,10 @@ interface ShapePageItem extends PageItemBase {
   shapeType: 'rectangle' | 'ellipse' | 'circle' | 'line' | 'arrow';
   fillColor?: string;    // Deprecated: use fill
   fill?: FillConfig;
+  hasFill?: boolean;     // Whether fill is enabled (default: true for shapes, false for lines)
   strokeColor?: string;
   strokeWidth?: number;
+  hasStroke?: boolean;   // Whether stroke is enabled (default: true)
 }
 ```
 

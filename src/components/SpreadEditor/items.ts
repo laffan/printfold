@@ -5,7 +5,7 @@
 
 import Konva from 'konva';
 import { appState } from '../../services/state';
-import type { PageContent, PageItem, TextPageItem, ShapePageItem, ImagePageItem, FillConfig, SpanningItem } from '../../types';
+import type { PageContent, PageItem, TextPageItem, ShapePageItem, ImagePageItem, FillConfig, SpanningItem, ArrayInstance } from '../../types';
 
 /**
  * Apply fill config to a Konva shape
@@ -101,19 +101,28 @@ export function createItemNode(
 
   if (item.type === 'shape') {
     const shapeItem = item as ShapePageItem;
+    const isLinear = shapeItem.shapeType === 'line' || shapeItem.shapeType === 'arrow';
+    const hasFill = shapeItem.hasFill ?? !isLinear;
+    const hasStroke = shapeItem.hasStroke ?? true;
+    const strokeProps = hasStroke ? {
+      stroke: shapeItem.strokeColor || '#000000',
+      strokeWidth: shapeItem.strokeWidth || 1,
+    } : {};
+
     if (shapeItem.shapeType === 'rectangle') {
       const rect = new Konva.Rect({
         x: xOffset + item.x,
         y: item.y,
         width: item.width,
         height: item.height,
-        stroke: shapeItem.strokeColor || '#000000',
-        strokeWidth: shapeItem.strokeWidth || 1,
+        ...strokeProps,
         rotation: item.rotation || 0,
         opacity,
         draggable: true,
       });
-      applyFillToShape(rect, shapeItem.fill, shapeItem.fillColor, item.width, item.height);
+      if (hasFill) {
+        applyFillToShape(rect, shapeItem.fill, shapeItem.fillColor, item.width, item.height);
+      }
       node = rect;
     } else if (shapeItem.shapeType === 'ellipse') {
       const ellipse = new Konva.Ellipse({
@@ -121,14 +130,15 @@ export function createItemNode(
         y: item.y + item.height / 2,
         radiusX: item.width / 2,
         radiusY: item.height / 2,
-        stroke: shapeItem.strokeColor || '#000000',
-        strokeWidth: shapeItem.strokeWidth || 1,
+        ...strokeProps,
         rotation: item.rotation || 0,
         opacity,
         draggable: true,
         offset: { x: 0, y: 0 },
       });
-      applyFillToShape(ellipse, shapeItem.fill, shapeItem.fillColor, item.width, item.height);
+      if (hasFill) {
+        applyFillToShape(ellipse, shapeItem.fill, shapeItem.fillColor, item.width, item.height);
+      }
       node = ellipse;
     } else if (shapeItem.shapeType === 'circle') {
       // Circle uses the minimum of width/height for radius
@@ -137,21 +147,22 @@ export function createItemNode(
         x: xOffset + item.x + radius,
         y: item.y + radius,
         radius: radius,
-        stroke: shapeItem.strokeColor || '#000000',
-        strokeWidth: shapeItem.strokeWidth || 1,
+        ...strokeProps,
         rotation: item.rotation || 0,
         opacity,
         draggable: true,
       });
-      applyFillToShape(circle, shapeItem.fill, shapeItem.fillColor, radius * 2, radius * 2);
+      if (hasFill) {
+        applyFillToShape(circle, shapeItem.fill, shapeItem.fillColor, radius * 2, radius * 2);
+      }
       node = circle;
     } else if (shapeItem.shapeType === 'line') {
       node = new Konva.Line({
         x: xOffset + item.x,
         y: item.y,
         points: [0, 0, item.width, 0],
-        stroke: shapeItem.strokeColor || '#000000',
-        strokeWidth: shapeItem.strokeWidth || 2,
+        stroke: hasStroke ? (shapeItem.strokeColor || '#000000') : undefined,
+        strokeWidth: hasStroke ? (shapeItem.strokeWidth || 2) : 0,
         rotation: item.rotation || 0,
         opacity,
         draggable: true,
@@ -161,8 +172,8 @@ export function createItemNode(
         x: xOffset + item.x,
         y: item.y,
         points: [0, 0, item.width, 0],
-        stroke: shapeItem.strokeColor || '#000000',
-        strokeWidth: shapeItem.strokeWidth || 2,
+        stroke: hasStroke ? (shapeItem.strokeColor || '#000000') : undefined,
+        strokeWidth: hasStroke ? (shapeItem.strokeWidth || 2) : 0,
         fill: shapeItem.strokeColor || '#000000',
         pointerLength: 10,
         pointerWidth: 8,
@@ -173,7 +184,10 @@ export function createItemNode(
     }
   } else if (item.type === 'text') {
     const textItem = item as TextPageItem;
-    node = new Konva.Text({
+    const hasFill = textItem.hasFill ?? true;
+    const hasStroke = textItem.hasStroke ?? false;
+
+    const textNode = new Konva.Text({
       x: xOffset + item.x,
       y: item.y,
       width: item.width,
@@ -181,12 +195,24 @@ export function createItemNode(
       fontSize: textItem.fontSize,
       fontFamily: textItem.fontFamily,
       fontStyle: `${textItem.fontWeight === 'bold' ? 'bold' : ''} ${textItem.fontStyle === 'italic' ? 'italic' : ''}`.trim() || 'normal',
-      fill: textItem.color,
       align: textItem.textAlign,
       rotation: item.rotation || 0,
       opacity,
       draggable: true,
     });
+
+    // Apply fill if enabled
+    if (hasFill) {
+      applyFillToShape(textNode, textItem.fill, textItem.color, item.width, item.height || textNode.height());
+    }
+
+    // Apply stroke if enabled
+    if (hasStroke) {
+      textNode.stroke(textItem.strokeColor || '#000000');
+      textNode.strokeWidth(textItem.strokeWidth || 1);
+    }
+
+    node = textNode;
   } else if (item.type === 'image') {
     const imageItem = item as ImagePageItem;
     const imageFile = appState.getProject().files.find(f => f.id === imageItem.imageFileId);
@@ -229,6 +255,16 @@ export function createItemNode(
     node.setAttr('itemId', item.id);
     node.setAttr('pageNumber', pageNumber);
     node.setAttr('xOffset', xOffset);
+
+    // Apply shadow if enabled
+    if (item.hasShadow) {
+      node.shadowEnabled(true);
+      node.shadowColor(item.shadowColor || '#000000');
+      node.shadowBlur(item.shadowBlur ?? 5);
+      node.shadowOffsetX(item.shadowOffsetX ?? 3);
+      node.shadowOffsetY(item.shadowOffsetY ?? 3);
+      node.shadowOpacity(item.shadowOpacity ?? 0.5);
+    }
 
     // Handle click to select item and its page
     node.on('click tap', () => {
@@ -290,6 +326,15 @@ export function createItemNode(
       let newHeight = item.height * scaleY;
       let newX = node!.x() - xOffset;
       let newY = node!.y();
+
+      // For text, get actual dimensions from the node and update width
+      if (item.type === 'text') {
+        const textNode = node as Konva.Text;
+        newWidth = textNode.width() * scaleX;
+        newHeight = textNode.height() * scaleY;
+        // Apply new width to the text node for proper wrapping
+        textNode.width(newWidth);
+      }
 
       // For ellipse, we need to handle differently since it's centered
       if (item.type === 'shape' && (item as ShapePageItem).shapeType === 'ellipse') {
@@ -427,6 +472,55 @@ export function startTextEditing(
 }
 
 /**
+ * Create a single array instance node with optional fill override
+ */
+function createArrayInstanceNode(
+  item: PageItem,
+  instanceIndex: number,
+  xOffset: number,
+  arrayOffsetX: number,
+  arrayOffsetY: number,
+  instanceConfig: ArrayInstance | undefined,
+  pageNumber: number,
+  zoomLevel: number,
+  stage: Konva.Stage,
+  itemsLayer: Konva.Layer,
+  transformer: Konva.Transformer,
+  updateTransformerFn: () => void
+): Konva.Shape | Konva.Text | Konva.Arrow | null {
+  // Create a modified item for this instance position
+  const instanceItem: PageItem = {
+    ...item,
+    id: `${item.id}-instance-${instanceIndex}`,
+    x: item.x + (arrayOffsetX * instanceIndex),
+    y: item.y + (arrayOffsetY * instanceIndex),
+    arrayCount: undefined,
+    arrayOffsetX: undefined,
+    arrayOffsetY: undefined,
+    arrayInstances: undefined,
+  } as PageItem;
+
+  // Apply instance-specific fill override
+  if (instanceConfig?.fill) {
+    if (instanceItem.type === 'shape') {
+      (instanceItem as ShapePageItem).fill = instanceConfig.fill;
+    } else if (instanceItem.type === 'text') {
+      (instanceItem as TextPageItem).fill = instanceConfig.fill;
+    }
+  }
+  if (instanceConfig?.opacity !== undefined) {
+    instanceItem.opacity = instanceConfig.opacity;
+  }
+
+  const node = createItemNode(instanceItem, xOffset, pageNumber, zoomLevel, stage, itemsLayer, transformer, updateTransformerFn);
+  if (node) {
+    node.setAttr('arrayInstanceIndex', instanceIndex);
+    node.setAttr('parentItemId', item.id);
+  }
+  return node;
+}
+
+/**
  * Render items for a specific page
  */
 export function renderPageItems(
@@ -443,11 +537,67 @@ export function renderPageItems(
   if (!page.items) return;
 
   for (const item of page.items) {
-    const node = createItemNode(item, xOffset, page.pageNumber, zoomLevel, stage, itemsLayer, transformer, updateTransformerFn);
-    if (node) {
-      itemNodes.set(item.id, node);
-      itemsLayer.add(node);
+    const arrayCount = item.arrayCount || 1;
+    const arrayOffsetX = item.arrayOffsetX || 0;
+    const arrayOffsetY = item.arrayOffsetY || 0;
+    const arrayInstances = item.arrayInstances || [];
+
+    // If array count is 1 or less, just create a single item
+    if (arrayCount <= 1) {
+      const node = createItemNode(item, xOffset, page.pageNumber, zoomLevel, stage, itemsLayer, transformer, updateTransformerFn);
+      if (node) {
+        itemNodes.set(item.id, node);
+        itemsLayer.add(node);
+      }
+      continue;
     }
+
+    // Create a Konva.Group for array items
+    const group = new Konva.Group({
+      x: xOffset,
+      y: 0,
+      draggable: true,
+    });
+    group.setAttr('itemId', item.id);
+    group.setAttr('pageNumber', page.pageNumber);
+    group.setAttr('xOffset', xOffset);
+    group.setAttr('isArrayGroup', true);
+
+    // Create all array instances within the group
+    for (let i = 0; i < Math.min(arrayCount, 50); i++) {
+      const instanceConfig = arrayInstances.find(inst => inst.index === i);
+      const instanceNode = createArrayInstanceNode(
+        item, i, 0, arrayOffsetX, arrayOffsetY,
+        instanceConfig, page.pageNumber, zoomLevel, stage, itemsLayer, transformer, updateTransformerFn
+      );
+      if (instanceNode) {
+        // Remove individual event handlers - group handles interactions
+        instanceNode.draggable(false);
+        instanceNode.off('click tap dragstart dragmove dragend transform transformend');
+        instanceNode.setAttr('isArrayMember', true);
+        group.add(instanceNode);
+      }
+    }
+
+    // Handle group click to select the parent item
+    group.on('click tap', () => {
+      const position = xOffset === 0 ? 'verso' : 'recto';
+      appState.updateEditor({
+        selectedItemId: item.id,
+        selectedPageNumber: page.pageNumber,
+        selectedPagePosition: position,
+      });
+    });
+
+    // Handle group drag
+    group.on('dragend', () => {
+      const newX = group.x() - xOffset + item.x;
+      const newY = group.y() + item.y;
+      appState.updateItemOnPage(page.pageNumber, item.id, { x: newX, y: newY });
+    });
+
+    itemNodes.set(item.id, group);
+    itemsLayer.add(group);
   }
 }
 

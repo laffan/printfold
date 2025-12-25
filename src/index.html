@@ -144,400 +144,19 @@
 
       <!-- Column 3: Options -->
       <section class="column column-options">
-        <div class="column-header">
-          <h2>Options</h2>
+        <div class="options-tabs">
+          <button class="tab-btn active" data-tab="selected">Selected</button>
+          <button class="tab-btn" data-tab="styles">Styles</button>
+          <button class="tab-btn" data-tab="document">Document</button>
+          <button class="tab-btn" data-tab="output">Output</button>
         </div>
 
-        <!-- Info Panel (Document + Selected Page) -->
-        <div class="panel panel-info" data-panel="info">
-          <div class="panel-header collapsible">
-            <h3>Info</h3>
-            <span class="collapse-icon">▼</span>
-          </div>
-          <div class="panel-content">
-            <!-- Measurement Unit -->
-            <div class="info-item">
-              <span class="info-label">Units:</span>
-              <select id="opt-measurement-unit" class="info-value unit-select">
-                <option value="in">Inches</option>
-                <option value="cm">Centimeters</option>
-                <option value="pt">Points</option>
-                <option value="px">Pixels</option>
-              </select>
-            </div>
-            <div class="section-divider"></div>
-            <!-- Document Info -->
-            <div class="info-item">
-              <span class="info-label">Pages:</span>
-              <span id="info-pages" class="info-value">0</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Spreads:</span>
-              <span id="info-spreads" class="info-value">0</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Signatures:</span>
-              <span id="info-signatures" class="info-value">0</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Sheets:</span>
-              <span id="info-sheets" class="info-value">0</span>
-            </div>
-
-            <!-- Selected Page Info (shown when a page is selected) -->
-            <div id="selected-page-section" class="selected-page-section" style="display: none;">
-              <div class="section-divider"></div>
-              <div class="info-item">
-                <span class="info-label">Selected:</span>
-                <span id="selected-page-number" class="info-value">–</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">Position:</span>
-                <span id="selected-page-position" class="info-value">–</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">Type:</span>
-                <span id="selected-page-type" class="info-value">–</span>
-              </div>
-              <div id="static-page-actions" class="page-actions" style="display: none;">
-                <button id="btn-delete-page" class="btn btn-secondary btn-small btn-danger">Delete Page</button>
-              </div>
-              <div id="normal-page-actions" class="page-actions" style="display: none;">
-                <button id="btn-add-blank-after" class="btn btn-secondary btn-small">Add Blank Page After</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Output Options -->
-        <div class="panel panel-options collapsed" data-panel="output">
-          <div class="panel-header collapsible">
-            <h3>Output</h3>
-            <span class="collapse-icon">▼</span>
-          </div>
-          <div class="panel-content">
-            <div class="form-group">
-              <label for="opt-sheet-size">Sheet Size</label>
-              <select id="opt-sheet-size">
-                <option value="letter">US Letter (8.5×11")</option>
-                <option value="a4">A4 (210×297mm)</option>
-                <option value="legal">US Legal (8.5×14")</option>
-                <option value="tabloid">Tabloid (11×17")</option>
-                <option value="a3">A3 (297×420mm)</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="opt-booklet-size">Booklet Size</label>
-              <select id="opt-booklet-size">
-                <option value="half-letter">Half Letter</option>
-                <option value="quarter-letter">Quarter Letter</option>
-                <option value="half-a4">Half A4</option>
-                <option value="quarter-a4">Quarter A4</option>
-                <option value="custom">Custom</option>
-              </select>
-            </div>
-            <div class="form-group" id="fill-space-group" style="display: none;">
-              <label class="checkbox-label">
-                <input type="checkbox" id="opt-fill-space">
-                <span>Fill available space</span>
-              </label>
-              <p class="hint" id="fill-space-hint">Print multiple rows per sheet, then cut</p>
-            </div>
-            <div class="form-group" id="custom-size-group" style="display: none;">
-              <div class="inline-inputs">
-                <label>
-                  <span>Width</span>
-                  <div class="input-with-cap">
-                    <input type="number" id="opt-custom-width" step="0.1" min="1">
-                    <span class="input-cap" data-for="opt-custom-width" id="custom-width-unit">in</span>
-                  </div>
-                </label>
-                <label>
-                  <span>Height</span>
-                  <div class="input-with-cap">
-                    <input type="number" id="opt-custom-height" step="0.1" min="1">
-                    <span class="input-cap" data-for="opt-custom-height" id="custom-height-unit">in</span>
-                  </div>
-                </label>
-              </div>
-            </div>
-            <div class="form-group">
-              <label for="opt-pages-per-sig">Pages per Signature</label>
-              <select id="opt-pages-per-sig">
-                <option value="4">4 pages</option>
-                <option value="8" selected>8 pages</option>
-                <option value="12">12 pages</option>
-                <option value="16">16 pages</option>
-                <option value="20">20 pages</option>
-                <option value="24">24 pages</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <!-- Layout Options -->
-        <div class="panel panel-options collapsed" data-panel="layout">
-          <div class="panel-header collapsible">
-            <h3>Layout</h3>
-            <span class="collapse-icon">▼</span>
-          </div>
-          <div class="panel-content">
-            <div class="form-group">
-              <label>Margins</label>
-              <div class="margin-inputs">
-                <label>
-                  <span>Top</span>
-                  <div class="input-with-cap">
-                    <input type="number" id="opt-margin-top" value="54" min="0" step="any">
-                    <span class="input-cap" data-for="opt-margin-top">in</span>
-                  </div>
-                </label>
-                <label>
-                  <span>Bottom</span>
-                  <div class="input-with-cap">
-                    <input type="number" id="opt-margin-bottom" value="54" min="0" step="any">
-                    <span class="input-cap" data-for="opt-margin-bottom">in</span>
-                  </div>
-                </label>
-                <label>
-                  <span>Inner</span>
-                  <div class="input-with-cap">
-                    <input type="number" id="opt-margin-inner" value="54" min="0" step="any">
-                    <span class="input-cap" data-for="opt-margin-inner">in</span>
-                  </div>
-                </label>
-                <label>
-                  <span>Outer</span>
-                  <div class="input-with-cap">
-                    <input type="number" id="opt-margin-outer" value="36" min="0" step="any">
-                    <span class="input-cap" data-for="opt-margin-outer">in</span>
-                  </div>
-                </label>
-              </div>
-            </div>
-            <div class="form-group">
-              <label class="checkbox-label">
-                <input type="checkbox" id="opt-empty-before-h1" checked>
-                <span>New page before H1</span>
-              </label>
-            </div>
-            <div class="form-group">
-              <label for="opt-spacing-h1">Spacing above H1</label>
-              <div class="input-with-cap">
-                <input type="number" id="opt-spacing-h1" value="72" min="0">
-                <span class="input-cap" data-for="opt-spacing-h1">pt</span>
-              </div>
-            </div>
-            <div class="form-group">
-              <label for="opt-line-height">Line Height</label>
-              <div class="input-with-cap">
-                <input type="number" id="opt-line-height" value="1.5" min="1" max="3" step="0.1">
-                <span class="input-cap" data-for="opt-line-height">×</span>
-              </div>
-            </div>
-            <div class="form-group">
-              <label for="opt-paragraph-spacing">Paragraph Spacing</label>
-              <div class="input-with-cap">
-                <input type="number" id="opt-paragraph-spacing" value="12" min="0">
-                <span class="input-cap" data-for="opt-paragraph-spacing">pt</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Header/Footer Options -->
-        <div class="panel panel-options collapsed" data-panel="headerfooter">
-          <div class="panel-header collapsible">
-            <h3>Header / Footer</h3>
-            <span class="collapse-icon">▼</span>
-          </div>
-          <div class="panel-content">
-            <div class="form-group">
-              <label class="checkbox-label">
-                <input type="checkbox" id="opt-header-enabled">
-                <span>Enable Header</span>
-              </label>
-            </div>
-            <div id="header-options" class="sub-options" style="display: none;">
-              <div class="form-group">
-                <label>Header Content (Left/Center/Right)</label>
-                <div class="hf-inputs">
-                  <input type="text" id="opt-header-left" placeholder="Left">
-                  <input type="text" id="opt-header-center" placeholder="Center">
-                  <input type="text" id="opt-header-right" placeholder="Right">
-                </div>
-                <p class="hint">Use {{pageNumber}} for page numbers</p>
-              </div>
-              <div class="form-group inline-sizes">
-                <label>
-                  <span>Font</span>
-                  <select id="opt-header-font">
-                    <option value="Georgia, serif">Georgia</option>
-                    <option value="Times New Roman, serif">Times New Roman</option>
-                    <option value="Arial, sans-serif">Arial</option>
-                    <option value="Helvetica, sans-serif">Helvetica</option>
-                  </select>
-                </label>
-                <label>
-                  <span>Size</span>
-                  <div class="input-with-cap">
-                    <input type="number" id="opt-header-font-size" value="10" min="6" max="16">
-                    <span class="input-cap" data-for="opt-header-font-size">pt</span>
-                  </div>
-                </label>
-                <label>
-                  <span>Color</span>
-                  <input type="color" id="opt-header-color" value="#000000">
-                </label>
-              </div>
-            </div>
-            <div class="form-group">
-              <label class="checkbox-label">
-                <input type="checkbox" id="opt-footer-enabled" checked>
-                <span>Enable Footer</span>
-              </label>
-            </div>
-            <div id="footer-options" class="sub-options">
-              <div class="form-group">
-                <label>Footer Content (Verso: L/C/R)</label>
-                <div class="hf-inputs">
-                  <input type="text" id="opt-footer-verso-left" placeholder="Left" value="{{pageNumber}}">
-                  <input type="text" id="opt-footer-verso-center" placeholder="Center">
-                  <input type="text" id="opt-footer-verso-right" placeholder="Right">
-                </div>
-              </div>
-              <div class="form-group">
-                <label>Footer Content (Recto: L/C/R)</label>
-                <div class="hf-inputs">
-                  <input type="text" id="opt-footer-recto-left" placeholder="Left">
-                  <input type="text" id="opt-footer-recto-center" placeholder="Center">
-                  <input type="text" id="opt-footer-recto-right" placeholder="Right" value="{{pageNumber}}">
-                </div>
-              </div>
-              <div class="form-group inline-sizes">
-                <label>
-                  <span>Font</span>
-                  <select id="opt-footer-font">
-                    <option value="Georgia, serif">Georgia</option>
-                    <option value="Times New Roman, serif">Times New Roman</option>
-                    <option value="Arial, sans-serif">Arial</option>
-                    <option value="Helvetica, sans-serif">Helvetica</option>
-                  </select>
-                </label>
-                <label>
-                  <span>Size</span>
-                  <div class="input-with-cap">
-                    <input type="number" id="opt-footer-font-size" value="10" min="6" max="16">
-                    <span class="input-cap" data-for="opt-footer-font-size">pt</span>
-                  </div>
-                </label>
-                <label>
-                  <span>Color</span>
-                  <input type="color" id="opt-footer-color" value="#000000">
-                </label>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Font Options -->
-        <div class="panel panel-options collapsed" data-panel="fonts">
-          <div class="panel-header collapsible">
-            <h3>Fonts</h3>
-            <span class="collapse-icon">▼</span>
-          </div>
-          <div class="panel-content">
-            <!-- Body (p) -->
-            <div class="font-section">
-              <h4 class="font-section-header">Body Text (p)</h4>
-              <div class="form-group">
-                <label for="opt-font-body">Font Family</label>
-                <select id="opt-font-body">
-                  <option value="Georgia, serif">Georgia</option>
-                  <option value="Times New Roman, serif">Times New Roman</option>
-                  <option value="Palatino, serif">Palatino</option>
-                  <option value="Arial, sans-serif">Arial</option>
-                  <option value="Helvetica, sans-serif">Helvetica</option>
-                </select>
-              </div>
-              <div class="form-group inline-sizes">
-                <label>
-                  <span>Size</span>
-                  <div class="input-with-cap">
-                    <input type="number" id="opt-font-size-body" value="12" min="6" max="24">
-                    <span class="input-cap" data-for="opt-font-size-body">pt</span>
-                  </div>
-                </label>
-                <label>
-                  <span>Line Height</span>
-                  <div class="input-with-cap">
-                    <input type="number" id="opt-line-height-fonts" value="1.5" min="1" max="3" step="0.1">
-                    <span class="input-cap" data-for="opt-line-height-fonts">×</span>
-                  </div>
-                </label>
-              </div>
-              <div class="form-group inline-sizes">
-                <label>
-                  <span>Color</span>
-                  <input type="color" id="opt-color-body" value="#000000">
-                </label>
-                <label class="checkbox-label">
-                  <input type="checkbox" id="opt-justify">
-                  <span>Full Justify</span>
-                </label>
-              </div>
-            </div>
-
-            <!-- Headings -->
-            <div class="font-section">
-              <h4 class="font-section-header">Headings</h4>
-              <div class="form-group">
-                <label for="opt-font-h1">Font Family</label>
-                <select id="opt-font-h1">
-                  <option value="Georgia, serif">Georgia</option>
-                  <option value="Times New Roman, serif">Times New Roman</option>
-                  <option value="Palatino, serif">Palatino</option>
-                  <option value="Arial, sans-serif">Arial</option>
-                  <option value="Helvetica, sans-serif">Helvetica</option>
-                </select>
-              </div>
-              <div class="form-group inline-sizes">
-                <label>
-                  <span>H1</span>
-                  <div class="input-with-cap">
-                    <input type="number" id="opt-font-size-h1" value="24" min="12" max="72">
-                    <span class="input-cap" data-for="opt-font-size-h1">pt</span>
-                  </div>
-                </label>
-                <label>
-                  <span>H2</span>
-                  <div class="input-with-cap">
-                    <input type="number" id="opt-font-size-h2" value="20" min="10" max="48">
-                    <span class="input-cap" data-for="opt-font-size-h2">pt</span>
-                  </div>
-                </label>
-                <label>
-                  <span>H3</span>
-                  <div class="input-with-cap">
-                    <input type="number" id="opt-font-size-h3" value="16" min="8" max="36">
-                    <span class="input-cap" data-for="opt-font-size-h3">pt</span>
-                  </div>
-                </label>
-              </div>
-              <div class="form-group">
-                <label for="opt-color-headings">Color</label>
-                <input type="color" id="opt-color-headings" value="#000000">
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Edit Page Panel (for static pages) -->
-        <div id="edit-page-panel" class="panel panel-edit-page" style="display: none;">
-          <div class="panel-header">
-            <h3>Edit Selected</h3>
-          </div>
-          <div id="edit-selected-section" class="panel-content" style="display: none;">
+        <div class="options-tab-content">
+          <!-- Selected Tab -->
+          <div id="tab-selected" class="tab-panel active">
+            <!-- Edit Selected Section -->
+            <div id="edit-selected-section" class="options-section" style="display: none;">
+              <h4 class="section-header">Properties</h4>
               <!-- Common properties -->
               <div class="edit-properties">
                 <div class="form-group inline-sizes">
@@ -592,24 +211,14 @@
 
               <!-- Shape properties -->
               <div id="shape-properties" class="edit-properties" style="display: none;">
-                <div class="form-group inline-sizes">
-                  <label>
+                <div class="form-group toggle-section">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="shape-has-fill" checked>
                     <span>Fill</span>
+                  </label>
+                  <div id="shape-fill-section">
                     <div id="item-fill-picker"></div>
-                  </label>
-                  <label>
-                    <span>Stroke</span>
-                    <input type="color" id="item-stroke" value="#000000">
-                  </label>
-                </div>
-                <div class="form-group">
-                  <label>
-                    <span>Stroke Width</span>
-                    <div class="input-with-cap">
-                      <input type="number" id="item-stroke-width" step="0.5" min="0" value="1">
-                      <span class="input-cap" data-for="item-stroke-width">px</span>
-                    </div>
-                  </label>
+                  </div>
                 </div>
               </div>
 
@@ -633,10 +242,6 @@
                       <span class="input-cap" data-for="item-font-size">pt</span>
                     </div>
                   </label>
-                  <label>
-                    <span>Color</span>
-                    <input type="color" id="item-text-color" value="#000000">
-                  </label>
                 </div>
                 <div class="form-group">
                   <label>Align</label>
@@ -651,6 +256,118 @@
                   <div class="btn-group">
                     <button id="item-bold" class="btn btn-icon btn-small" title="Bold"><b>B</b></button>
                     <button id="item-italic" class="btn btn-icon btn-small" title="Italic"><i>I</i></button>
+                  </div>
+                </div>
+                <div class="form-group toggle-section">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="text-has-fill" checked>
+                    <span>Fill</span>
+                  </label>
+                  <div id="text-fill-section">
+                    <div id="text-fill-picker"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Effects Section -->
+              <div id="effects-section" class="options-section">
+                <h4 class="section-header">Effects</h4>
+                <!-- Stroke Effect -->
+                <div class="form-group toggle-section">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="item-has-stroke">
+                    <span>Stroke</span>
+                  </label>
+                  <div id="item-stroke-section" style="display: none;">
+                    <div class="inline-sizes">
+                      <label>
+                        <span>Color</span>
+                        <input type="color" id="item-stroke" value="#000000">
+                      </label>
+                      <label>
+                        <span>Width</span>
+                        <div class="input-with-cap">
+                          <input type="number" id="item-stroke-width" step="0.5" min="0" value="1">
+                          <span class="input-cap" data-for="item-stroke-width">px</span>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                <!-- Shadow Effect -->
+                <div class="form-group toggle-section">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="item-has-shadow">
+                    <span>Shadow</span>
+                  </label>
+                  <div id="item-shadow-section" style="display: none;">
+                    <div class="inline-sizes">
+                      <label>
+                        <span>Color</span>
+                        <input type="color" id="item-shadow-color" value="#000000">
+                      </label>
+                      <label>
+                        <span>Blur</span>
+                        <div class="input-with-cap">
+                          <input type="number" id="item-shadow-blur" step="1" min="0" value="5">
+                          <span class="input-cap">px</span>
+                        </div>
+                      </label>
+                    </div>
+                    <div class="inline-sizes">
+                      <label>
+                        <span>X Offset</span>
+                        <div class="input-with-cap">
+                          <input type="number" id="item-shadow-offset-x" step="1" value="3">
+                          <span class="input-cap">px</span>
+                        </div>
+                      </label>
+                      <label>
+                        <span>Y Offset</span>
+                        <div class="input-with-cap">
+                          <input type="number" id="item-shadow-offset-y" step="1" value="3">
+                          <span class="input-cap">px</span>
+                        </div>
+                      </label>
+                      <label>
+                        <span>Opacity</span>
+                        <div class="input-with-cap">
+                          <input type="number" id="item-shadow-opacity" step="0.1" min="0" max="1" value="0.5">
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                <!-- Array Effect -->
+                <div class="form-group toggle-section">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="item-has-array">
+                    <span>Array</span>
+                  </label>
+                  <div id="item-array-section" style="display: none;">
+                    <div class="inline-sizes three-col">
+                      <label>
+                        <span>Count</span>
+                        <input type="number" id="item-array-count" step="1" min="2" max="50" value="2">
+                      </label>
+                      <label>
+                        <span>X Offset</span>
+                        <div class="input-with-cap">
+                          <input type="number" id="item-array-offset-x" step="1" value="20">
+                          <span class="input-cap">pt</span>
+                        </div>
+                      </label>
+                      <label>
+                        <span>Y Offset</span>
+                        <div class="input-with-cap">
+                          <input type="number" id="item-array-offset-y" step="1" value="20">
+                          <span class="input-cap">pt</span>
+                        </div>
+                      </label>
+                    </div>
+                    <div id="array-instances-list" class="array-instances-list">
+                      <!-- Instance items will be dynamically added here -->
+                    </div>
                   </div>
                 </div>
               </div>
@@ -671,17 +388,323 @@
                 <button id="btn-duplicate-item" class="btn btn-secondary btn-small">Duplicate</button>
                 <button id="btn-delete-item" class="btn btn-secondary btn-small btn-danger">Delete</button>
               </div>
+            </div>
+
+            <!-- Page Background Section -->
+            <div id="page-background-section" class="options-section" style="display: none;">
+              <h4 class="section-header">Page Background</h4>
+              <div class="form-group">
+                <div id="page-background-picker"></div>
+              </div>
+              <p class="hint">Select an item to edit its properties.</p>
+            </div>
+
+            <!-- Placeholder when nothing is selected -->
+            <div id="no-selection-message" class="options-section">
+              <p class="hint">Select a static page to add items, or select an item to edit its properties.</p>
+            </div>
           </div>
 
-          <!-- Page Background Section (shown when page selected but no item) -->
-          <div id="page-background-section" class="panel-content" style="display: none;">
-            <div class="form-group">
-              <label>
-                <span>Page Background</span>
-                <div id="page-background-picker"></div>
-              </label>
+          <!-- Styles Tab -->
+          <div id="tab-styles" class="tab-panel">
+            <!-- No Markdown Message -->
+            <div id="styles-no-markdown" class="options-section">
+              <p class="hint">No markdown content. Add text files to customize typography styles.</p>
             </div>
-            <p class="hint">Select an item to edit its properties, or set a background fill for this page.</p>
+            <!-- Dynamic styles container -->
+            <div id="styles-content"></div>
+          </div>
+
+          <!-- Document Tab -->
+          <div id="tab-document" class="tab-panel">
+            <div class="options-section">
+              <h4 class="section-header">Info</h4>
+              <div class="info-item">
+                <span class="info-label">Units:</span>
+                <select id="opt-measurement-unit" class="info-value unit-select">
+                  <option value="in">Inches</option>
+                  <option value="cm">Centimeters</option>
+                  <option value="pt">Points</option>
+                  <option value="px">Pixels</option>
+                </select>
+              </div>
+              <div class="section-divider"></div>
+              <div class="info-item">
+                <span class="info-label">Pages:</span>
+                <span id="info-pages" class="info-value">0</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Spreads:</span>
+                <span id="info-spreads" class="info-value">0</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Signatures:</span>
+                <span id="info-signatures" class="info-value">0</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Sheets:</span>
+                <span id="info-sheets" class="info-value">0</span>
+              </div>
+
+              <!-- Selected Page Info -->
+              <div id="selected-page-section" class="selected-page-section" style="display: none;">
+                <div class="section-divider"></div>
+                <div class="info-item">
+                  <span class="info-label">Selected:</span>
+                  <span id="selected-page-number" class="info-value">–</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Position:</span>
+                  <span id="selected-page-position" class="info-value">–</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Type:</span>
+                  <span id="selected-page-type" class="info-value">–</span>
+                </div>
+                <div id="static-page-actions" class="page-actions" style="display: none;">
+                  <button id="btn-delete-page" class="btn btn-secondary btn-small btn-danger">Delete Page</button>
+                </div>
+                <div id="normal-page-actions" class="page-actions" style="display: none;">
+                  <button id="btn-add-blank-after" class="btn btn-secondary btn-small">Add Blank Page After</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="options-section">
+              <h4 class="section-header">Layout</h4>
+              <div class="form-group">
+                <label>Margins</label>
+                <div class="margin-inputs">
+                  <label>
+                    <span>Top</span>
+                    <div class="input-with-cap">
+                      <input type="number" id="opt-margin-top" value="54" min="0" step="any">
+                      <span class="input-cap" data-for="opt-margin-top">in</span>
+                    </div>
+                  </label>
+                  <label>
+                    <span>Bottom</span>
+                    <div class="input-with-cap">
+                      <input type="number" id="opt-margin-bottom" value="54" min="0" step="any">
+                      <span class="input-cap" data-for="opt-margin-bottom">in</span>
+                    </div>
+                  </label>
+                  <label>
+                    <span>Inner</span>
+                    <div class="input-with-cap">
+                      <input type="number" id="opt-margin-inner" value="54" min="0" step="any">
+                      <span class="input-cap" data-for="opt-margin-inner">in</span>
+                    </div>
+                  </label>
+                  <label>
+                    <span>Outer</span>
+                    <div class="input-with-cap">
+                      <input type="number" id="opt-margin-outer" value="36" min="0" step="any">
+                      <span class="input-cap" data-for="opt-margin-outer">in</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="opt-empty-before-h1" checked>
+                  <span>New page before H1</span>
+                </label>
+              </div>
+              <div class="form-group">
+                <label for="opt-spacing-h1">Spacing above H1</label>
+                <div class="input-with-cap">
+                  <input type="number" id="opt-spacing-h1" value="72" min="0">
+                  <span class="input-cap" data-for="opt-spacing-h1">pt</span>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="opt-line-height">Line Height</label>
+                <div class="input-with-cap">
+                  <input type="number" id="opt-line-height" value="1.5" min="1" max="3" step="0.1">
+                  <span class="input-cap" data-for="opt-line-height">×</span>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="opt-paragraph-spacing">Paragraph Spacing</label>
+                <div class="input-with-cap">
+                  <input type="number" id="opt-paragraph-spacing" value="12" min="0">
+                  <span class="input-cap" data-for="opt-paragraph-spacing">pt</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="options-section">
+              <h4 class="section-header">Header / Footer</h4>
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="opt-header-enabled">
+                  <span>Enable Header</span>
+                </label>
+              </div>
+              <div id="header-options" class="sub-options" style="display: none;">
+                <div class="form-group">
+                  <label>Header Content (Left/Center/Right)</label>
+                  <div class="hf-inputs">
+                    <input type="text" id="opt-header-left" placeholder="Left">
+                    <input type="text" id="opt-header-center" placeholder="Center">
+                    <input type="text" id="opt-header-right" placeholder="Right">
+                  </div>
+                  <p class="hint">Use {{pageNumber}} for page numbers</p>
+                </div>
+                <div class="form-group inline-sizes">
+                  <label>
+                    <span>Font</span>
+                    <select id="opt-header-font">
+                      <option value="Georgia, serif">Georgia</option>
+                      <option value="Times New Roman, serif">Times New Roman</option>
+                      <option value="Arial, sans-serif">Arial</option>
+                      <option value="Helvetica, sans-serif">Helvetica</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Size</span>
+                    <div class="input-with-cap">
+                      <input type="number" id="opt-header-font-size" value="10" min="6" max="16">
+                      <span class="input-cap" data-for="opt-header-font-size">pt</span>
+                    </div>
+                  </label>
+                  <label>
+                    <span>Color</span>
+                    <input type="color" id="opt-header-color" value="#000000">
+                  </label>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="opt-footer-enabled" checked>
+                  <span>Enable Footer</span>
+                </label>
+              </div>
+              <div id="footer-options" class="sub-options">
+                <div class="form-group">
+                  <label>Footer Content (Verso: L/C/R)</label>
+                  <div class="hf-inputs">
+                    <input type="text" id="opt-footer-verso-left" placeholder="Left" value="{{pageNumber}}">
+                    <input type="text" id="opt-footer-verso-center" placeholder="Center">
+                    <input type="text" id="opt-footer-verso-right" placeholder="Right">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Footer Content (Recto: L/C/R)</label>
+                  <div class="hf-inputs">
+                    <input type="text" id="opt-footer-recto-left" placeholder="Left">
+                    <input type="text" id="opt-footer-recto-center" placeholder="Center">
+                    <input type="text" id="opt-footer-recto-right" placeholder="Right" value="{{pageNumber}}">
+                  </div>
+                </div>
+                <div class="form-group inline-sizes">
+                  <label>
+                    <span>Font</span>
+                    <select id="opt-footer-font">
+                      <option value="Georgia, serif">Georgia</option>
+                      <option value="Times New Roman, serif">Times New Roman</option>
+                      <option value="Arial, sans-serif">Arial</option>
+                      <option value="Helvetica, sans-serif">Helvetica</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Size</span>
+                    <div class="input-with-cap">
+                      <input type="number" id="opt-footer-font-size" value="10" min="6" max="16">
+                      <span class="input-cap" data-for="opt-footer-font-size">pt</span>
+                    </div>
+                  </label>
+                  <label>
+                    <span>Color</span>
+                    <input type="color" id="opt-footer-color" value="#000000">
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Output Tab -->
+          <div id="tab-output" class="tab-panel">
+            <div class="options-section">
+              <h4 class="section-header">Sheet & Booklet</h4>
+              <div class="form-group">
+                <label for="opt-sheet-size">Sheet Size</label>
+                <select id="opt-sheet-size">
+                  <option value="letter">US Letter (8.5×11")</option>
+                  <option value="a4">A4 (210×297mm)</option>
+                  <option value="legal">US Legal (8.5×14")</option>
+                  <option value="tabloid">Tabloid (11×17")</option>
+                  <option value="a3">A3 (297×420mm)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="opt-booklet-size">Booklet Size</label>
+                <select id="opt-booklet-size">
+                  <option value="half-letter">Half Letter</option>
+                  <option value="quarter-letter" selected>Quarter Letter</option>
+                  <option value="half-a4">Half A4</option>
+                  <option value="quarter-a4">Quarter A4</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </div>
+              <div class="form-group" id="fill-space-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="opt-fill-space" checked>
+                  <span>Fill available space</span>
+                </label>
+                <p class="hint" id="fill-space-hint">Print multiple rows per sheet, then cut</p>
+              </div>
+              <div class="form-group" id="custom-size-group" style="display: none;">
+                <div class="inline-inputs">
+                  <label>
+                    <span>Width</span>
+                    <div class="input-with-cap">
+                      <input type="number" id="opt-custom-width" step="0.1" min="1">
+                      <span class="input-cap" data-for="opt-custom-width" id="custom-width-unit">in</span>
+                    </div>
+                  </label>
+                  <label>
+                    <span>Height</span>
+                    <div class="input-with-cap">
+                      <input type="number" id="opt-custom-height" step="0.1" min="1">
+                      <span class="input-cap" data-for="opt-custom-height" id="custom-height-unit">in</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="options-section">
+              <h4 class="section-header">Signatures</h4>
+              <div class="form-group">
+                <label for="opt-pages-per-sig">Pages per Signature</label>
+                <select id="opt-pages-per-sig">
+                  <option value="4">4 pages</option>
+                  <option value="8" selected>8 pages</option>
+                  <option value="12">12 pages</option>
+                  <option value="16">16 pages</option>
+                  <option value="20">20 pages</option>
+                  <option value="24">24 pages</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="opt-creep-enabled">
+                  <span>Creep Compensation</span>
+                </label>
+                <div id="creep-settings" style="display: none;">
+                  <label>
+                    <span>Per Sheet</span>
+                    <div class="input-with-cap">
+                      <input type="number" id="opt-creep-per-sheet" value="0.0625" min="0" step="0.0001">
+                      <span class="input-cap" data-for="opt-creep-per-sheet">in</span>
+                    </div>
+                  </label>
+                  <small class="help-text">Amount to narrow each successive sheet (0.0625" typical for bond paper)</small>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>

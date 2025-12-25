@@ -23,6 +23,7 @@ import { setupHeaderFooterOptions } from './headerFooterOptions';
 import { initFontDropdowns, setupFontOptions, preloadFonts } from './fontOptions';
 import { setupSelectedPagePanel, updateSelectedPagePanel } from './selectedPage';
 import { setupEditPagePanel, updateEditPagePanel, updateEditSelectedSection } from './editPage';
+import { updateStylesTab } from './stylesTab';
 
 export class OptionsPanel {
   private fontDropdowns: Map<string, FontDropdown> = new Map();
@@ -41,12 +42,14 @@ export class OptionsPanel {
     this.setupMeasurementUnit();
     setupDraggableCaps();
     this.syncFromState();
+    updateStylesTab();
 
     // Listen for state changes to update UI
     appState.onProjectChange(() => {
       this.syncFromState();
       updateSelectedPagePanel();
       updateEditSelectedSection();
+      updateStylesTab();
     });
 
     // Listen for editor state changes (selected page, selected item)
@@ -55,6 +58,7 @@ export class OptionsPanel {
           state.selectedPagePosition !== prevState.selectedPagePosition) {
         updateSelectedPagePanel();
         updateEditPagePanel();
+        updateEditSelectedSection();
       }
       if (state.selectedItemId !== prevState.selectedItemId) {
         updateEditSelectedSection();
@@ -125,6 +129,16 @@ export class OptionsPanel {
     // Fill available space
     setCheckboxValue('opt-fill-space', project.outputOptions.fillAvailableSpace);
     updateFillSpaceVisibility();
+
+    // Creep compensation
+    setCheckboxValue('opt-creep-enabled', project.outputOptions.creepEnabled ?? false);
+    const creepSettings = document.getElementById('creep-settings');
+    if (creepSettings) {
+      creepSettings.style.display = project.outputOptions.creepEnabled ? 'block' : 'none';
+    }
+    // Convert points back to inches for display
+    const creepPerSheetInches = (project.outputOptions.creepPerSheet ?? (0.0625 * 72)) / 72;
+    setInputValue('opt-creep-per-sheet', creepPerSheetInches.toFixed(4));
 
     // Layout options - margins are converted to display unit
     setMarginInputValue('opt-margin-top', project.layoutOptions.margins.top, unit);
