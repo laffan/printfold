@@ -333,7 +333,7 @@ function setupEditPropertyInputs(updateEditSelectedSectionFn: () => void): void 
  */
 function addItemToCurrentPage(itemType: 'text' | 'rectangle' | 'ellipse' | 'circle' | 'line' | 'arrow'): void {
   const editorState = appState.getEditor();
-  if (!editorState.selectedPageNumber) return;
+  if (editorState.selectedPageNumber === null) return;
 
   // Determine dimensions based on shape type
   const isLinear = itemType === 'line' || itemType === 'arrow';
@@ -384,7 +384,7 @@ function addItemToCurrentPage(itemType: 'text' | 'rectangle' | 'ellipse' | 'circ
  */
 async function addImageToCurrentPage(file: File): Promise<void> {
   const editorState = appState.getEditor();
-  if (!editorState.selectedPageNumber) return;
+  if (editorState.selectedPageNumber === null) return;
 
   // Read file as base64
   const content = await new Promise<string>((resolve) => {
@@ -430,7 +430,7 @@ async function addImageToCurrentPage(file: File): Promise<void> {
  */
 export function addImageFromFileToPage(fileId: string): void {
   const editorState = appState.getEditor();
-  if (!editorState.selectedPageNumber) return;
+  if (editorState.selectedPageNumber === null) return;
 
   const file = appState.getProject().files.find(f => f.id === fileId);
   if (!file || file.type !== 'image') return;
@@ -759,7 +759,7 @@ function setupPageBackgroundPicker(pageNumber: number): void {
   } else {
     pageBackgroundPicker = createFillPicker(container, currentFill, (fill) => {
       const editorState = appState.getEditor();
-      if (!editorState.selectedPageNumber) return;
+      if (editorState.selectedPageNumber === null) return;
       appState.updatePageBackground(editorState.selectedPageNumber, fill);
     });
   }

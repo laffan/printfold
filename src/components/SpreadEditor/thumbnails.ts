@@ -43,9 +43,12 @@ export function renderThumbnails(
     sigContainer.style.cssText = `
       border: 1px dashed #9ca3af;
       border-radius: 4px;
-      padding: 4px;
-      margin-bottom: 8px;
+      padding: 6px;
+      margin-bottom: 10px;
       background: rgba(156, 163, 175, 0.05);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     `;
 
     // Add signature label

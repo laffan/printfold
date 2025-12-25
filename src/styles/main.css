@@ -866,6 +866,7 @@ body {
   flex-shrink: 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   transition: border-color 0.15s, box-shadow 0.15s;
+  margin-bottom: 6px;
 }
 
 .spread-thumbnail:hover {

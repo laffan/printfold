@@ -107,7 +107,7 @@ Renders a single page:
 - **Zoom buttons**: `#btn-zoom-in`, `#btn-zoom-out`, `#btn-zoom-fit`
 - **Navigation**: `#btn-prev-spread`, `#btn-next-spread`
 - **Show margins**: `#chk-show-margins`
-- **Add pages**: `#btn-add-blank-page` (spread), `#btn-add-single-page` (page)
+- **Add pages**: `#btn-add-signature` (adds full signature), `#btn-add-single-page` (single page)
 
 ### Keyboard Shortcuts
 
@@ -225,10 +225,12 @@ Returns margins for a page, applying overrides if configured.
 
 Renders navigation thumbnail strip:
 
-- Small page representations
+- Thumbnails grouped by signature with dashed outline
+- Signature labels (Sig 1, Sig 2, etc.)
+- Small page representations with centered layout
 - Current spread highlight
 - Click to navigate
-- Page numbers
+- Page numbers (back cover shown as "BC" in red for single-signature booklets)
 
 ## Types (`types.ts`)
 

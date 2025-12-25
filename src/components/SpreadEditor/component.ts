@@ -111,7 +111,7 @@ export class SpreadEditor {
 
       // Check if a static/blank page is selected
       const editorState = appState.getEditor();
-      if (!editorState.selectedPageNumber) {
+      if (editorState.selectedPageNumber === null) {
         // Try to find which page was dropped on based on position
         const rect = container.getBoundingClientRect();
         const dropX = e.clientX - rect.left;

@@ -329,10 +329,11 @@ Component Action
 
 Static spreads exist independently of Markdown content:
 
-1. **Creating**: Click "+ Spread" or "+ Page" buttons
-2. **Items**: Add text, shapes, images to static pages
+1. **Creating**: Click "+ Signature" (adds a full signature worth of spreads) or "+ Page" buttons
+2. **Items**: Add text, shapes, images to static pages (including the back cover)
 3. **Spanning**: Items can bridge across verso and recto
 4. **Export**: Items render correctly with cross-page clipping
+5. **Navigation**: Thumbnails are grouped by signature with visual outlines
 
 ### Page Items
 
