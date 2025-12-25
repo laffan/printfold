@@ -44,16 +44,6 @@ export class FillPicker {
   private panelElement: HTMLElement | null = null;
   private closeHandler: ((e: MouseEvent) => void) | null = null;
 
-  // Throttled update for gradient changes during slider interactions
-  private gradientUpdateTimeout: number | null = null;
-  private throttledUpdateGradient = () => {
-    if (this.gradientUpdateTimeout !== null) return;
-    this.gradientUpdateTimeout = window.setTimeout(() => {
-      this.gradientUpdateTimeout = null;
-      this.updateGradient();
-    }, 50); // Update at most every 50ms during slider drag
-  };
-
   constructor(
     container: HTMLElement,
     initialFill: FillConfig,
@@ -551,10 +541,10 @@ export class FillPicker {
       angleInput.addEventListener('input', () => {
         this.gradientAngle = parseInt(angleInput.value);
         angleValue.textContent = `${this.gradientAngle}°`;
-        this.throttledUpdateGradient();
+        // Only update local state during drag - no expensive onChange calls
       });
       angleInput.addEventListener('change', () => {
-        // Ensure final value is saved when slider is released
+        // Update state only when slider is released
         this.updateGradient();
       });
 
@@ -579,7 +569,7 @@ export class FillPicker {
       centerXInput.value = (this.radialCenterX * 100).toString();
       centerXInput.addEventListener('input', () => {
         this.radialCenterX = parseInt(centerXInput.value) / 100;
-        this.throttledUpdateGradient();
+        // Only update local state during drag
       });
       centerXInput.addEventListener('change', () => {
         this.updateGradient();
@@ -594,7 +584,7 @@ export class FillPicker {
       centerYInput.value = (this.radialCenterY * 100).toString();
       centerYInput.addEventListener('input', () => {
         this.radialCenterY = parseInt(centerYInput.value) / 100;
-        this.throttledUpdateGradient();
+        // Only update local state during drag
       });
       centerYInput.addEventListener('change', () => {
         this.updateGradient();
@@ -886,10 +876,6 @@ export class FillPicker {
   }
 
   destroy(): void {
-    if (this.gradientUpdateTimeout !== null) {
-      clearTimeout(this.gradientUpdateTimeout);
-      this.gradientUpdateTimeout = null;
-    }
     this.removePanel();
     this.container.innerHTML = '';
   }
