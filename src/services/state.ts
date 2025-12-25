@@ -344,6 +344,51 @@ class AppState {
   }
 
   // Static spreads (exist independently of markdown)
+  // Add a complete signature worth of static spreads
+  addStaticSignature(): void {
+    const prevState = this.project;
+    const staticSpreads = [...(this.project.staticSpreads || [])];
+    const spreadsPerSig = this.project.outputOptions.pagesPerSignature / 2;
+
+    // Add spreadsPerSig number of spreads
+    for (let i = 0; i < spreadsPerSig; i++) {
+      const newIndex = staticSpreads.length;
+      const basePageNumber = 1000 + newIndex * 2;
+
+      const newSpread: import('../types').StaticSpread = {
+        id: crypto.randomUUID(),
+        index: newIndex,
+        verso: {
+          id: crypto.randomUUID(),
+          pageNumber: basePageNumber,
+          sections: [],
+          isBlank: true,
+          isRecto: false,
+          isStatic: true,
+          items: [],
+        },
+        recto: {
+          id: crypto.randomUUID(),
+          pageNumber: basePageNumber + 1,
+          sections: [],
+          isBlank: true,
+          isRecto: true,
+          isStatic: true,
+          items: [],
+        },
+      };
+
+      staticSpreads.push(newSpread);
+    }
+
+    this.project = { ...this.project, staticSpreads };
+    this.notifyProjectListeners(prevState);
+
+    // Trigger reflow to merge static spreads
+    this.requestReflow();
+  }
+
+  // Add a single static spread (2 pages)
   addStaticSpread(): void {
     const prevState = this.project;
     const staticSpreads = [...(this.project.staticSpreads || [])];

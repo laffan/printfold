@@ -12,6 +12,7 @@ import { createItemNode, renderPageItems, renderSpanningItems } from './items';
 import { renderThumbnails } from './thumbnails';
 import { drawMarginGuides, getMarginsForPage } from './margins';
 import { drawPageContent } from './content';
+import { switchToSelectedTab } from '../OptionsPanel/editPage';
 
 export class SpreadEditor {
   private container!: HTMLElement;
@@ -182,6 +183,7 @@ export class SpreadEditor {
 
     appState.addItemToPage(pageNumber, item);
     appState.updateEditor({ selectedItemId: item.id });
+    switchToSelectedTab();
   }
 
   private setupStateListeners(): void {
@@ -264,9 +266,9 @@ export class SpreadEditor {
       this.render();
     });
 
-    // Add blank spread button - adds a new static spread (2 pages)
-    document.getElementById('btn-add-blank-page')?.addEventListener('click', () => {
-      appState.addStaticSpread();
+    // Add signature button - adds a complete signature worth of spreads
+    document.getElementById('btn-add-signature')?.addEventListener('click', () => {
+      appState.addStaticSignature();
     });
 
     // Add single page button - adds a single blank page
@@ -394,6 +396,7 @@ export class SpreadEditor {
           };
           appState.addItemToPage(editorState.selectedPageNumber, newItem);
           appState.updateEditor({ selectedItemId: newItem.id });
+          switchToSelectedTab();
         }
       }
     });

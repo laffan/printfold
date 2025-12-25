@@ -5,6 +5,7 @@
 
 import Konva from 'konva';
 import { appState } from '../../services/state';
+import { switchToSelectedTab } from '../OptionsPanel/editPage';
 import type { PageContent, PageItem, TextPageItem, ShapePageItem, ImagePageItem, FillConfig, SpanningItem, ArrayInstance } from '../../types';
 
 /**
@@ -276,6 +277,7 @@ export function createItemNode(
         selectedPageNumber: pageNumber,
         selectedPagePosition: position,
       });
+      switchToSelectedTab();
     });
 
     // Handle double-click for text editing
@@ -587,6 +589,7 @@ export function renderPageItems(
         selectedPageNumber: page.pageNumber,
         selectedPagePosition: position,
       });
+      switchToSelectedTab();
     });
 
     // Handle group drag

@@ -16,6 +16,24 @@ let pageBackgroundPicker: FillPicker | null = null;
 const instanceFillPickers: Map<number, FillPicker> = new Map();
 
 /**
+ * Switch to the Selected tab in the options panel
+ */
+export function switchToSelectedTab(): void {
+  const tabButtons = document.querySelectorAll('.options-tabs .tab-btn');
+  const tabPanels = document.querySelectorAll('.options-tab-content > .tab-panel');
+
+  tabButtons.forEach(btn => {
+    const isSelected = btn.getAttribute('data-tab') === 'selected';
+    btn.classList.toggle('active', isSelected);
+  });
+
+  tabPanels.forEach(panel => {
+    const isSelected = panel.id === 'tab-selected';
+    panel.classList.toggle('active', isSelected);
+  });
+}
+
+/**
  * Set up the Edit Page panel event handlers
  */
 export function setupEditPagePanel(updateEditSelectedSectionFn: () => void): void {
@@ -78,6 +96,7 @@ export function setupEditPagePanel(updateEditSelectedSectionFn: () => void): voi
         };
         appState.addItemToPage(editorState.selectedPageNumber, newItem);
         appState.updateEditor({ selectedItemId: newItem.id });
+        switchToSelectedTab();
       }
     }
   });
@@ -357,6 +376,7 @@ function addItemToCurrentPage(itemType: 'text' | 'rectangle' | 'ellipse' | 'circ
 
   appState.addItemToPage(editorState.selectedPageNumber, item);
   appState.updateEditor({ selectedItemId: item.id });
+  switchToSelectedTab();
 }
 
 /**
@@ -402,6 +422,7 @@ async function addImageToCurrentPage(file: File): Promise<void> {
 
   appState.addItemToPage(editorState.selectedPageNumber, item);
   appState.updateEditor({ selectedItemId: item.id });
+  switchToSelectedTab();
 }
 
 /**
@@ -428,6 +449,7 @@ export function addImageFromFileToPage(fileId: string): void {
 
   appState.addItemToPage(editorState.selectedPageNumber, item);
   appState.updateEditor({ selectedItemId: item.id });
+  switchToSelectedTab();
 }
 
 /**

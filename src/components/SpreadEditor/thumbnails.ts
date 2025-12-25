@@ -19,12 +19,11 @@ export function renderThumbnails(
 ): void {
   const project = appState.getProject();
   const editorState = appState.getEditor();
-  const allSpreads = project.signatures.flatMap(sig => sig.spreads);
 
   // Clear existing thumbnails
   thumbnailContainer.innerHTML = '';
 
-  if (allSpreads.length === 0) {
+  if (project.signatures.length === 0) {
     return;
   }
 
@@ -33,9 +32,42 @@ export function renderThumbnails(
   const spreadAspect = (pageDimensions.width * 2) / pageDimensions.height;
   const thumbHeight = thumbWidth / spreadAspect;
 
-  allSpreads.forEach((spread, index) => {
-    const thumbDiv = document.createElement('div');
-    thumbDiv.className = 'spread-thumbnail' + (index === currentSpreadIndex ? ' active' : '');
+  // Track global spread index for navigation
+  let globalSpreadIndex = 0;
+
+  // Iterate through signatures to create grouped thumbnails
+  project.signatures.forEach((signature, sigIndex) => {
+    // Create signature container with dashed border
+    const sigContainer = document.createElement('div');
+    sigContainer.className = 'signature-thumbnail-group';
+    sigContainer.style.cssText = `
+      border: 1px dashed #9ca3af;
+      border-radius: 4px;
+      padding: 4px;
+      margin-bottom: 8px;
+      background: rgba(156, 163, 175, 0.05);
+    `;
+
+    // Add signature label
+    const sigLabel = document.createElement('div');
+    sigLabel.className = 'signature-label';
+    sigLabel.style.cssText = `
+      font-size: 9px;
+      color: #6b7280;
+      text-align: center;
+      margin-bottom: 4px;
+      font-weight: 500;
+    `;
+    sigLabel.textContent = `Sig ${sigIndex + 1}`;
+    sigContainer.appendChild(sigLabel);
+
+    // Render spreads within this signature
+    signature.spreads.forEach((spread) => {
+      const spreadIndex = globalSpreadIndex;
+      globalSpreadIndex++;
+
+      const thumbDiv = document.createElement('div');
+      thumbDiv.className = 'spread-thumbnail' + (spreadIndex === currentSpreadIndex ? ' active' : '');
 
     // Create a small canvas for the thumbnail
     const canvas = document.createElement('canvas');
@@ -170,7 +202,7 @@ export function renderThumbnails(
     versoLabel.title = isBackCover ? 'Back Cover' : `Page ${versoPageNum}`;
     versoLabel.addEventListener('click', (e) => {
       e.stopPropagation();
-      setCurrentSpreadIndex(index);
+      setCurrentSpreadIndex(spreadIndex);
       if (spread.verso) {
         selectPageFn(spread.verso.pageNumber, 'verso');
       }
@@ -184,7 +216,7 @@ export function renderThumbnails(
     rectoLabel.textContent = spread.recto?.pageNumber?.toString() || '–';
     rectoLabel.addEventListener('click', (e) => {
       e.stopPropagation();
-      setCurrentSpreadIndex(index);
+      setCurrentSpreadIndex(spreadIndex);
       if (spread.recto) {
         selectPageFn(spread.recto.pageNumber, 'recto');
       }
@@ -204,7 +236,7 @@ export function renderThumbnails(
     versoClick.style.cssText = 'flex: 1; cursor: pointer;';
     versoClick.addEventListener('click', (e) => {
       e.stopPropagation();
-      setCurrentSpreadIndex(index);
+      setCurrentSpreadIndex(spreadIndex);
       if (spread.verso) {
         selectPageFn(spread.verso.pageNumber, 'verso');
       }
@@ -217,7 +249,7 @@ export function renderThumbnails(
     rectoClick.style.cssText = 'flex: 1; cursor: pointer;';
     rectoClick.addEventListener('click', (e) => {
       e.stopPropagation();
-      setCurrentSpreadIndex(index);
+      setCurrentSpreadIndex(spreadIndex);
       if (spread.recto) {
         selectPageFn(spread.recto.pageNumber, 'recto');
       }
@@ -227,7 +259,10 @@ export function renderThumbnails(
 
     thumbDiv.appendChild(clickContainer);
 
-    thumbnailContainer.appendChild(thumbDiv);
+      sigContainer.appendChild(thumbDiv);
+    });
+
+    thumbnailContainer.appendChild(sigContainer);
   });
 
   // Scroll active thumbnail into view
