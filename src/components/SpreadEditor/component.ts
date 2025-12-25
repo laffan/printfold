@@ -553,18 +553,19 @@ export class SpreadEditor {
     }
 
     // Check if this is the first spread and handle back cover display
+    // The back cover is identified by: first spread (index 0) with verso page number 0
     const isFirstSpread = this.currentSpreadIndex === 0;
     const signatureCount = project.signatures.length;
-    const isBackCover = spread.verso && (spread.verso as PageContent & { isBackCover?: boolean }).isBackCover;
+    const isBackCoverPage = isFirstSpread && spread.verso?.pageNumber === 0;
 
     // Draw verso (left) page
     if (spread.verso) {
-      if (isFirstSpread && isBackCover) {
+      if (isBackCoverPage) {
         if (signatureCount === 1) {
-          // Single signature: show back cover with indicator
+          // Single signature: show back cover with red dashed border and label
           this.drawBackCoverPage(0, 0, pageDimensions);
         } else {
-          // Multiple signatures: hide the back cover (don't show internal signature page)
+          // Multiple signatures: collapse the left side (internal signature page is confusing)
           this.drawHiddenPage(0, 0, pageDimensions);
         }
       } else {
