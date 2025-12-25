@@ -2057,3 +2057,78 @@ body {
     min-width: 200px;
   }
 }
+
+/* Multi-select Controls */
+#multi-select-controls {
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+}
+
+.align-distribute-controls .form-group {
+  margin-bottom: 12px;
+}
+
+.align-distribute-controls label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.align-buttons,
+.distribute-buttons {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.align-buttons .btn-icon,
+.distribute-buttons .btn-icon {
+  width: 32px;
+  height: 28px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.multi-select-info {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  text-align: center;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+}
+
+/* Context Menu */
+.context-menu {
+  font-family: var(--font-sans);
+}
+
+.context-menu-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  color: var(--color-text);
+  user-select: none;
+}
+
+.context-menu-item:hover {
+  background: var(--color-bg-hover);
+}
+
+.context-menu-item.disabled {
+  color: var(--color-text-muted);
+  cursor: default;
+}
+
+.context-menu-separator {
+  height: 1px;
+  background: var(--color-border);
+  margin: 4px 0;
+}
+
+/* Selection marquee */
+.selection-marquee {
+  pointer-events: none;
+}

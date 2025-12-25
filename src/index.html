@@ -154,6 +154,33 @@
         <div class="options-tab-content">
           <!-- Selected Tab -->
           <div id="tab-selected" class="tab-panel active">
+            <!-- Multi-select Align & Distribute Controls -->
+            <div id="multi-select-controls" class="options-section" style="display: none;">
+              <h4 class="section-header">Align & Distribute</h4>
+              <div class="align-distribute-controls">
+                <div class="form-group">
+                  <label>Align</label>
+                  <div class="btn-group align-buttons">
+                    <button id="btn-align-left" class="btn btn-icon btn-small" title="Align Left">⬅</button>
+                    <button id="btn-align-h-center" class="btn btn-icon btn-small" title="Align Center">↔</button>
+                    <button id="btn-align-right" class="btn btn-icon btn-small" title="Align Right">➡</button>
+                    <button id="btn-align-top" class="btn btn-icon btn-small" title="Align Top">⬆</button>
+                    <button id="btn-align-v-center" class="btn btn-icon btn-small" title="Align Middle">↕</button>
+                    <button id="btn-align-bottom" class="btn btn-icon btn-small" title="Align Bottom">⬇</button>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Distribute</label>
+                  <div class="btn-group distribute-buttons">
+                    <button id="btn-distribute-h" class="btn btn-icon btn-small" title="Distribute Horizontally">⇔</button>
+                    <button id="btn-distribute-v" class="btn btn-icon btn-small" title="Distribute Vertically">⇕</button>
+                  </div>
+                </div>
+                <div class="multi-select-info">
+                  <span id="multi-select-count">0 items selected</span>
+                </div>
+              </div>
+            </div>
             <!-- Edit Selected Section -->
             <div id="edit-selected-section" class="options-section" style="display: none;">
               <h4 class="section-header">Properties</h4>
