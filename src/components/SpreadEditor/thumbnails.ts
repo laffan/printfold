@@ -78,12 +78,13 @@ export function renderThumbnails(
     // Draw content indicators (simple lines to represent text)
     ctx.fillStyle = '#d0d0d0';
     const contentMargin = 3;
+    const signatureCount = project.signatures.length;
 
     // Verso page content - draw blank indicator or content lines
     if (spread.verso) {
-      // Check if this is the back cover (page 0)
-      if (spread.verso.pageNumber === 0) {
-        // Draw back cover indicator with red dashed border
+      // Check if this is the back cover (page 0) for single-signature booklets
+      if (spread.verso.pageNumber === 0 && signatureCount === 1) {
+        // Draw back cover indicator with red dashed border (only for single signature)
         ctx.fillStyle = '#fef2f2';
         ctx.fillRect(1, 1, thumbWidth / 2 - 2, thumbHeight - 2);
         ctx.strokeStyle = '#dc2626';
@@ -160,12 +161,13 @@ export function renderThumbnails(
     const labelsContainer = document.createElement('div');
     labelsContainer.className = 'spread-thumbnail-labels';
 
-    // Verso label - show "BC" for back cover (page 0), otherwise page number
+    // Verso label - show "BC" for back cover (page 0) only in single-signature booklets
     const versoLabel = document.createElement('div');
     versoLabel.className = 'spread-thumbnail-page-label' + (isVersoSelected ? ' selected' : '');
     const versoPageNum = spread.verso?.pageNumber;
-    versoLabel.textContent = versoPageNum === 0 ? 'BC' : (versoPageNum?.toString() || '–');
-    versoLabel.title = versoPageNum === 0 ? 'Back Cover' : `Page ${versoPageNum}`;
+    const isBackCover = versoPageNum === 0 && signatureCount === 1;
+    versoLabel.textContent = isBackCover ? 'BC' : (versoPageNum?.toString() || '–');
+    versoLabel.title = isBackCover ? 'Back Cover' : `Page ${versoPageNum}`;
     versoLabel.addEventListener('click', (e) => {
       e.stopPropagation();
       setCurrentSpreadIndex(index);

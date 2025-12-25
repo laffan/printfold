@@ -670,20 +670,41 @@ export class TextFlowEngine {
   private createSpreads(pages: PageContent[]): Spread[] {
     const spreads: Spread[] = [];
 
+    // Get previous signatures to preserve items on existing pages
+    const project = appState.getProject();
+    const prevFirstSpread = project.signatures[0]?.spreads[0];
+
     // Always create the back cover page (page 0) for reading order display
     // This represents where the last page of the signature appears when folded
     const backCoverPage = this.createEmptyPage(0, true);
     backCoverPage.isRecto = false;
     backCoverPage.isStatic = true; // Back cover is editable like a static page
+    // Preserve items from previous back cover
+    if (prevFirstSpread?.verso?.pageNumber === 0 && prevFirstSpread.verso.items) {
+      backCoverPage.items = prevFirstSpread.verso.items;
+    }
+    if (prevFirstSpread?.verso?.backgroundFill) {
+      backCoverPage.backgroundFill = prevFirstSpread.verso.backgroundFill;
+    }
 
     // First spread: back cover on left, page 1 (front cover) on right
     const page1 = pages[0] || this.createEmptyPage(1, true);
     if (!pages[0]) {
       page1.isStatic = true; // Make it editable when no content
+      // Preserve items from previous page 1
+      if (prevFirstSpread?.recto?.pageNumber === 1 && prevFirstSpread.recto.items) {
+        page1.items = prevFirstSpread.recto.items;
+      }
+      if (prevFirstSpread?.recto?.backgroundFill) {
+        page1.backgroundFill = prevFirstSpread.recto.backgroundFill;
+      }
     }
 
+    // Preserve the spread ID if it exists (helps with item references)
+    const spreadId = prevFirstSpread?.id || crypto.randomUUID();
+
     spreads.push({
-      id: crypto.randomUUID(),
+      id: spreadId,
       spreadNumber: 1,
       verso: backCoverPage,
       recto: page1,
