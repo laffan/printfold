@@ -81,7 +81,22 @@ export function renderThumbnails(
 
     // Verso page content - draw blank indicator or content lines
     if (spread.verso) {
-      if (spread.verso.isBlank || spread.verso.isStatic) {
+      // Check if this is the back cover (page 0)
+      if (spread.verso.pageNumber === 0) {
+        // Draw back cover indicator with red dashed border
+        ctx.fillStyle = '#fef2f2';
+        ctx.fillRect(1, 1, thumbWidth / 2 - 2, thumbHeight - 2);
+        ctx.strokeStyle = '#dc2626';
+        ctx.lineWidth = 0.5;
+        ctx.setLineDash([2, 1]);
+        ctx.strokeRect(2, 2, thumbWidth / 2 - 4, thumbHeight - 4);
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#dc2626';
+        ctx.font = '5px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('BACK', thumbWidth / 4, thumbHeight / 2 - 1);
+        ctx.fillText('COVER', thumbWidth / 4, thumbHeight / 2 + 5);
+      } else if (spread.verso.isBlank || spread.verso.isStatic) {
         // Draw blank/static page indicator
         ctx.fillStyle = '#f0f0f0';
         ctx.fillRect(1, 1, thumbWidth / 2 - 2, thumbHeight - 2);
@@ -145,10 +160,12 @@ export function renderThumbnails(
     const labelsContainer = document.createElement('div');
     labelsContainer.className = 'spread-thumbnail-labels';
 
-    // Verso label
+    // Verso label - show "BC" for back cover (page 0), otherwise page number
     const versoLabel = document.createElement('div');
     versoLabel.className = 'spread-thumbnail-page-label' + (isVersoSelected ? ' selected' : '');
-    versoLabel.textContent = spread.verso?.pageNumber?.toString() || '–';
+    const versoPageNum = spread.verso?.pageNumber;
+    versoLabel.textContent = versoPageNum === 0 ? 'BC' : (versoPageNum?.toString() || '–');
+    versoLabel.title = versoPageNum === 0 ? 'Back Cover' : `Page ${versoPageNum}`;
     versoLabel.addEventListener('click', (e) => {
       e.stopPropagation();
       setCurrentSpreadIndex(index);
