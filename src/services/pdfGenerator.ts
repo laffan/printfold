@@ -726,17 +726,15 @@ export class PDFGenerator {
         const color = this.parseColor(textItem.color);
         const textY = itemPdfY + item.height - textItem.fontSize;
 
-        // For text, only draw if the start is visible (simple clipping)
-        if (adjustedX >= 0) {
-          pdfPage.drawText(this.sanitizeText(textItem.content), {
-            x: pageX + adjustedX,
-            y: textY,
-            size: textItem.fontSize,
-            font,
-            color,
-            opacity,
-          });
-        }
+        // Draw text - PDF will handle clipping to page boundaries
+        pdfPage.drawText(this.sanitizeText(textItem.content), {
+          x: pageX + adjustedX,
+          y: textY,
+          size: textItem.fontSize,
+          font,
+          color,
+          opacity,
+        });
       } else if (item.type === 'shape') {
         const shapeItem = item as ShapePageItem;
         const fillColor = this.getFillColorFromConfig(shapeItem.fill, shapeItem.fillColor);

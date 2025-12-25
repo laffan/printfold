@@ -291,6 +291,15 @@ export function createItemNode(
       let newX = node!.x() - xOffset;
       let newY = node!.y();
 
+      // For text, get actual dimensions from the node and update width
+      if (item.type === 'text') {
+        const textNode = node as Konva.Text;
+        newWidth = textNode.width() * scaleX;
+        newHeight = textNode.height() * scaleY;
+        // Apply new width to the text node for proper wrapping
+        textNode.width(newWidth);
+      }
+
       // For ellipse, we need to handle differently since it's centered
       if (item.type === 'shape' && (item as ShapePageItem).shapeType === 'ellipse') {
         const ellipse = node as Konva.Ellipse;
