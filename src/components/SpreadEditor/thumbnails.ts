@@ -114,22 +114,7 @@ export function renderThumbnails(
 
     // Verso page content - draw blank indicator or content lines
     if (spread.verso) {
-      // Check if this is the back cover (page 0) for single-signature booklets
-      if (spread.verso.pageNumber === 0 && signatureCount === 1) {
-        // Draw back cover indicator with red dashed border (only for single signature)
-        ctx.fillStyle = '#fef2f2';
-        ctx.fillRect(1, 1, thumbWidth / 2 - 2, thumbHeight - 2);
-        ctx.strokeStyle = '#dc2626';
-        ctx.lineWidth = 0.5;
-        ctx.setLineDash([2, 1]);
-        ctx.strokeRect(2, 2, thumbWidth / 2 - 4, thumbHeight - 4);
-        ctx.setLineDash([]);
-        ctx.fillStyle = '#dc2626';
-        ctx.font = '5px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('BACK', thumbWidth / 4, thumbHeight / 2 - 1);
-        ctx.fillText('COVER', thumbWidth / 4, thumbHeight / 2 + 5);
-      } else if (spread.verso.isBlank || spread.verso.isStatic) {
+      if (spread.verso.isBlank || spread.verso.isStatic) {
         // Draw blank/static page indicator
         ctx.fillStyle = '#f0f0f0';
         ctx.fillRect(1, 1, thumbWidth / 2 - 2, thumbHeight - 2);
@@ -200,6 +185,10 @@ export function renderThumbnails(
     const isBackCover = versoPageNum === 0 && signatureCount === 1;
     versoLabel.textContent = isBackCover ? 'BC' : (versoPageNum?.toString() || '–');
     versoLabel.title = isBackCover ? 'Back Cover' : `Page ${versoPageNum}`;
+    if (isBackCover) {
+      versoLabel.style.color = '#dc2626';
+      versoLabel.style.fontWeight = 'bold';
+    }
     versoLabel.addEventListener('click', (e) => {
       e.stopPropagation();
       setCurrentSpreadIndex(spreadIndex);

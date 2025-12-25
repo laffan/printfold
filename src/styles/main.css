@@ -842,8 +842,8 @@ body {
 }
 
 .spread-thumbnails {
-  width: 100px;
-  min-width: 100px;
+  width: 120px;
+  min-width: 120px;
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden;

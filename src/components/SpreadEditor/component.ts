@@ -565,8 +565,9 @@ export class SpreadEditor {
     if (spread.verso) {
       if (isBackCoverPage) {
         if (signatureCount === 1) {
-          // Single signature: show back cover with red dashed border and label
-          this.drawBackCoverPage(0, 0, pageDimensions);
+          // Single signature: draw as normal editable page with "Back Cover" label above
+          this.drawPage(spread.verso, 0, 0, pageDimensions);
+          this.drawBackCoverLabel(0, pageDimensions.width);
         } else {
           // Multiple signatures: collapse the left side (internal signature page is confusing)
           this.drawHiddenPage(0, 0, pageDimensions);
@@ -834,68 +835,21 @@ export class SpreadEditor {
   }
 
   /**
-   * Draw the back cover page with a red dashed border and "Back Cover" label
+   * Draw a "Back Cover" label above the page
    * Shown for single-signature booklets on the first spread's verso
    */
-  private drawBackCoverPage(x: number, y: number, dimensions: { width: number; height: number }): void {
-    const { width, height } = dimensions;
-    const padding = 10;
-
-    // Draw white page background
-    const page = new Konva.Rect({
-      x,
-      y,
-      width,
-      height,
-      fill: '#fafafa',
-      stroke: '#cccccc',
-      strokeWidth: 1,
-      shadowColor: 'black',
-      shadowBlur: 10,
-      shadowOpacity: 0.2,
-      shadowOffset: { x: 2, y: 2 },
-    });
-    this.layer.add(page);
-
-    // Draw red dashed border
-    const dashedBorder = new Konva.Rect({
-      x: x + padding,
-      y: y + padding,
-      width: width - padding * 2,
-      height: height - padding * 2,
-      stroke: '#dc2626',
-      strokeWidth: 2,
-      dash: [8, 4],
-      fill: 'transparent',
-    });
-    this.layer.add(dashedBorder);
-
-    // Draw "Back Cover" label at the top
+  private drawBackCoverLabel(x: number, pageWidth: number): void {
     const label = new Konva.Text({
-      x: x + width / 2,
-      y: y + padding + 15,
+      x: x + pageWidth / 2,
+      y: -25,
       text: 'Back Cover',
-      fontSize: 14,
+      fontSize: 12,
       fontStyle: 'bold',
       fill: '#dc2626',
       align: 'center',
     });
     label.offsetX(label.width() / 2);
     this.layer.add(label);
-
-    // Draw helper text
-    const helperText = new Konva.Text({
-      x: x + width / 2,
-      y: y + height / 2,
-      text: 'This page will be the\nback cover when folded',
-      fontSize: 11,
-      fill: '#9ca3af',
-      align: 'center',
-      lineHeight: 1.4,
-    });
-    helperText.offsetX(helperText.width() / 2);
-    helperText.offsetY(helperText.height() / 2);
-    this.layer.add(helperText);
   }
 
   /**
