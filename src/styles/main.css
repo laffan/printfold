@@ -1056,6 +1056,43 @@ body {
   font-size: 14px;
 }
 
+/* Array instances list */
+.array-instances-list {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+}
+
+.array-instance-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+}
+
+.array-instance-item:last-child {
+  margin-bottom: 0;
+}
+
+.array-instance-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  min-width: 60px;
+}
+
+.array-instance-fill {
+  flex: 1;
+}
+
+.array-instance-fill .fill-preview {
+  width: 100%;
+  height: 24px;
+}
+
 .panel-options {
   flex: 0 0 auto;
 }

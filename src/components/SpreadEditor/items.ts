@@ -5,7 +5,7 @@
 
 import Konva from 'konva';
 import { appState } from '../../services/state';
-import type { PageContent, PageItem, TextPageItem, ShapePageItem, ImagePageItem, FillConfig, SpanningItem } from '../../types';
+import type { PageContent, PageItem, TextPageItem, ShapePageItem, ImagePageItem, FillConfig, SpanningItem, ArrayInstance } from '../../types';
 
 /**
  * Apply fill config to a Konva shape
@@ -472,6 +472,55 @@ export function startTextEditing(
 }
 
 /**
+ * Create a single array instance node with optional fill override
+ */
+function createArrayInstanceNode(
+  item: PageItem,
+  instanceIndex: number,
+  xOffset: number,
+  arrayOffsetX: number,
+  arrayOffsetY: number,
+  instanceConfig: ArrayInstance | undefined,
+  pageNumber: number,
+  zoomLevel: number,
+  stage: Konva.Stage,
+  itemsLayer: Konva.Layer,
+  transformer: Konva.Transformer,
+  updateTransformerFn: () => void
+): Konva.Shape | Konva.Text | Konva.Arrow | null {
+  // Create a modified item for this instance position
+  const instanceItem: PageItem = {
+    ...item,
+    id: `${item.id}-instance-${instanceIndex}`,
+    x: item.x + (arrayOffsetX * instanceIndex),
+    y: item.y + (arrayOffsetY * instanceIndex),
+    arrayCount: undefined,
+    arrayOffsetX: undefined,
+    arrayOffsetY: undefined,
+    arrayInstances: undefined,
+  } as PageItem;
+
+  // Apply instance-specific fill override
+  if (instanceConfig?.fill) {
+    if (instanceItem.type === 'shape') {
+      (instanceItem as ShapePageItem).fill = instanceConfig.fill;
+    } else if (instanceItem.type === 'text') {
+      (instanceItem as TextPageItem).fill = instanceConfig.fill;
+    }
+  }
+  if (instanceConfig?.opacity !== undefined) {
+    instanceItem.opacity = instanceConfig.opacity;
+  }
+
+  const node = createItemNode(instanceItem, xOffset, pageNumber, zoomLevel, stage, itemsLayer, transformer, updateTransformerFn);
+  if (node) {
+    node.setAttr('arrayInstanceIndex', instanceIndex);
+    node.setAttr('parentItemId', item.id);
+  }
+  return node;
+}
+
+/**
  * Render items for a specific page
  */
 export function renderPageItems(
@@ -491,39 +540,64 @@ export function renderPageItems(
     const arrayCount = item.arrayCount || 1;
     const arrayOffsetX = item.arrayOffsetX || 0;
     const arrayOffsetY = item.arrayOffsetY || 0;
+    const arrayInstances = item.arrayInstances || [];
 
-    // Create the main item (interactive)
-    const node = createItemNode(item, xOffset, page.pageNumber, zoomLevel, stage, itemsLayer, transformer, updateTransformerFn);
-    if (node) {
-      itemNodes.set(item.id, node);
-      itemsLayer.add(node);
+    // If array count is 1 or less, just create a single item
+    if (arrayCount <= 1) {
+      const node = createItemNode(item, xOffset, page.pageNumber, zoomLevel, stage, itemsLayer, transformer, updateTransformerFn);
+      if (node) {
+        itemNodes.set(item.id, node);
+        itemsLayer.add(node);
+      }
+      continue;
+    }
 
-      // Create array duplicates (non-interactive visual copies)
-      if (arrayCount > 1 && arrayCount <= 50) {
-        for (let i = 1; i < arrayCount; i++) {
-          const duplicatedItem: PageItem = {
-            ...item,
-            id: `${item.id}-array-${i}`,
-            x: item.x + (arrayOffsetX * i),
-            y: item.y + (arrayOffsetY * i),
-            // Explicitly remove array properties from duplicates to prevent recursion
-            arrayCount: undefined,
-            arrayOffsetX: undefined,
-            arrayOffsetY: undefined,
-          } as PageItem;
-          const duplicateNode = createItemNode(duplicatedItem, xOffset, page.pageNumber, zoomLevel, stage, itemsLayer, transformer, updateTransformerFn);
-          if (duplicateNode) {
-            // Make array duplicates non-interactive
-            duplicateNode.draggable(false);
-            duplicateNode.setAttr('isArrayDuplicate', true);
-            duplicateNode.setAttr('parentItemId', item.id);
-            // Remove all event handlers - duplicates shouldn't be interactive
-            duplicateNode.off('click tap dragstart dragmove dragend transform transformend dblclick');
-            itemsLayer.add(duplicateNode);
-          }
-        }
+    // Create a Konva.Group for array items
+    const group = new Konva.Group({
+      x: xOffset,
+      y: 0,
+      draggable: true,
+    });
+    group.setAttr('itemId', item.id);
+    group.setAttr('pageNumber', page.pageNumber);
+    group.setAttr('xOffset', xOffset);
+    group.setAttr('isArrayGroup', true);
+
+    // Create all array instances within the group
+    for (let i = 0; i < Math.min(arrayCount, 50); i++) {
+      const instanceConfig = arrayInstances.find(inst => inst.index === i);
+      const instanceNode = createArrayInstanceNode(
+        item, i, 0, arrayOffsetX, arrayOffsetY,
+        instanceConfig, page.pageNumber, zoomLevel, stage, itemsLayer, transformer, updateTransformerFn
+      );
+      if (instanceNode) {
+        // Remove individual event handlers - group handles interactions
+        instanceNode.draggable(false);
+        instanceNode.off('click tap dragstart dragmove dragend transform transformend');
+        instanceNode.setAttr('isArrayMember', true);
+        group.add(instanceNode);
       }
     }
+
+    // Handle group click to select the parent item
+    group.on('click tap', () => {
+      const position = xOffset === 0 ? 'verso' : 'recto';
+      appState.updateEditor({
+        selectedItemId: item.id,
+        selectedPageNumber: page.pageNumber,
+        selectedPagePosition: position,
+      });
+    });
+
+    // Handle group drag
+    group.on('dragend', () => {
+      const newX = group.x() - xOffset + item.x;
+      const newY = group.y() + item.y;
+      appState.updateItemOnPage(page.pageNumber, item.id, { x: newX, y: newY });
+    });
+
+    itemNodes.set(item.id, group);
+    itemsLayer.add(group);
   }
 }
 

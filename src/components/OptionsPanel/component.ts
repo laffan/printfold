@@ -23,6 +23,7 @@ import { setupHeaderFooterOptions } from './headerFooterOptions';
 import { initFontDropdowns, setupFontOptions, preloadFonts } from './fontOptions';
 import { setupSelectedPagePanel, updateSelectedPagePanel } from './selectedPage';
 import { setupEditPagePanel, updateEditPagePanel, updateEditSelectedSection } from './editPage';
+import { updateStylesTab } from './stylesTab';
 
 export class OptionsPanel {
   private fontDropdowns: Map<string, FontDropdown> = new Map();
@@ -41,12 +42,14 @@ export class OptionsPanel {
     this.setupMeasurementUnit();
     setupDraggableCaps();
     this.syncFromState();
+    updateStylesTab();
 
     // Listen for state changes to update UI
     appState.onProjectChange(() => {
       this.syncFromState();
       updateSelectedPagePanel();
       updateEditSelectedSection();
+      updateStylesTab();
     });
 
     // Listen for editor state changes (selected page, selected item)

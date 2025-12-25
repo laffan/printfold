@@ -136,6 +136,14 @@ export interface PageItemBase {
   arrayCount?: number; // Number of duplicates (1 = no duplication)
   arrayOffsetX?: number; // X offset between each duplicate
   arrayOffsetY?: number; // Y offset between each duplicate
+  arrayInstances?: ArrayInstance[]; // Per-instance overrides
+}
+
+// Array instance with individual fill override
+export interface ArrayInstance {
+  index: number;
+  fill?: FillConfig;
+  opacity?: number;
 }
 
 export interface TextPageItem extends PageItemBase {

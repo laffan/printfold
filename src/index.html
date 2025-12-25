@@ -154,20 +154,6 @@
         <div class="options-tab-content">
           <!-- Selected Tab -->
           <div id="tab-selected" class="tab-panel active">
-            <!-- Add Items Section -->
-            <div class="options-section">
-              <h4 class="section-header">Add Items</h4>
-              <div class="add-items-grid">
-                <button id="btn-add-text" class="btn btn-secondary btn-small" title="Add Text">T</button>
-                <button id="btn-add-rect" class="btn btn-secondary btn-small" title="Add Rectangle">▢</button>
-                <button id="btn-add-ellipse" class="btn btn-secondary btn-small" title="Add Ellipse">◯</button>
-                <button id="btn-add-circle" class="btn btn-secondary btn-small" title="Add Circle">●</button>
-                <button id="btn-add-line" class="btn btn-secondary btn-small" title="Add Line">─</button>
-                <button id="btn-add-arrow" class="btn btn-secondary btn-small" title="Add Arrow">→</button>
-                <button id="btn-add-image" class="btn btn-secondary btn-small" title="Add Image">🖼</button>
-              </div>
-            </div>
-
             <!-- Edit Selected Section -->
             <div id="edit-selected-section" class="options-section" style="display: none;">
               <h4 class="section-header">Properties</h4>
@@ -362,7 +348,7 @@
                     <div class="inline-sizes three-col">
                       <label>
                         <span>Count</span>
-                        <input type="number" id="item-array-count" step="1" min="1" max="50" value="1">
+                        <input type="number" id="item-array-count" step="1" min="2" max="50" value="2">
                       </label>
                       <label>
                         <span>X Offset</span>
@@ -378,6 +364,9 @@
                           <span class="input-cap">pt</span>
                         </div>
                       </label>
+                    </div>
+                    <div id="array-instances-list" class="array-instances-list">
+                      <!-- Instance items will be dynamically added here -->
                     </div>
                   </div>
                 </div>
@@ -418,79 +407,12 @@
 
           <!-- Styles Tab -->
           <div id="tab-styles" class="tab-panel">
-            <div class="options-section">
-              <h4 class="section-header">Body Text</h4>
-              <div class="form-group">
-                <label for="opt-font-body">Font Family</label>
-                <select id="opt-font-body">
-                  <option value="Georgia, serif">Georgia</option>
-                  <option value="Times New Roman, serif">Times New Roman</option>
-                  <option value="Palatino, serif">Palatino</option>
-                  <option value="Arial, sans-serif">Arial</option>
-                  <option value="Helvetica, sans-serif">Helvetica</option>
-                </select>
-              </div>
-              <div class="form-group inline-sizes">
-                <label>
-                  <span>Size</span>
-                  <div class="input-with-cap">
-                    <input type="number" id="opt-font-size-body" value="12" min="6" max="24">
-                    <span class="input-cap" data-for="opt-font-size-body">pt</span>
-                  </div>
-                </label>
-                <label>
-                  <span>Line Height</span>
-                  <div class="input-with-cap">
-                    <input type="number" id="opt-line-height-body" value="1.5" min="1" max="3" step="0.1">
-                    <span class="input-cap" data-for="opt-line-height-body">×</span>
-                  </div>
-                </label>
-                <label>
-                  <span>Color</span>
-                  <input type="color" id="opt-color-body" value="#000000">
-                </label>
-              </div>
+            <!-- No Markdown Message -->
+            <div id="styles-no-markdown" class="options-section">
+              <p class="hint">No markdown content. Add text files to customize typography styles.</p>
             </div>
-
-            <div class="options-section">
-              <h4 class="section-header">Headings</h4>
-              <div class="form-group">
-                <label for="opt-font-headings">Font Family</label>
-                <select id="opt-font-headings">
-                  <option value="Georgia, serif">Georgia</option>
-                  <option value="Times New Roman, serif">Times New Roman</option>
-                  <option value="Arial, sans-serif">Arial</option>
-                  <option value="Helvetica, sans-serif">Helvetica</option>
-                </select>
-              </div>
-              <div class="form-group inline-sizes">
-                <label>
-                  <span>H1</span>
-                  <div class="input-with-cap">
-                    <input type="number" id="opt-font-size-h1" value="24" min="12" max="72">
-                    <span class="input-cap" data-for="opt-font-size-h1">pt</span>
-                  </div>
-                </label>
-                <label>
-                  <span>H2</span>
-                  <div class="input-with-cap">
-                    <input type="number" id="opt-font-size-h2" value="20" min="10" max="48">
-                    <span class="input-cap" data-for="opt-font-size-h2">pt</span>
-                  </div>
-                </label>
-                <label>
-                  <span>H3</span>
-                  <div class="input-with-cap">
-                    <input type="number" id="opt-font-size-h3" value="16" min="8" max="36">
-                    <span class="input-cap" data-for="opt-font-size-h3">pt</span>
-                  </div>
-                </label>
-              </div>
-              <div class="form-group">
-                <label for="opt-color-headings">Color</label>
-                <input type="color" id="opt-color-headings" value="#000000">
-              </div>
-            </div>
+            <!-- Dynamic styles container -->
+            <div id="styles-content"></div>
           </div>
 
           <!-- Document Tab -->

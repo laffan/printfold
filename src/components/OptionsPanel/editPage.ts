@@ -6,13 +6,14 @@
 import { appState } from '../../services/state';
 import { createFontDropdown, FontDropdown } from '../FontDropdown';
 import { createFillPicker, FillPicker } from '../FillPicker';
-import type { PageItem, TextPageItem, ShapePageItem, ImagePageItem, ProjectFile, FillConfig } from '../../types';
+import type { PageItem, TextPageItem, ShapePageItem, ImagePageItem, ProjectFile, FillConfig, ArrayInstance } from '../../types';
 
 // Module-level instances
 let itemFontDropdown: FontDropdown | null = null;
 let itemFillPicker: FillPicker | null = null;
 let textFillPicker: FillPicker | null = null;
 let pageBackgroundPicker: FillPicker | null = null;
+const instanceFillPickers: Map<number, FillPicker> = new Map();
 
 /**
  * Set up the Edit Page panel event handlers
@@ -292,7 +293,18 @@ function setupEditPropertyInputs(updateEditSelectedSectionFn: () => void): void 
   });
 
   // Array duplication inputs
-  setupPropInput('item-array-count', 'arrayCount');
+  const arrayCountInput = document.getElementById('item-array-count') as HTMLInputElement;
+  arrayCountInput?.addEventListener('input', () => {
+    const editorState = appState.getEditor();
+    if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+    const value = parseInt(arrayCountInput.value, 10);
+    if (!isNaN(value) && value >= 1 && value <= 50) {
+      appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { arrayCount: value });
+      // Refresh the instances list
+      const item = appState.getItemFromPage(editorState.selectedPageNumber, editorState.selectedItemId);
+      if (item) updateArrayInstancesList(item);
+    }
+  });
   setupPropInput('item-array-offset-x', 'arrayOffsetX');
   setupPropInput('item-array-offset-y', 'arrayOffsetY');
 }
@@ -575,6 +587,9 @@ export function updateEditSelectedSection(): void {
   (document.getElementById('item-array-offset-x') as HTMLInputElement).value = (item.arrayOffsetX || 20).toString();
   (document.getElementById('item-array-offset-y') as HTMLInputElement).value = (item.arrayOffsetY || 20).toString();
 
+  // Update array instances list
+  updateArrayInstancesList(item);
+
   // Show/hide type-specific properties
   if (item.type === 'shape') {
     const shapeItem = item as ShapePageItem;
@@ -719,5 +734,75 @@ function setupPageBackgroundPicker(pageNumber: number): void {
       if (!editorState.selectedPageNumber) return;
       appState.updatePageBackground(editorState.selectedPageNumber, fill);
     });
+  }
+}
+
+/**
+ * Update the array instances list UI
+ */
+function updateArrayInstancesList(item: PageItem): void {
+  const container = document.getElementById('array-instances-list');
+  if (!container) return;
+
+  const arrayCount = item.arrayCount || 1;
+  const arrayInstances = item.arrayInstances || [];
+
+  // Clear existing pickers
+  instanceFillPickers.forEach(picker => picker.destroy?.());
+  instanceFillPickers.clear();
+  container.innerHTML = '';
+
+  // Don't show list if array count is 1 or less
+  if (arrayCount <= 1) return;
+
+  // Get the default fill from the item
+  let defaultFill: FillConfig = { type: 'color', color: '#cccccc' };
+  if (item.type === 'shape') {
+    const shapeItem = item as ShapePageItem;
+    defaultFill = shapeItem.fill || { type: 'color', color: shapeItem.fillColor || '#cccccc' };
+  } else if (item.type === 'text') {
+    const textItem = item as TextPageItem;
+    defaultFill = textItem.fill || { type: 'color', color: textItem.color || '#000000' };
+  }
+
+  // Create instance items
+  for (let i = 0; i < arrayCount; i++) {
+    const instanceConfig = arrayInstances.find(inst => inst.index === i);
+    const instanceFill = instanceConfig?.fill || defaultFill;
+
+    const instanceItem = document.createElement('div');
+    instanceItem.className = 'array-instance-item';
+    instanceItem.innerHTML = `
+      <span class="array-instance-label">Instance ${i + 1}</span>
+      <div class="array-instance-fill" id="instance-fill-${i}"></div>
+    `;
+    container.appendChild(instanceItem);
+
+    // Create fill picker for this instance
+    const fillContainer = instanceItem.querySelector(`#instance-fill-${i}`) as HTMLElement;
+    if (fillContainer) {
+      const picker = createFillPicker(fillContainer, instanceFill, (fill) => {
+        const editorState = appState.getEditor();
+        if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+
+        // Get current item and update its arrayInstances
+        const currentItem = appState.getItemFromPage(editorState.selectedPageNumber, editorState.selectedItemId);
+        if (!currentItem) return;
+
+        const currentInstances = [...(currentItem.arrayInstances || [])];
+        const existingIndex = currentInstances.findIndex(inst => inst.index === i);
+
+        if (existingIndex >= 0) {
+          currentInstances[existingIndex] = { ...currentInstances[existingIndex], fill };
+        } else {
+          currentInstances.push({ index: i, fill });
+        }
+
+        appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, {
+          arrayInstances: currentInstances
+        });
+      });
+      instanceFillPickers.set(i, picker);
+    }
   }
 }
