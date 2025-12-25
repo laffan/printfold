@@ -231,9 +231,11 @@ export class SpreadEditor {
       appState.clearSelection();
     }
     this.isMarqueeSelecting = false;
+
+    // Force immediate transformer update and redraw
     this.updateTransformer();
-    // Force redraw to show transformer immediately
-    this.itemsLayer.batchDraw();
+    this.transformer.moveToTop();
+    this.stage.draw();
   }
 
   /**

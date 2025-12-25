@@ -297,6 +297,8 @@ export function createItemNode(
     let dragStartNodePositions: Map<string, { x: number; y: number }> = new Map();
     let initialDragPos = { x: 0, y: 0 };
     let dragStartItemData: Map<string, PageItem> = new Map(); // Store complete item data for duplication
+    let originalOpacities: Map<string, number> = new Map(); // Store original opacities for restore
+    let ghostNodes: Konva.Node[] = []; // Visual indicators showing where originals stay
 
     node.on('dragstart', (e) => {
       const isAltKey = e.evt?.altKey || false;
@@ -306,7 +308,7 @@ export function createItemNode(
       // Store initial node position
       initialDragPos = { x: node!.x(), y: node!.y() };
 
-      // Option+drag: prepare for duplication
+      // Option+drag: prepare for duplication with visual feedback
       if (isAltKey) {
         isDuplicateDrag = true;
 
@@ -324,15 +326,40 @@ export function createItemNode(
         editorState = appState.getEditor();
         selectedIds = editorState.selectedItemIds;
 
-        // Store complete item data for all selected items (for creating copies later)
+        // Store complete item data and create visual ghosts for all selected items
         dragStartItemData.clear();
+        originalOpacities.clear();
+        ghostNodes.forEach(g => g.destroy());
+        ghostNodes = [];
+
         for (const id of selectedIds) {
           const itemData = appState.getItemFromPage(pageNumber, id);
-          if (itemData) {
+          const itemNode = id === item.id ? node : itemsLayer.findOne((n: Konva.Node) => n.getAttr('itemId') === id);
+          if (itemData && itemNode) {
             // Deep clone the item data
             dragStartItemData.set(id, JSON.parse(JSON.stringify(itemData)));
+
+            // Store original opacity and make dragged node semi-transparent
+            originalOpacities.set(id, itemNode.opacity());
+            itemNode.opacity(0.5);
+
+            // Create a ghost (dashed outline) at the original position to show where original stays
+            const ghost = new Konva.Rect({
+              x: itemNode.x(),
+              y: itemNode.y(),
+              width: itemNode.width() || 50,
+              height: itemNode.height() || 50,
+              stroke: '#3b82f6',
+              strokeWidth: 1,
+              dash: [4, 4],
+              fill: 'transparent',
+              listening: false,
+            });
+            itemsLayer.add(ghost);
+            ghostNodes.push(ghost);
           }
         }
+        itemsLayer.batchDraw();
       }
 
       // Refresh state
@@ -350,6 +377,9 @@ export function createItemNode(
             }
           }
         }
+        // Detach transformer during multi-item drag to prevent jittering
+        transformer.nodes([]);
+        itemsLayer.batchDraw();
       }
     });
 
@@ -384,6 +414,17 @@ export function createItemNode(
       const dx = node!.x() - initialDragPos.x;
       const dy = node!.y() - initialDragPos.y;
 
+      // Clean up ghost nodes and restore opacities
+      ghostNodes.forEach(g => g.destroy());
+      ghostNodes = [];
+      originalOpacities.forEach((opacity, id) => {
+        const itemNode = id === item.id ? node : itemsLayer.findOne((n: Konva.Node) => n.getAttr('itemId') === id);
+        if (itemNode) {
+          itemNode.opacity(opacity);
+        }
+      });
+      originalOpacities.clear();
+
       // If Option+drag, create copies at NEW positions and reset originals to their start positions
       if (isDuplicateDrag && dragStartItemData.size > 0) {
         const newItemIds: string[] = [];
@@ -399,12 +440,9 @@ export function createItemNode(
           };
           appState.addItemToPage(pageNumber, copy);
           newItemIds.push(copy.id);
-
-          // Reset the original item's visual node position (it will be reset by render anyway)
-          // The original stays at its original position (we don't update it)
         }
 
-        // Select the new copies
+        // Select the new copies (this triggers render which re-attaches transformer)
         if (newItemIds.length > 0) {
           appState.selectItems(newItemIds);
         }
@@ -412,6 +450,7 @@ export function createItemNode(
         dragStartItemData.clear();
         isDuplicateDrag = false;
         dragStartNodePositions.clear();
+        // Transformer will be re-attached by the render triggered by addItemToPage/selectItems
         return; // Don't update original positions - they stay where they were
       }
 
