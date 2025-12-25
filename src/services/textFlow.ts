@@ -714,13 +714,16 @@ export class TextFlowEngine {
     const signatures: Signature[] = [];
 
     // Pad spreads to fill complete signatures
+    // Page numbering: spread 0 has [backCover(0) | page1], spread 1 has [page2 | page3], etc.
+    // So spread at index N has pages (N*2) and (N*2 + 1) for N > 0
+    // For padding spreads, continue this pattern
     const paddedSpreads = [...spreads];
     while (paddedSpreads.length % spreadsPerSig !== 0) {
       const emptySpread: Spread = {
         id: crypto.randomUUID(),
         spreadNumber: paddedSpreads.length + 1,
-        verso: this.createEmptyPage(paddedSpreads.length * 2 + 1, true),
-        recto: this.createEmptyPage(paddedSpreads.length * 2 + 2, true),
+        verso: this.createEmptyPage(paddedSpreads.length * 2, true),
+        recto: this.createEmptyPage(paddedSpreads.length * 2 + 1, true),
       };
       paddedSpreads.push(emptySpread);
     }
