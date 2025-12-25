@@ -4,12 +4,11 @@
  */
 
 import { appState } from '../../services/state';
-import type { Spread, PageContent } from '../../types';
+import type { Spread } from '../../types';
 
 // Track drag state
-let draggedPageNumbers: number[] = [];
+let draggedSpreadId: string | null = null;
 let dragSourceSpreadIndex: number = -1;
-let isDraggingSpread: boolean = false;
 
 /**
  * Render all spread thumbnails
@@ -180,10 +179,14 @@ export function renderThumbnails(
     const isRectoSelected = editorState.selectedPagePosition === 'recto' &&
       spread.recto?.pageNumber === editorState.selectedPageNumber;
 
-    // Check if pages are static (draggable)
+    // Check if this spread is a user-created static spread (from staticSpreads array)
+    // This is different from isStatic on pages, which includes back cover and padding pages
+    const staticSpreads = project.staticSpreads || [];
+    const isUserStaticSpread = staticSpreads.some(ss => ss.id === spread.id);
+
+    // Individual page static checks (for display purposes)
     const isVersoStatic = spread.verso?.isStatic ?? false;
     const isRectoStatic = spread.recto?.isStatic ?? false;
-    const isFullStaticSpread = isVersoStatic && isRectoStatic;
 
     thumbDiv.appendChild(canvas);
 
@@ -202,8 +205,8 @@ export function renderThumbnails(
       versoLabel.style.color = '#dc2626';
       versoLabel.style.fontWeight = 'bold';
     }
-    // Add dark orange background for static pages
-    if (isVersoStatic && !isBackCover) {
+    // Add dark orange background for user-created static spreads (not back cover)
+    if (isUserStaticSpread) {
       versoLabel.classList.add('static-page-label');
     }
     versoLabel.addEventListener('click', (e) => {
@@ -220,8 +223,8 @@ export function renderThumbnails(
     const rectoLabel = document.createElement('div');
     rectoLabel.className = 'spread-thumbnail-page-label' + (isRectoSelected ? ' selected' : '');
     rectoLabel.textContent = spread.recto?.pageNumber?.toString() || '–';
-    // Add dark orange background for static pages
-    if (isRectoStatic) {
+    // Add dark orange background for user-created static spreads
+    if (isUserStaticSpread) {
       rectoLabel.classList.add('static-page-label');
     }
     rectoLabel.addEventListener('click', (e) => {
@@ -236,43 +239,22 @@ export function renderThumbnails(
 
     thumbDiv.appendChild(labelsContainer);
 
-    // Make static pages draggable
-    if (isVersoStatic || isRectoStatic) {
+    // Make user-created static spreads draggable
+    if (isUserStaticSpread) {
       thumbDiv.setAttribute('draggable', 'true');
       thumbDiv.classList.add('draggable-thumbnail');
 
       // Drag start
       thumbDiv.addEventListener('dragstart', (e) => {
         e.stopPropagation();
-        const shiftHeld = e.shiftKey;
 
-        // Determine which pages to drag
-        draggedPageNumbers = [];
-        isDraggingSpread = false;
-
-        if (shiftHeld && isFullStaticSpread) {
-          // Shift held: drag both pages together
-          if (spread.verso) draggedPageNumbers.push(spread.verso.pageNumber);
-          if (spread.recto) draggedPageNumbers.push(spread.recto.pageNumber);
-          isDraggingSpread = true;
-        } else if (isFullStaticSpread) {
-          // For full static spread without shift, drag both
-          if (spread.verso) draggedPageNumbers.push(spread.verso.pageNumber);
-          if (spread.recto) draggedPageNumbers.push(spread.recto.pageNumber);
-          isDraggingSpread = true;
-        } else {
-          // Mixed spread or single static - drag only static pages
-          if (isVersoStatic && spread.verso) draggedPageNumbers.push(spread.verso.pageNumber);
-          if (isRectoStatic && spread.recto) draggedPageNumbers.push(spread.recto.pageNumber);
-        }
-
+        draggedSpreadId = spread.id;
         dragSourceSpreadIndex = spreadIndex;
 
         e.dataTransfer!.effectAllowed = 'move';
-        e.dataTransfer!.setData('application/x-printfold-page', JSON.stringify({
-          pageNumbers: draggedPageNumbers,
-          sourceSpreadIndex: spreadIndex,
-          isSpread: isDraggingSpread
+        e.dataTransfer!.setData('application/x-printfold-spread', JSON.stringify({
+          spreadId: spread.id,
+          sourceSpreadIndex: spreadIndex
         }));
 
         thumbDiv.classList.add('dragging');
@@ -281,9 +263,8 @@ export function renderThumbnails(
       // Drag end
       thumbDiv.addEventListener('dragend', () => {
         thumbDiv.classList.remove('dragging');
-        draggedPageNumbers = [];
+        draggedSpreadId = null;
         dragSourceSpreadIndex = -1;
-        isDraggingSpread = false;
 
         // Remove all drop indicators
         thumbnailContainer.querySelectorAll('.drop-target, .drop-before, .drop-after').forEach(el => {
@@ -292,43 +273,40 @@ export function renderThumbnails(
       });
     }
 
-    // Drop target handling for all thumbnails
-    thumbDiv.addEventListener('dragover', (e) => {
-      if (draggedPageNumbers.length === 0) return;
-      e.preventDefault();
-      e.dataTransfer!.dropEffect = 'move';
+    // Drop target handling - only for user-created static spreads
+    if (isUserStaticSpread) {
+      thumbDiv.addEventListener('dragover', (e) => {
+        if (!draggedSpreadId) return;
+        e.preventDefault();
+        e.dataTransfer!.dropEffect = 'move';
 
-      // Don't allow dropping on self
-      if (spreadIndex === dragSourceSpreadIndex) return;
+        // Don't allow dropping on self
+        if (spreadIndex === dragSourceSpreadIndex) return;
 
-      // Add visual feedback
-      thumbDiv.classList.add('drop-target');
-    });
+        // Add visual feedback
+        thumbDiv.classList.add('drop-target');
+      });
 
-    thumbDiv.addEventListener('dragleave', () => {
-      thumbDiv.classList.remove('drop-target', 'drop-before', 'drop-after');
-    });
+      thumbDiv.addEventListener('dragleave', () => {
+        thumbDiv.classList.remove('drop-target', 'drop-before', 'drop-after');
+      });
 
-    thumbDiv.addEventListener('drop', (e) => {
-      e.preventDefault();
-      thumbDiv.classList.remove('drop-target', 'drop-before', 'drop-after');
+      thumbDiv.addEventListener('drop', (e) => {
+        e.preventDefault();
+        thumbDiv.classList.remove('drop-target', 'drop-before', 'drop-after');
 
-      const dataStr = e.dataTransfer?.getData('application/x-printfold-page');
-      if (!dataStr) return;
+        const dataStr = e.dataTransfer?.getData('application/x-printfold-spread');
+        if (!dataStr) return;
 
-      const data = JSON.parse(dataStr);
-      const sourcePageNumbers: number[] = data.pageNumbers;
-      const isSpreadDrag: boolean = data.isSpread;
+        const data = JSON.parse(dataStr);
+        const sourceSpreadId: string = data.spreadId;
 
-      if (sourcePageNumbers.length === 0) return;
+        if (!sourceSpreadId) return;
 
-      // Determine target page(s)
-      const targetVerso = spread.verso;
-      const targetRecto = spread.recto;
-
-      // Perform the reorder
-      appState.reorderStaticPages(sourcePageNumbers, spreadIndex, isSpreadDrag);
-    });
+        // Perform the reorder using spread IDs
+        appState.reorderStaticPages(sourceSpreadId, spread.id);
+      });
+    }
 
     // Create click areas for page selection (overlaid on canvas)
     const clickContainer = document.createElement('div');
