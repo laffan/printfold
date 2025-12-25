@@ -233,7 +233,13 @@ Konva.js-based visual editor for spreads.
 
 ### [Options Panel (`OptionsPanel/`)](./OptionsPanel.md)
 
-Settings interface with collapsible sections.
+Settings interface with tabbed organization.
+
+**Tabs:**
+- Selected - Item editing and effects
+- Styles - Dynamic typography (based on content)
+- Document - Layout, margins, info
+- Output - Sheet/booklet settings
 
 **Modules:**
 - `component.ts` - Main panel class
@@ -243,7 +249,8 @@ Settings interface with collapsible sections.
 - `fontOptions.ts` - Typography
 - `headerFooterOptions.ts` - Headers/footers
 - `selectedPage.ts` - Page info display
-- `editPage.ts` - Item editing
+- `editPage.ts` - Item editing and effects
+- `stylesTab.ts` - Dynamic styles generation
 
 ---
 
@@ -333,11 +340,16 @@ Items can be placed on static/blank pages:
 
 | Type | Properties |
 |------|------------|
-| Text | Content, font, size, color, alignment |
-| Shape | Rectangle, ellipse, circle, line, arrow |
+| Text | Content, font, size, fill (color/gradient/pattern), alignment, stroke |
+| Shape | Rectangle, ellipse, circle, line, arrow with fill and stroke |
 | Image | Reference to project image file |
 
 **Common Properties:** Position (x, y), size, rotation, opacity
+
+**Effects (available for all items):**
+- **Stroke** - Border with customizable color and width
+- **Shadow** - Drop shadow with color, blur, offset, and opacity
+- **Array** - Create multiple instances with offset and per-instance fill customization
 
 ### Fill System
 

@@ -1,16 +1,14 @@
 # Options Panel (`src/components/OptionsPanel/`)
 
-The Options Panel provides all configuration controls for the booklet project, organized into collapsible sections.
+The Options Panel provides all configuration controls for the booklet project, organized into a tabbed interface.
 
 ## Overview
 
-The OptionsPanel manages settings for:
-- Output options (sheet size, booklet size, signatures)
-- Layout options (margins, spacing, alignment)
-- Font options (families, sizes, colors)
-- Header/Footer configuration
-- Selected page properties
-- Item editing
+The OptionsPanel is organized into four tabs:
+- **Selected** - Item editing and page properties
+- **Styles** - Typography settings (dynamic based on content)
+- **Document** - Layout, margins, and document info
+- **Output** - Sheet size, booklet size, signatures
 
 ## Module Structure
 
@@ -24,8 +22,44 @@ OptionsPanel/
 ├── headerFooterOptions.ts  # Header/footer configuration
 ├── selectedPage.ts     # Selected page info display
 ├── editPage.ts         # Page item editing controls
+├── stylesTab.ts        # Dynamic styles tab
 └── index.ts            # Barrel export
 ```
+
+## Tab Structure
+
+### Selected Tab
+
+Contains:
+- **Edit Selected Section** - Properties for selected items
+- **Effects Section** - Stroke, shadow, and array effects
+- **Page Background Section** - Background fill for static pages
+
+### Styles Tab
+
+Dynamically generated based on markdown content:
+- Only shows style options for elements actually used in the document
+- Displays "No markdown content" message when no text files are present
+- Header/footer styles appear only when enabled in Document tab
+
+**Detected styles:**
+- Body text (if any text content exists)
+- Headings H1-H6 (only levels actually used)
+- Header text (if header enabled)
+- Footer text (if footer enabled)
+
+### Document Tab
+
+Contains:
+- **Info Section** - Page count, spreads, signatures, sheets
+- **Layout Section** - Margins, spacing, alignment
+- **Headers & Footers Section** - Enable/configure headers and footers
+
+### Output Tab
+
+Contains:
+- **Sheet & Booklet Section** - Paper size, booklet size, signatures
+- **Creep Compensation** - Adjustment for paper thickness in signatures
 
 ## Main Class (`component.ts`)
 
@@ -270,13 +304,14 @@ Uses FillPicker component for page background:
 
 ### Item Tools
 
-Buttons to add new items:
+Buttons in toolbar to add new items:
 - Text (`#btn-add-text`)
 - Rectangle (`#btn-add-rect`)
 - Ellipse (`#btn-add-ellipse`)
 - Circle (`#btn-add-circle`)
 - Line (`#btn-add-line`)
 - Arrow (`#btn-add-arrow`)
+- Image (`#btn-add-image`)
 
 ### Selected Item Properties
 
@@ -293,14 +328,39 @@ When an item is selected:
 - Font family dropdown
 - Font size
 - Font weight/style toggles
-- Color
+- Fill (solid color, gradient, or pattern)
 - Text alignment
 
 ### Shape Item Properties
 
-- Fill type and configuration
+- Fill type and configuration (solid, gradient, pattern)
+- Has Fill toggle
+
+### Effects Section
+
+Toggle-based effects available for all items:
+
+#### Stroke Effect
+- Enable/disable toggle
 - Stroke color
 - Stroke width
+
+#### Shadow Effect
+- Enable/disable toggle
+- Shadow color
+- Blur amount
+- X/Y offset
+- Opacity
+
+#### Array Effect
+Creates multiple copies of an item in a grid pattern:
+- Enable/disable toggle
+- Instance count (2-50)
+- X offset between instances
+- Y offset between instances
+- Per-instance fill customization
+
+The array uses Konva.Group to group all instances together for unified selection and dragging.
 
 ### Z-Order Controls
 
@@ -315,18 +375,36 @@ Removes selected item from page.
 
 ## CSS Classes
 
-Expected panel structure:
+### Tab Structure
 
 ```html
-<div class="panel-options" data-panel="output">
-  <div class="panel-header collapsible">Output</div>
-  <div class="panel-content">
-    <!-- controls -->
+<div class="options-tabs">
+  <button class="tab-btn active" data-tab="selected">Selected</button>
+  <button class="tab-btn" data-tab="styles">Styles</button>
+  <button class="tab-btn" data-tab="document">Document</button>
+  <button class="tab-btn" data-tab="output">Output</button>
+</div>
+<div class="options-tab-content">
+  <div id="tab-selected" class="tab-panel active">
+    <!-- Selected tab content -->
   </div>
+  <div id="tab-styles" class="tab-panel">
+    <!-- Dynamic styles content -->
+  </div>
+  <!-- ... other tabs -->
 </div>
 ```
 
-## Input Cap Structure
+### Section Structure
+
+```html
+<div class="options-section">
+  <h4 class="section-header">Section Title</h4>
+  <!-- controls -->
+</div>
+```
+
+### Input Cap Structure
 
 ```html
 <div class="input-with-cap">
@@ -334,3 +412,24 @@ Expected panel structure:
   <span class="input-cap" data-for="opt-margin-top">in</span>
 </div>
 ```
+
+## Styles Tab (`stylesTab.ts`)
+
+The styles tab is dynamically generated based on the markdown content.
+
+### `updateStylesTab(): void`
+
+Called on mount and whenever project changes. The function:
+
+1. Clears existing dynamic content
+2. Scans markdown files to detect which elements are used
+3. Creates style sections only for detected elements
+4. Adds header/footer sections if they're enabled
+5. Sets up input handlers and font dropdowns
+
+### Detection Logic
+
+The `detectUsedStyles()` function scans:
+- Markdown file content for headings (`# `, `## `, etc.)
+- Parsed sections from signatures
+- Raw markdown for lists, code blocks, blockquotes
