@@ -142,6 +142,22 @@ export class PDFGenerator {
       project.outputOptions.fillAvailableSpace
     );
 
+    // Helper function to convert imposition page number to pages array index
+    // The new spread arrangement has back cover at index 0, so:
+    // - Imposition page N (last page) → index 0 (back cover)
+    // - Imposition page 1 → index 1 (page 1)
+    // - Imposition page 2 → index 2 (page 2), etc.
+    const basePageOffset = (signature.signatureNumber - 1) * signature.pageCount;
+    const pageNumberToIndex = (impositionPageNum: number): number => {
+      const localPageNum = impositionPageNum - basePageOffset;
+      if (localPageNum === signature.pageCount) {
+        // Last page in signature maps to index 0 (back cover)
+        return 0;
+      }
+      // Other pages: imposition page 1 → index 1, page 2 → index 2, etc.
+      return localPageNum;
+    };
+
     // Group imposition sheets for multi-row layout
     for (let i = 0; i < imposition.length; i += rowsPerSheet) {
       const sheetsInGroup = imposition.slice(i, i + rowsPerSheet);
@@ -154,8 +170,8 @@ export class PDFGenerator {
         // Y position: start from top, work down
         const rowY = sheetSize.height - (rowIndex + 1) * pageHeight;
 
-        const leftPageIndex = sheet.front.left - 1 - (signature.signatureNumber - 1) * signature.pageCount;
-        const rightPageIndex = sheet.front.right - 1 - (signature.signatureNumber - 1) * signature.pageCount;
+        const leftPageIndex = pageNumberToIndex(sheet.front.left);
+        const rightPageIndex = pageNumberToIndex(sheet.front.right);
 
         const leftPage = leftPageIndex >= 0 && leftPageIndex < pages.length ? pages[leftPageIndex] : null;
         const rightPage = rightPageIndex >= 0 && rightPageIndex < pages.length ? pages[rightPageIndex] : null;
@@ -186,8 +202,8 @@ export class PDFGenerator {
       sheetsInGroup.forEach((sheet, rowIndex) => {
         const rowY = sheetSize.height - (rowIndex + 1) * pageHeight;
 
-        const backLeftIndex = sheet.back.left - 1 - (signature.signatureNumber - 1) * signature.pageCount;
-        const backRightIndex = sheet.back.right - 1 - (signature.signatureNumber - 1) * signature.pageCount;
+        const backLeftIndex = pageNumberToIndex(sheet.back.left);
+        const backRightIndex = pageNumberToIndex(sheet.back.right);
 
         const leftPage = backLeftIndex >= 0 && backLeftIndex < pages.length ? pages[backLeftIndex] : null;
         const rightPage = backRightIndex >= 0 && backRightIndex < pages.length ? pages[backRightIndex] : null;

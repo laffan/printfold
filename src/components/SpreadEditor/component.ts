@@ -12,6 +12,7 @@ import { createItemNode, renderPageItems, renderSpanningItems } from './items';
 import { renderThumbnails } from './thumbnails';
 import { drawMarginGuides, getMarginsForPage } from './margins';
 import { drawPageContent } from './content';
+import { switchToSelectedTab } from '../OptionsPanel/editPage';
 
 export class SpreadEditor {
   private container!: HTMLElement;
@@ -110,7 +111,7 @@ export class SpreadEditor {
 
       // Check if a static/blank page is selected
       const editorState = appState.getEditor();
-      if (!editorState.selectedPageNumber) {
+      if (editorState.selectedPageNumber === null) {
         // Try to find which page was dropped on based on position
         const rect = container.getBoundingClientRect();
         const dropX = e.clientX - rect.left;
@@ -182,6 +183,7 @@ export class SpreadEditor {
 
     appState.addItemToPage(pageNumber, item);
     appState.updateEditor({ selectedItemId: item.id });
+    switchToSelectedTab();
   }
 
   private setupStateListeners(): void {
@@ -264,9 +266,9 @@ export class SpreadEditor {
       this.render();
     });
 
-    // Add blank spread button - adds a new static spread (2 pages)
-    document.getElementById('btn-add-blank-page')?.addEventListener('click', () => {
-      appState.addStaticSpread();
+    // Add signature button - adds a complete signature worth of spreads
+    document.getElementById('btn-add-signature')?.addEventListener('click', () => {
+      appState.addStaticSignature();
     });
 
     // Add single page button - adds a single blank page
@@ -394,6 +396,7 @@ export class SpreadEditor {
           };
           appState.addItemToPage(editorState.selectedPageNumber, newItem);
           appState.updateEditor({ selectedItemId: newItem.id });
+          switchToSelectedTab();
         }
       }
     });
@@ -552,9 +555,26 @@ export class SpreadEditor {
       return;
     }
 
+    // Check if this is the first spread and handle back cover display
+    // The back cover is identified by: first spread (index 0) with verso page number 0
+    const isFirstSpread = this.currentSpreadIndex === 0;
+    const signatureCount = project.signatures.length;
+    const isBackCoverPage = isFirstSpread && spread.verso?.pageNumber === 0;
+
     // Draw verso (left) page
     if (spread.verso) {
-      this.drawPage(spread.verso, 0, 0, pageDimensions);
+      if (isBackCoverPage) {
+        if (signatureCount === 1) {
+          // Single signature: draw as normal editable page with "Back Cover" label above
+          this.drawPage(spread.verso, 0, 0, pageDimensions);
+          this.drawBackCoverLabel(0, pageDimensions.width);
+        } else {
+          // Multiple signatures: collapse the left side (internal signature page is confusing)
+          this.drawHiddenPage(0, 0, pageDimensions);
+        }
+      } else {
+        this.drawPage(spread.verso, 0, 0, pageDimensions);
+      }
     } else {
       this.drawPageOutline(0, 0, pageDimensions.width, pageDimensions.height);
     }
@@ -691,6 +711,24 @@ export class SpreadEditor {
     this.itemNodes.forEach(node => node.destroy());
     this.itemNodes.clear();
 
+    // Also clear any stale children from itemsLayer (except transformer)
+    const children = this.itemsLayer.getChildren();
+    children.forEach(child => {
+      if (child !== this.transformer) {
+        child.destroy();
+      }
+    });
+
+    // Detach transformer from any stale nodes
+    this.transformer.nodes([]);
+
+    // Clean up any lingering text editing textareas
+    const container = this.stage.container().parentElement;
+    if (container) {
+      const textareas = container.querySelectorAll('textarea');
+      textareas.forEach(ta => ta.remove());
+    }
+
     // Render items on verso page
     if (spread.verso?.items) {
       renderPageItems(
@@ -794,6 +832,59 @@ export class SpreadEditor {
       shadowOffset: { x: 2, y: 2 },
     });
     this.layer.add(page);
+  }
+
+  /**
+   * Draw a "Back Cover" label above the page
+   * Shown for single-signature booklets on the first spread's verso
+   */
+  private drawBackCoverLabel(x: number, pageWidth: number): void {
+    const label = new Konva.Text({
+      x: x + pageWidth / 2,
+      y: -25,
+      text: 'Back Cover',
+      fontSize: 12,
+      fontStyle: 'bold',
+      fill: '#dc2626',
+      align: 'center',
+    });
+    label.offsetX(label.width() / 2);
+    this.layer.add(label);
+  }
+
+  /**
+   * Draw a hidden/collapsed page placeholder
+   * Shown for multi-signature booklets where showing internal signature pages would be confusing
+   */
+  private drawHiddenPage(x: number, y: number, dimensions: { width: number; height: number }): void {
+    const { width, height } = dimensions;
+
+    // Draw a grayed out, narrower representation
+    const collapsedWidth = 30;
+
+    // Draw collapsed page indicator
+    const page = new Konva.Rect({
+      x: x + width - collapsedWidth,
+      y,
+      width: collapsedWidth,
+      height,
+      fill: '#e5e7eb',
+      stroke: '#d1d5db',
+      strokeWidth: 1,
+    });
+    this.layer.add(page);
+
+    // Draw fold lines
+    for (let i = 1; i < 4; i++) {
+      const lineY = y + (height / 4) * i;
+      const line = new Konva.Line({
+        points: [x + width - collapsedWidth + 5, lineY, x + width - 5, lineY],
+        stroke: '#9ca3af',
+        strokeWidth: 1,
+        dash: [3, 3],
+      });
+      this.layer.add(line);
+    }
   }
 
   private drawPageBackground(x: number, y: number, width: number, height: number, backgroundFill?: FillConfig): void {

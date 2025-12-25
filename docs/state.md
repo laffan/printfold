@@ -70,6 +70,7 @@ Static spreads exist independently of markdown content, allowing users to create
 
 | Method | Description |
 |--------|-------------|
+| `addStaticSignature()` | Creates a full signature worth of static spreads |
 | `addStaticSpread()` | Creates a new static spread with verso and recto pages |
 | `addStaticPage(position)` | Adds a single static page (verso or recto) |
 | `removeStaticSpread(spreadId)` | Removes a static spread by ID |
@@ -147,7 +148,7 @@ State Update (updateProject/updateEditor)
 ## Default Values
 
 The module exports default configuration objects:
-- `defaultOutputOptions` - Letter size, half-letter booklet, 8 pages/signature
+- `defaultOutputOptions` - Letter size, half-letter booklet, 4 pages/signature
 - `defaultLayoutOptions` - Standard margins (0.75" top/bottom, 0.5" outer, 0.75" inner)
 - `defaultFontOptions` - Source Serif 4 for body, Source Sans 3 for headings
 - `defaultHeaderFooter` - Footer enabled with page numbers, header disabled

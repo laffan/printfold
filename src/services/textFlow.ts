@@ -108,6 +108,10 @@ export class TextFlowEngine {
   /**
    * Merge static spreads with content spreads
    * Static spreads are appended after content
+   *
+   * Page numbering:
+   * - Spread 0: [page 0 (back cover), page 1 (front cover)]
+   * - Spread N (N > 0): [page 2N, page 2N+1]
    */
   private mergeStaticSpreads(contentSpreads: Spread[], staticSpreads: StaticSpread[]): Spread[] {
     const merged = [...contentSpreads];
@@ -118,9 +122,10 @@ export class TextFlowEngine {
       : 1;
 
     // Convert static spreads to regular spreads
+    // Page numbering continues from content: after N content spreads, next page is 2N
     staticSpreads.forEach((staticSpread, index) => {
       const spreadNumber = baseSpreadNumber + index;
-      const basePageNumber = contentSpreads.length * 2 + index * 2 + 1;
+      const basePageNumber = contentSpreads.length * 2 + index * 2;
 
       // Update page numbers in static spread
       const verso = staticSpread.verso ? {
@@ -652,23 +657,79 @@ export class TextFlowEngine {
 
   /**
    * Create spreads from pages
+   *
+   * For booklet printing, this creates spreads in reading order:
+   * - Spread 1: [Back Cover indicator | Page 1 (front cover)]
+   * - Spread 2: [Page 2 | Page 3]
+   * - Spread 3: [Page 4 | Page 5]
+   * - etc.
+   *
+   * The back cover is a special placeholder that represents where the
+   * last page of the signature will appear when the booklet is folded.
    */
   private createSpreads(pages: PageContent[]): Spread[] {
     const spreads: Spread[] = [];
 
-    // Pad to even number of pages
-    const paddedPages = [...pages];
-    while (paddedPages.length % 2 !== 0) {
-      paddedPages.push(this.createEmptyPage(paddedPages.length + 1, true));
+    // Get previous signatures to preserve items on existing pages
+    const project = appState.getProject();
+    const prevFirstSpread = project.signatures[0]?.spreads[0];
+
+    // Always create the back cover page (page 0) for reading order display
+    // This represents where the last page of the signature appears when folded
+    const backCoverPage = this.createEmptyPage(0, true);
+    backCoverPage.isRecto = false;
+    backCoverPage.isStatic = true; // Back cover is editable like a static page
+    // Preserve items from previous back cover
+    if (prevFirstSpread?.verso?.pageNumber === 0 && prevFirstSpread.verso.items) {
+      backCoverPage.items = prevFirstSpread.verso.items;
+    }
+    if (prevFirstSpread?.verso?.backgroundFill) {
+      backCoverPage.backgroundFill = prevFirstSpread.verso.backgroundFill;
     }
 
-    for (let i = 0; i < paddedPages.length; i += 2) {
-      spreads.push({
-        id: crypto.randomUUID(),
-        spreadNumber: Math.floor(i / 2) + 1,
-        verso: paddedPages[i],
-        recto: paddedPages[i + 1] || null,
-      });
+    // First spread: back cover on left, page 1 (front cover) on right
+    const page1 = pages[0] || this.createEmptyPage(1, true);
+    if (!pages[0]) {
+      page1.isStatic = true; // Make it editable when no content
+      // Preserve items from previous page 1
+      if (prevFirstSpread?.recto?.pageNumber === 1 && prevFirstSpread.recto.items) {
+        page1.items = prevFirstSpread.recto.items;
+      }
+      if (prevFirstSpread?.recto?.backgroundFill) {
+        page1.backgroundFill = prevFirstSpread.recto.backgroundFill;
+      }
+    }
+
+    // Preserve the spread ID if it exists (helps with item references)
+    const spreadId = prevFirstSpread?.id || crypto.randomUUID();
+
+    spreads.push({
+      id: spreadId,
+      spreadNumber: 1,
+      verso: backCoverPage,
+      recto: page1,
+    });
+
+    // If we have content pages, create remaining spreads
+    if (pages.length > 1) {
+      // Remaining pages in reading order: [page 2, page 3], [page 4, page 5], etc.
+      for (let i = 1; i < pages.length; i += 2) {
+        const verso = pages[i];
+        const recto = pages[i + 1] || null;
+
+        spreads.push({
+          id: crypto.randomUUID(),
+          spreadNumber: spreads.length + 1,
+          verso,
+          recto,
+        });
+      }
+
+      // Ensure last spread has a recto if needed
+      const lastSpread = spreads[spreads.length - 1];
+      if (!lastSpread.recto) {
+        lastSpread.recto = this.createEmptyPage(pages.length + 1, true);
+      }
     }
 
     return spreads;
@@ -683,13 +744,16 @@ export class TextFlowEngine {
     const signatures: Signature[] = [];
 
     // Pad spreads to fill complete signatures
+    // Page numbering: spread 0 has [backCover(0) | page1], spread 1 has [page2 | page3], etc.
+    // So spread at index N has pages (N*2) and (N*2 + 1) for N > 0
+    // For padding spreads, continue this pattern
     const paddedSpreads = [...spreads];
     while (paddedSpreads.length % spreadsPerSig !== 0) {
       const emptySpread: Spread = {
         id: crypto.randomUUID(),
         spreadNumber: paddedSpreads.length + 1,
-        verso: this.createEmptyPage(paddedSpreads.length * 2 + 1, true),
-        recto: this.createEmptyPage(paddedSpreads.length * 2 + 2, true),
+        verso: this.createEmptyPage(paddedSpreads.length * 2, true),
+        recto: this.createEmptyPage(paddedSpreads.length * 2 + 1, true),
       };
       paddedSpreads.push(emptySpread);
     }
