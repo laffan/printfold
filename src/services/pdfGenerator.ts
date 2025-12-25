@@ -6,6 +6,7 @@
 import { PDFDocument, PDFPage, PDFImage, rgb, StandardFonts, PDFFont, degrees } from 'pdf-lib';
 import { appState } from './state';
 import { textFlowEngine } from './textFlow';
+import { renderPageToImage } from './pageRenderer';
 import type { Signature, Spread, PageContent, FontStyle, PageItem, TextPageItem, ShapePageItem, ImagePageItem, FillConfig } from '../types';
 import { SHEET_SIZES, calculateSpreadRowsPerSheet } from '../types';
 
@@ -20,6 +21,7 @@ interface FontCache {
 export class PDFGenerator {
   private fontCache: FontCache | null = null;
   private imageCache: Map<string, PDFImage> = new Map();
+  private renderedPageCache: Map<number, PDFImage> = new Map();
 
   /**
    * Sanitize text for WinAnsi encoding (removes emojis and non-Latin characters)
@@ -59,6 +61,9 @@ export class PDFGenerator {
 
     // Embed images used in static pages
     await this.embedImages(pdfDoc, project);
+
+    // Pre-render static/blank pages as high-res images for gradient/pattern/font support
+    await this.preRenderStaticPages(pdfDoc, project);
 
     // Get sheet dimensions
     const sheetSize = SHEET_SIZES[project.outputOptions.sheetSize];
@@ -239,6 +244,20 @@ export class PDFGenerator {
 
     // For blank/static pages, draw items
     if (pageContent.isBlank || pageContent.isStatic) {
+      // Check if we have a pre-rendered image for this page (supports gradients, patterns, custom fonts)
+      const preRenderedImage = this.renderedPageCache.get(pageContent.pageNumber);
+      if (preRenderedImage) {
+        // Draw the pre-rendered image to fill the page
+        pdfPage.drawImage(preRenderedImage, {
+          x,
+          y,
+          width,
+          height,
+        });
+        return;
+      }
+
+      // Fallback: draw items individually (for simple solid colors)
       // Draw this page's items
       if (pageContent.items && pageContent.items.length > 0) {
         this.drawPageItemsClipped(pdfPage, pageContent.items, x, y, width, height, 0, width);
@@ -977,6 +996,72 @@ export class PDFGenerator {
         }
       } catch (error) {
         console.warn(`Error processing image ${file.name}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Pre-render static/blank pages as high-resolution images
+   * This enables support for gradients, patterns, and custom fonts
+   */
+  private async preRenderStaticPages(pdfDoc: PDFDocument, project: ReturnType<typeof appState.getProject>): Promise<void> {
+    this.renderedPageCache.clear();
+
+    // Get page dimensions
+    const sheetSize = SHEET_SIZES[project.outputOptions.sheetSize];
+    let pageWidth: number;
+    let pageHeight: number;
+
+    if (project.outputOptions.bookletSize === 'custom') {
+      pageWidth = project.outputOptions.customWidth || sheetSize.width / 2;
+      pageHeight = project.outputOptions.customHeight || sheetSize.height;
+    } else if (project.outputOptions.bookletSize.startsWith('quarter-')) {
+      pageWidth = sheetSize.width / 2;
+      pageHeight = sheetSize.height / 2;
+    } else {
+      pageWidth = sheetSize.width / 2;
+      pageHeight = sheetSize.height;
+    }
+
+    // Build a map of spreads for finding adjacent pages
+    const spreadForPage: Map<number, Spread> = new Map();
+    for (const sig of project.signatures) {
+      for (const spread of sig.spreads) {
+        if (spread.verso) spreadForPage.set(spread.verso.pageNumber, spread);
+        if (spread.recto) spreadForPage.set(spread.recto.pageNumber, spread);
+      }
+    }
+
+    // Collect static/blank pages that need rendering
+    const pagesToRender: Array<{ page: PageContent; adjacentPage: PageContent | null }> = [];
+
+    for (const sig of project.signatures) {
+      for (const spread of sig.spreads) {
+        const pages = [spread.verso, spread.recto].filter(Boolean) as PageContent[];
+        for (const page of pages) {
+          if ((page.isBlank || page.isStatic) && (page.items?.length || page.backgroundFill)) {
+            const adjacentPage = page.isRecto ? spread.verso : spread.recto;
+            pagesToRender.push({ page, adjacentPage: adjacentPage || null });
+          }
+        }
+      }
+    }
+
+    // Render each page
+    for (const { page, adjacentPage } of pagesToRender) {
+      try {
+        const dataUrl = await renderPageToImage(page, pageWidth, pageHeight, adjacentPage);
+        if (dataUrl) {
+          // Convert data URL to image bytes
+          const base64Data = dataUrl.split(',')[1];
+          const imageBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+
+          // Embed as PNG
+          const pdfImage = await pdfDoc.embedPng(imageBytes);
+          this.renderedPageCache.set(page.pageNumber, pdfImage);
+        }
+      } catch (error) {
+        console.warn(`Failed to pre-render page ${page.pageNumber}:`, error);
       }
     }
   }
