@@ -296,18 +296,17 @@ export function createItemNode(
     let isDuplicateDrag = false;
     let dragStartPositions: Map<string, { x: number; y: number }> = new Map();
     let initialDragPos = { x: 0, y: 0 };
-    let dragStartItemPos = { x: 0, y: 0 }; // Item position (without xOffset)
+    let dragStartItemPositions: Map<string, { x: number; y: number }> = new Map(); // Original item positions for duplication
 
     node.on('dragstart', (e) => {
       const isAltKey = e.evt?.altKey || false;
       let editorState = appState.getEditor();
       let selectedIds = editorState.selectedItemIds;
 
-      // Store initial positions
+      // Store initial node position
       initialDragPos = { x: node!.x(), y: node!.y() };
-      dragStartItemPos = { x: item.x, y: item.y };
 
-      // Option+drag: duplicate items (works even if not pre-selected)
+      // Option+drag: prepare for duplication (but don't duplicate yet - that happens on dragend)
       if (isAltKey) {
         isDuplicateDrag = true;
 
@@ -319,19 +318,27 @@ export function createItemNode(
             selectedPagePosition: position,
           });
           appState.selectItem(item.id, false);
-          selectedIds = [item.id];
         }
 
-        // Create duplicates at exact same position - they stay behind as "originals"
-        // while we continue dragging the actual originals (which become the "copies")
-        appState.duplicateItemsInPlace();
+        // Refresh state after potential selection change
+        editorState = appState.getEditor();
+        selectedIds = editorState.selectedItemIds;
+
+        // Store original item positions for all selected items (for creating duplicates later)
+        dragStartItemPositions.clear();
+        for (const id of selectedIds) {
+          const itemData = appState.getItemFromPage(pageNumber, id);
+          if (itemData) {
+            dragStartItemPositions.set(id, { x: itemData.x, y: itemData.y });
+          }
+        }
       }
 
-      // Refresh state after potential selection change
+      // Refresh state
       editorState = appState.getEditor();
       selectedIds = editorState.selectedItemIds;
 
-      // If this item is part of a multi-selection, store positions of all selected items
+      // If this item is part of a multi-selection, store node positions for synchronized movement
       if (selectedIds.includes(item.id) && selectedIds.length > 1) {
         dragStartPositions.clear();
         for (const id of selectedIds) {
@@ -362,7 +369,7 @@ export function createItemNode(
         });
       }
 
-      // Force transformer to update during drag
+      // Force redraw during drag
       itemsLayer.batchDraw();
     });
 
@@ -371,16 +378,33 @@ export function createItemNode(
       const editorState = appState.getEditor();
       const selectedIds = editorState.selectedItemIds;
 
-      // Calculate the final delta (in item coordinate space, not screen space)
+      // Calculate the final delta
       const dx = node!.x() - initialDragPos.x;
       const dy = node!.y() - initialDragPos.y;
+
+      // If Option+drag, create duplicates at original positions first
+      if (isDuplicateDrag && dragStartItemPositions.size > 0) {
+        // Create duplicates at the original positions (they stay behind)
+        for (const [id, origPos] of dragStartItemPositions) {
+          const itemData = appState.getItemFromPage(pageNumber, id);
+          if (itemData) {
+            const duplicate: PageItem = {
+              ...JSON.parse(JSON.stringify(itemData)),
+              id: crypto.randomUUID(),
+              x: origPos.x,
+              y: origPos.y,
+            };
+            appState.addItemToPage(pageNumber, duplicate);
+          }
+        }
+        dragStartItemPositions.clear();
+      }
 
       // Reset duplicate drag state
       isDuplicateDrag = false;
 
-      // Update all selected items' positions
+      // Update all selected items' positions (these are the "copies" that moved)
       if (selectedIds.includes(item.id) && selectedIds.length > 1) {
-        // Update positions for all selected items using delta
         for (const id of selectedIds) {
           const currentItem = appState.getItemFromPage(pageNumber, id);
           if (currentItem) {
@@ -391,7 +415,7 @@ export function createItemNode(
           }
         }
       } else {
-        // Single item drag - calculate final position from node position
+        // Single item drag
         let newX = node!.x() - xOffset;
         let newY = node!.y();
 
