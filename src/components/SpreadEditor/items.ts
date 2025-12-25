@@ -294,9 +294,9 @@ export function createItemNode(
 
     // Multi-item drag state
     let isDuplicateDrag = false;
-    let dragStartPositions: Map<string, { x: number; y: number }> = new Map();
+    let dragStartNodePositions: Map<string, { x: number; y: number }> = new Map();
     let initialDragPos = { x: 0, y: 0 };
-    let dragStartItemPositions: Map<string, { x: number; y: number }> = new Map(); // Original item positions for duplication
+    let dragStartItemData: Map<string, PageItem> = new Map(); // Store complete item data for duplication
 
     node.on('dragstart', (e) => {
       const isAltKey = e.evt?.altKey || false;
@@ -306,7 +306,7 @@ export function createItemNode(
       // Store initial node position
       initialDragPos = { x: node!.x(), y: node!.y() };
 
-      // Option+drag: prepare for duplication (but don't duplicate yet - that happens on dragend)
+      // Option+drag: prepare for duplication
       if (isAltKey) {
         isDuplicateDrag = true;
 
@@ -324,12 +324,13 @@ export function createItemNode(
         editorState = appState.getEditor();
         selectedIds = editorState.selectedItemIds;
 
-        // Store original item positions for all selected items (for creating duplicates later)
-        dragStartItemPositions.clear();
+        // Store complete item data for all selected items (for creating copies later)
+        dragStartItemData.clear();
         for (const id of selectedIds) {
           const itemData = appState.getItemFromPage(pageNumber, id);
           if (itemData) {
-            dragStartItemPositions.set(id, { x: itemData.x, y: itemData.y });
+            // Deep clone the item data
+            dragStartItemData.set(id, JSON.parse(JSON.stringify(itemData)));
           }
         }
       }
@@ -340,11 +341,13 @@ export function createItemNode(
 
       // If this item is part of a multi-selection, store node positions for synchronized movement
       if (selectedIds.includes(item.id) && selectedIds.length > 1) {
-        dragStartPositions.clear();
+        dragStartNodePositions.clear();
         for (const id of selectedIds) {
-          const otherNode = itemsLayer.findOne((n: Konva.Node) => n.getAttr('itemId') === id);
-          if (otherNode && id !== item.id) {
-            dragStartPositions.set(id, { x: otherNode.x(), y: otherNode.y() });
+          if (id !== item.id) {
+            const otherNode = itemsLayer.findOne((n: Konva.Node) => n.getAttr('itemId') === id);
+            if (otherNode) {
+              dragStartNodePositions.set(id, { x: otherNode.x(), y: otherNode.y() });
+            }
           }
         }
       }
@@ -356,21 +359,20 @@ export function createItemNode(
       const selectedIds = editorState.selectedItemIds;
 
       // If multi-selection, move all other selected items by the same delta
-      if (selectedIds.includes(item.id) && selectedIds.length > 1) {
+      if (selectedIds.includes(item.id) && selectedIds.length > 1 && dragStartNodePositions.size > 0) {
         const dx = node!.x() - initialDragPos.x;
         const dy = node!.y() - initialDragPos.y;
 
-        dragStartPositions.forEach((startPos, id) => {
+        dragStartNodePositions.forEach((startPos, id) => {
           const otherNode = itemsLayer.findOne((n: Konva.Node) => n.getAttr('itemId') === id);
           if (otherNode) {
             otherNode.x(startPos.x + dx);
             otherNode.y(startPos.y + dy);
           }
         });
-      }
 
-      // Force redraw during drag
-      itemsLayer.batchDraw();
+        itemsLayer.batchDraw();
+      }
     });
 
     // Handle drag end to update positions
@@ -382,29 +384,43 @@ export function createItemNode(
       const dx = node!.x() - initialDragPos.x;
       const dy = node!.y() - initialDragPos.y;
 
-      // If Option+drag, create duplicates at original positions first
-      if (isDuplicateDrag && dragStartItemPositions.size > 0) {
-        // Create duplicates at the original positions (they stay behind)
-        for (const [id, origPos] of dragStartItemPositions) {
-          const itemData = appState.getItemFromPage(pageNumber, id);
-          if (itemData) {
-            const duplicate: PageItem = {
-              ...JSON.parse(JSON.stringify(itemData)),
-              id: crypto.randomUUID(),
-              x: origPos.x,
-              y: origPos.y,
-            };
-            appState.addItemToPage(pageNumber, duplicate);
-          }
+      // If Option+drag, create copies at NEW positions and reset originals to their start positions
+      if (isDuplicateDrag && dragStartItemData.size > 0) {
+        const newItemIds: string[] = [];
+
+        // Create copies at the new (dragged) positions
+        for (const [originalId, originalItemData] of dragStartItemData) {
+          // Create a copy with new ID at the NEW position (where user dropped)
+          const copy: PageItem = {
+            ...originalItemData,
+            id: crypto.randomUUID(),
+            x: originalItemData.x + dx,
+            y: originalItemData.y + dy,
+          };
+          appState.addItemToPage(pageNumber, copy);
+          newItemIds.push(copy.id);
+
+          // Reset the original item's visual node position (it will be reset by render anyway)
+          // The original stays at its original position (we don't update it)
         }
-        dragStartItemPositions.clear();
+
+        // Select the new copies
+        if (newItemIds.length > 0) {
+          appState.selectItems(newItemIds);
+        }
+
+        dragStartItemData.clear();
+        isDuplicateDrag = false;
+        dragStartNodePositions.clear();
+        return; // Don't update original positions - they stay where they were
       }
 
       // Reset duplicate drag state
       isDuplicateDrag = false;
 
-      // Update all selected items' positions (these are the "copies" that moved)
+      // Update all selected items' positions
       if (selectedIds.includes(item.id) && selectedIds.length > 1) {
+        // Multi-item drag: update all selected items
         for (const id of selectedIds) {
           const currentItem = appState.getItemFromPage(pageNumber, id);
           if (currentItem) {
@@ -436,7 +452,7 @@ export function createItemNode(
       }
 
       // Clear drag state
-      dragStartPositions.clear();
+      dragStartNodePositions.clear();
     });
 
     // Handle transform end to update size/rotation

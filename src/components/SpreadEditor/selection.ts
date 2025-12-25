@@ -87,9 +87,6 @@ export function createSelectionMarquee(
     const marqueeClientRect = marquee.rect.getClientRect();
     const selectedIds: string[] = [];
 
-    // Debug: log marquee bounds and item count
-    console.log('[Marquee] endMarquee - marquee rect:', marqueeClientRect, 'itemNodes count:', itemNodes.size);
-
     // Check which items intersect with the marquee
     itemNodes.forEach((node, id) => {
       // Skip array instance nodes
@@ -97,17 +94,10 @@ export function createSelectionMarquee(
 
       // Use client rect for both - ensures consistent coordinate system
       const nodeClientRect = node.getClientRect();
-      const doesIntersect = intersects(marqueeClientRect, nodeClientRect);
-
-      // Debug: log each item check
-      console.log('[Marquee] checking item:', id, 'rect:', nodeClientRect, 'intersects:', doesIntersect);
-
-      if (doesIntersect) {
+      if (intersects(marqueeClientRect, nodeClientRect)) {
         selectedIds.push(id);
       }
     });
-
-    console.log('[Marquee] selected items:', selectedIds);
 
     marquee.rect.visible(false);
     marquee.isActive = false;

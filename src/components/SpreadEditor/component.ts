@@ -232,6 +232,8 @@ export class SpreadEditor {
     }
     this.isMarqueeSelecting = false;
     this.updateTransformer();
+    // Force redraw to show transformer immediately
+    this.itemsLayer.batchDraw();
   }
 
   /**
