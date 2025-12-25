@@ -268,15 +268,20 @@ export function createItemNode(
     }
 
     // Handle click to select item and its page
-    node.on('click tap', () => {
+    node.on('click tap', (e) => {
       // Determine page position (verso or recto) based on xOffset
       // xOffset is 0 for verso, pageWidth for recto
       const position = xOffset === 0 ? 'verso' : 'recto';
+      const additive = e.evt?.shiftKey || false;
+
+      // Update page position first
       appState.updateEditor({
-        selectedItemId: item.id,
         selectedPageNumber: pageNumber,
         selectedPagePosition: position,
       });
+
+      // Then select the item (additive for shift+click)
+      appState.selectItem(item.id, additive);
       switchToSelectedTab();
     });
 
@@ -287,6 +292,24 @@ export function createItemNode(
       });
     }
 
+    // Handle Option+drag to duplicate
+    let isDuplicateDrag = false;
+    let originalItemIds: string[] = [];
+
+    node.on('dragstart', (e) => {
+      const editorState = appState.getEditor();
+      const isAltKey = e.evt?.altKey || false;
+
+      // If Alt/Option key is held and this item is selected, duplicate all selected items
+      if (isAltKey && editorState.selectedItemIds.includes(item.id)) {
+        isDuplicateDrag = true;
+        originalItemIds = [...editorState.selectedItemIds];
+
+        // Duplicate all selected items and select the duplicates
+        appState.duplicateSelectedItems();
+      }
+    });
+
     // Handle drag move to keep transformer in sync
     node.on('dragmove', () => {
       // Force transformer to update during drag
@@ -295,6 +318,10 @@ export function createItemNode(
 
     // Handle drag end to update position
     node.on('dragend', () => {
+      // Reset duplicate drag state
+      isDuplicateDrag = false;
+      originalItemIds = [];
+
       let newX = node!.x() - xOffset;
       let newY = node!.y();
 

@@ -22,7 +22,7 @@ import { setupLayoutOptions } from './layoutOptions';
 import { setupHeaderFooterOptions } from './headerFooterOptions';
 import { initFontDropdowns, setupFontOptions, preloadFonts } from './fontOptions';
 import { setupSelectedPagePanel, updateSelectedPagePanel } from './selectedPage';
-import { setupEditPagePanel, updateEditPagePanel, updateEditSelectedSection } from './editPage';
+import { setupEditPagePanel, updateEditPagePanel, updateEditSelectedSection, setupMultiSelectControls } from './editPage';
 import { updateStylesTab } from './stylesTab';
 
 export class OptionsPanel {
@@ -38,6 +38,7 @@ export class OptionsPanel {
     setupFontOptions(debounce);
     setupSelectedPagePanel();
     setupEditPagePanel(updateEditSelectedSection);
+    setupMultiSelectControls();
     initFontDropdowns(this.fontDropdowns);
     this.setupMeasurementUnit();
     setupDraggableCaps();
@@ -52,7 +53,7 @@ export class OptionsPanel {
       updateStylesTab();
     });
 
-    // Listen for editor state changes (selected page, selected item)
+    // Listen for editor state changes (selected page, selected items)
     appState.onEditorChange((state, prevState) => {
       if (state.selectedPageNumber !== prevState.selectedPageNumber ||
           state.selectedPagePosition !== prevState.selectedPagePosition) {
@@ -60,7 +61,10 @@ export class OptionsPanel {
         updateEditPagePanel();
         updateEditSelectedSection();
       }
-      if (state.selectedItemId !== prevState.selectedItemId) {
+      // Update when selected items change
+      const idsChanged = state.selectedItemIds.length !== prevState.selectedItemIds.length ||
+        state.selectedItemIds.some((id, i) => id !== prevState.selectedItemIds[i]);
+      if (idsChanged || state.selectedItemId !== prevState.selectedItemId) {
         updateEditSelectedSection();
       }
     });

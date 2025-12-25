@@ -13,6 +13,7 @@ import { renderThumbnails } from './thumbnails';
 import { drawMarginGuides, getMarginsForPage } from './margins';
 import { drawPageContent } from './content';
 import { switchToSelectedTab } from '../OptionsPanel/editPage';
+import { createSelectionMarquee, showContextMenu, createItemContextMenu, hideContextMenu } from './selection';
 
 export class SpreadEditor {
   private container!: HTMLElement;
@@ -21,6 +22,7 @@ export class SpreadEditor {
   private layer!: Konva.Layer;
   private marginLayer!: Konva.Layer;
   private itemsLayer!: Konva.Layer;
+  private selectionLayer!: Konva.Layer;
   private transformer!: Konva.Transformer;
 
   private currentSpreadIndex = 0;
@@ -34,6 +36,14 @@ export class SpreadEditor {
   private stateUnsubscribe: (() => void) | null = null;
   private projectUnsubscribe: (() => void) | null = null;
   private itemNodes: Map<string, Konva.Node> = new Map();
+
+  // Selection marquee
+  private selectionMarquee!: ReturnType<typeof createSelectionMarquee>;
+  private isMarqueeSelecting = false;
+
+  // Option+drag duplication
+  private isDuplicatingDrag = false;
+  private dragStartPositions: Map<string, { x: number; y: number }> = new Map();
 
   mount(): void {
     this.container = document.getElementById('konva-container')!;
@@ -49,9 +59,11 @@ export class SpreadEditor {
     this.layer = new Konva.Layer();
     this.marginLayer = new Konva.Layer();
     this.itemsLayer = new Konva.Layer();
+    this.selectionLayer = new Konva.Layer();
     this.stage.add(this.layer);
     this.stage.add(this.marginLayer);
     this.stage.add(this.itemsLayer);
+    this.stage.add(this.selectionLayer);
 
     // Create transformer for item selection
     this.transformer = new Konva.Transformer({
@@ -66,6 +78,14 @@ export class SpreadEditor {
       },
     });
     this.itemsLayer.add(this.transformer);
+
+    // Create selection marquee
+    this.selectionMarquee = createSelectionMarquee(
+      this.selectionLayer,
+      this.stage,
+      this.itemNodes,
+      (itemIds) => this.onMarqueeSelectionComplete(itemIds)
+    );
 
     // Set up event handlers
     this.setupControls();
@@ -186,6 +206,35 @@ export class SpreadEditor {
     switchToSelectedTab();
   }
 
+  /**
+   * Handle completion of marquee selection
+   */
+  private onMarqueeSelectionComplete(itemIds: string[]): void {
+    if (itemIds.length > 0) {
+      appState.selectItems(itemIds);
+      switchToSelectedTab();
+    } else {
+      appState.clearSelection();
+    }
+    this.isMarqueeSelecting = false;
+    this.updateTransformer();
+  }
+
+  /**
+   * Handle right-click context menu on items
+   */
+  private showItemContextMenu(e: MouseEvent): void {
+    const editorState = appState.getEditor();
+    const pageNumber = editorState.selectedPageNumber;
+    const itemIds = editorState.selectedItemIds;
+
+    if (pageNumber === null || itemIds.length === 0) return;
+
+    e.preventDefault();
+    const menuItems = createItemContextMenu(pageNumber, itemIds);
+    showContextMenu(e.clientX, e.clientY, menuItems);
+  }
+
   private setupStateListeners(): void {
     // Listen for editor state changes
     this.stateUnsubscribe = appState.onEditorChange((state, prevState) => {
@@ -197,8 +246,10 @@ export class SpreadEditor {
       if (state.marginUnit !== prevState.marginUnit) {
         this.render();
       }
-      // Update transformer when selected item changes
-      if (state.selectedItemId !== prevState.selectedItemId) {
+      // Update transformer when selected items change
+      const idsChanged = state.selectedItemIds.length !== prevState.selectedItemIds.length ||
+        state.selectedItemIds.some((id, i) => id !== prevState.selectedItemIds[i]);
+      if (idsChanged || state.selectedItemId !== prevState.selectedItemId) {
         this.updateTransformer();
       }
     });
@@ -337,14 +388,79 @@ export class SpreadEditor {
       const isOnAnyLayer = target === this.stage ||
                            targetLayer === this.layer ||
                            targetLayer === this.marginLayer ||
-                           targetLayer === this.itemsLayer;
+                           targetLayer === this.itemsLayer ||
+                           targetLayer === this.selectionLayer;
       const isItem = target.getAttr?.('itemId') !== undefined;
       const isTransformer = target.getParent?.()?.getClassName?.() === 'Transformer';
 
-      if (isOnAnyLayer && !isItem && !isTransformer) {
-        // Deselect the item when clicking on background
-        appState.updateEditor({ selectedItemId: null });
-        this.updateTransformer();
+      if (isOnAnyLayer && !isItem && !isTransformer && !this.isMarqueeSelecting) {
+        // Deselect items when clicking on background (unless shift is held)
+        if (!e.evt.shiftKey) {
+          appState.clearSelection();
+          this.updateTransformer();
+        }
+      }
+    });
+
+    // Marquee selection - start on mousedown on empty space
+    this.stage.on('mousedown', (e) => {
+      // Only start marquee on left click on empty space
+      if (e.evt.button !== 0) return;
+      if (e.evt.shiftKey) return; // Shift+click is for panning
+
+      const target = e.target;
+      const isItem = target.getAttr?.('itemId') !== undefined;
+      const isTransformer = target.getParent?.()?.getClassName?.() === 'Transformer';
+
+      // Only start marquee when clicking on background layers
+      if (!isItem && !isTransformer && target !== this.stage) {
+        const pos = this.stage.getPointerPosition();
+        if (pos) {
+          // Convert to stage coordinates
+          const stagePos = {
+            x: (pos.x - this.stage.x()) / this.zoomLevel,
+            y: (pos.y - this.stage.y()) / this.zoomLevel,
+          };
+          this.isMarqueeSelecting = true;
+          this.selectionMarquee.startMarquee(stagePos.x, stagePos.y);
+        }
+      }
+    });
+
+    // Update marquee on mousemove
+    this.stage.on('mousemove', (e) => {
+      if (this.isMarqueeSelecting) {
+        const pos = this.stage.getPointerPosition();
+        if (pos) {
+          const stagePos = {
+            x: (pos.x - this.stage.x()) / this.zoomLevel,
+            y: (pos.y - this.stage.y()) / this.zoomLevel,
+          };
+          this.selectionMarquee.updateMarquee(stagePos.x, stagePos.y);
+        }
+      }
+    });
+
+    // End marquee on mouseup
+    this.stage.on('mouseup', () => {
+      if (this.isMarqueeSelecting) {
+        this.selectionMarquee.endMarquee();
+      }
+    });
+
+    // Right-click context menu
+    this.stage.on('contextmenu', (e) => {
+      e.evt.preventDefault();
+      const target = e.target;
+      const itemId = target.getAttr?.('itemId');
+
+      if (itemId) {
+        // If right-clicking on an item, select it if not already selected
+        const editorState = appState.getEditor();
+        if (!editorState.selectedItemIds.includes(itemId)) {
+          appState.selectItem(itemId);
+        }
+        this.showItemContextMenu(e.evt);
       }
     });
   }
@@ -364,6 +480,7 @@ export class SpreadEditor {
       }
 
       const editorState = appState.getEditor();
+      const hasSelection = editorState.selectedItemIds.length > 0;
 
       // Arrow keys for navigation
       if (e.key === 'ArrowLeft') {
@@ -372,31 +489,54 @@ export class SpreadEditor {
         this.navigateSpread(1);
       }
 
-      // Delete/Backspace to delete selected item
-      if ((e.key === 'Delete' || e.key === 'Backspace') && editorState.selectedItemId && editorState.selectedPageNumber) {
+      // Delete/Backspace to delete selected items
+      if ((e.key === 'Delete' || e.key === 'Backspace') && hasSelection && editorState.selectedPageNumber) {
         e.preventDefault();
-        appState.deleteItemFromPage(editorState.selectedPageNumber, editorState.selectedItemId);
+        appState.deleteSelectedItems();
       }
 
       // Escape to deselect
       if (e.key === 'Escape') {
-        appState.updateEditor({ selectedItemId: null });
+        appState.clearSelection();
+        hideContextMenu();
+      }
+
+      // Copy with Cmd/Ctrl+C
+      if ((e.metaKey || e.ctrlKey) && e.key === 'c' && hasSelection) {
+        e.preventDefault();
+        appState.copyToClipboard();
+      }
+
+      // Paste with Cmd/Ctrl+V
+      if ((e.metaKey || e.ctrlKey) && e.key === 'v' && editorState.clipboard.length > 0 && editorState.selectedPageNumber) {
+        e.preventDefault();
+        appState.pasteFromClipboard();
+        switchToSelectedTab();
       }
 
       // Duplicate with Cmd/Ctrl+D
-      if ((e.metaKey || e.ctrlKey) && e.key === 'd' && editorState.selectedItemId && editorState.selectedPageNumber) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'd' && hasSelection && editorState.selectedPageNumber) {
         e.preventDefault();
-        const item = appState.getItemFromPage(editorState.selectedPageNumber, editorState.selectedItemId);
-        if (item) {
-          const newItem: PageItem = {
-            ...item,
-            id: crypto.randomUUID(),
-            x: item.x + 20,
-            y: item.y + 20,
-          };
-          appState.addItemToPage(editorState.selectedPageNumber, newItem);
-          appState.updateEditor({ selectedItemId: newItem.id });
-          switchToSelectedTab();
+        appState.duplicateSelectedItems();
+        switchToSelectedTab();
+      }
+
+      // Select all with Cmd/Ctrl+A (when on a static page)
+      if ((e.metaKey || e.ctrlKey) && e.key === 'a' && editorState.selectedPageNumber) {
+        const project = appState.getProject();
+        // Find current page and get all item IDs
+        for (const sig of project.signatures) {
+          for (const spread of sig.spreads) {
+            const page = spread.verso?.pageNumber === editorState.selectedPageNumber ? spread.verso :
+                        spread.recto?.pageNumber === editorState.selectedPageNumber ? spread.recto : null;
+            if (page && page.items && page.items.length > 0) {
+              e.preventDefault();
+              const allIds = page.items.map(item => item.id);
+              appState.selectItems(allIds);
+              switchToSelectedTab();
+              return;
+            }
+          }
         }
       }
     });
@@ -780,36 +920,51 @@ export class SpreadEditor {
   }
 
   /**
-   * Update the transformer to attach to the selected item
+   * Update the transformer to attach to selected items
    */
   private updateTransformer(): void {
     const editorState = appState.getEditor();
 
-    if (!editorState.selectedItemId) {
+    if (editorState.selectedItemIds.length === 0) {
       this.transformer.nodes([]);
       this.itemsLayer.draw();
       return;
     }
 
-    const node = this.itemNodes.get(editorState.selectedItemId);
-    if (node) {
-      // Don't attach transformer to images that are still loading
-      if (node.getAttr('imageLoading')) {
-        this.transformer.nodes([]);
-      } else {
-        // Configure transformer based on shape type
-        const className = node.getClassName();
-        if (className === 'Line' || className === 'Arrow') {
-          // Lines and arrows need special handling - disable resize, only allow rotate/move
-          this.transformer.enabledAnchors([]);
-          this.transformer.rotateEnabled(true);
-        } else {
-          // Standard shapes get full anchor set
-          this.transformer.enabledAnchors(['top-left', 'top-right', 'bottom-left', 'bottom-right', 'middle-left', 'middle-right', 'top-center', 'bottom-center']);
-          this.transformer.rotateEnabled(true);
+    // Collect all valid nodes for selected items
+    const nodes: Konva.Node[] = [];
+    let hasLineOrArrow = false;
+
+    for (const itemId of editorState.selectedItemIds) {
+      const node = this.itemNodes.get(itemId);
+      if (node) {
+        // Don't attach transformer to images that are still loading
+        if (!node.getAttr('imageLoading')) {
+          nodes.push(node);
+          const className = node.getClassName();
+          if (className === 'Line' || className === 'Arrow') {
+            hasLineOrArrow = true;
+          }
         }
-        this.transformer.nodes([node]);
       }
+    }
+
+    if (nodes.length > 0) {
+      // Configure transformer based on selection
+      if (hasLineOrArrow && nodes.length === 1) {
+        // Single line/arrow - disable resize, only allow rotate/move
+        this.transformer.enabledAnchors([]);
+        this.transformer.rotateEnabled(true);
+      } else if (nodes.length > 1) {
+        // Multiple items - enable all anchors for group transform
+        this.transformer.enabledAnchors(['top-left', 'top-right', 'bottom-left', 'bottom-right', 'middle-left', 'middle-right', 'top-center', 'bottom-center']);
+        this.transformer.rotateEnabled(true);
+      } else {
+        // Single standard shape
+        this.transformer.enabledAnchors(['top-left', 'top-right', 'bottom-left', 'bottom-right', 'middle-left', 'middle-right', 'top-center', 'bottom-center']);
+        this.transformer.rotateEnabled(true);
+      }
+      this.transformer.nodes(nodes);
     } else {
       this.transformer.nodes([]);
     }

@@ -411,11 +411,13 @@ export interface EditorState {
   selectedPageNumber: number | null;
   selectedSpreadNumber: number | null;
   selectedPagePosition: 'verso' | 'recto' | null; // Which page in the spread is selected
-  selectedItemId: string | null; // Selected item on a static page
+  selectedItemId: string | null; // Selected item on a static page (deprecated, use selectedItemIds)
+  selectedItemIds: string[]; // Multiple selected items
   isDraggingMargin: boolean;
   dragMarginType: 'top' | 'bottom' | 'inner' | 'outer' | null;
   isLocalMarginChange: boolean; // Cmd key held
   zoomLevel: number;
   activeTab: 'editor' | 'preview';
   marginUnit: MarginUnit;
+  clipboard: PageItem[]; // Clipboard for copy/paste
 }
