@@ -37,7 +37,7 @@ const defaultHeadingStyle = (size: number, weight: 'bold' | 'normal' = 'bold'): 
 export const defaultOutputOptions: OutputOptions = {
   sheetSize: 'letter',
   bookletSize: 'quarter-letter',
-  pagesPerSignature: 8,
+  pagesPerSignature: 4, // Default to 4-page signature (2 spreads: back cover/page 1, pages 2-3)
   orientation: 'portrait',
   fillAvailableSpace: true,
   creepEnabled: false,

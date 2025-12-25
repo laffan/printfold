@@ -108,6 +108,10 @@ export class TextFlowEngine {
   /**
    * Merge static spreads with content spreads
    * Static spreads are appended after content
+   *
+   * Page numbering:
+   * - Spread 0: [page 0 (back cover), page 1 (front cover)]
+   * - Spread N (N > 0): [page 2N, page 2N+1]
    */
   private mergeStaticSpreads(contentSpreads: Spread[], staticSpreads: StaticSpread[]): Spread[] {
     const merged = [...contentSpreads];
@@ -118,9 +122,10 @@ export class TextFlowEngine {
       : 1;
 
     // Convert static spreads to regular spreads
+    // Page numbering continues from content: after N content spreads, next page is 2N
     staticSpreads.forEach((staticSpread, index) => {
       const spreadNumber = baseSpreadNumber + index;
-      const basePageNumber = contentSpreads.length * 2 + index * 2 + 1;
+      const basePageNumber = contentSpreads.length * 2 + index * 2;
 
       // Update page numbers in static spread
       const verso = staticSpread.verso ? {
@@ -665,41 +670,45 @@ export class TextFlowEngine {
   private createSpreads(pages: PageContent[]): Spread[] {
     const spreads: Spread[] = [];
 
-    if (pages.length === 0) {
-      return spreads;
+    // Always create the back cover page (page 0) for reading order display
+    // This represents where the last page of the signature appears when folded
+    const backCoverPage = this.createEmptyPage(0, true);
+    backCoverPage.isRecto = false;
+    backCoverPage.isStatic = true; // Back cover is editable like a static page
+
+    // First spread: back cover on left, page 1 (front cover) on right
+    const page1 = pages[0] || this.createEmptyPage(1, true);
+    if (!pages[0]) {
+      page1.isStatic = true; // Make it editable when no content
     }
 
-    // For reading order display, the first spread is [back cover | page 1]
-    // Create a special back cover page for display purposes
-    const backCoverPage = this.createEmptyPage(0, true);
-    (backCoverPage as PageContent & { isBackCover?: boolean }).isBackCover = true;
-    backCoverPage.isRecto = false;
-
-    // First spread: back cover placeholder on left, page 1 on right
     spreads.push({
       id: crypto.randomUUID(),
       spreadNumber: 1,
       verso: backCoverPage,
-      recto: pages[0], // Page 1 on recto (front cover)
+      recto: page1,
     });
 
-    // Remaining pages in reading order: [page 2, page 3], [page 4, page 5], etc.
-    for (let i = 1; i < pages.length; i += 2) {
-      const verso = pages[i];
-      const recto = pages[i + 1] || null;
+    // If we have content pages, create remaining spreads
+    if (pages.length > 1) {
+      // Remaining pages in reading order: [page 2, page 3], [page 4, page 5], etc.
+      for (let i = 1; i < pages.length; i += 2) {
+        const verso = pages[i];
+        const recto = pages[i + 1] || null;
 
-      spreads.push({
-        id: crypto.randomUUID(),
-        spreadNumber: spreads.length + 1,
-        verso,
-        recto,
-      });
-    }
+        spreads.push({
+          id: crypto.randomUUID(),
+          spreadNumber: spreads.length + 1,
+          verso,
+          recto,
+        });
+      }
 
-    // Ensure last spread has a recto if needed
-    const lastSpread = spreads[spreads.length - 1];
-    if (!lastSpread.recto && pages.length > 1) {
-      lastSpread.recto = this.createEmptyPage(pages.length + 1, true);
+      // Ensure last spread has a recto if needed
+      const lastSpread = spreads[spreads.length - 1];
+      if (!lastSpread.recto) {
+        lastSpread.recto = this.createEmptyPage(pages.length + 1, true);
+      }
     }
 
     return spreads;
