@@ -83,23 +83,18 @@ export function createSelectionMarquee(
   function endMarquee(): void {
     if (!marquee.isActive) return;
 
-    // Get marquee bounds in stage coordinates
-    const marqueeBox = {
-      x: marquee.rect.x(),
-      y: marquee.rect.y(),
-      width: marquee.rect.width(),
-      height: marquee.rect.height(),
-    };
+    // Get marquee bounds using client rect for reliable comparison
+    const marqueeClientRect = marquee.rect.getClientRect();
     const selectedIds: string[] = [];
 
-    // Check which items intersect with the marquee using stage coordinates
+    // Check which items intersect with the marquee
     itemNodes.forEach((node, id) => {
       // Skip array instance nodes
       if (node.getAttr('isArrayMember')) return;
 
-      // Get the node's bounding box in stage coordinates
-      const nodeBox = getNodeBoundsInStage(node);
-      if (intersects(marqueeBox, nodeBox)) {
+      // Use client rect for both - ensures consistent coordinate system
+      const nodeClientRect = node.getClientRect();
+      if (intersects(marqueeClientRect, nodeClientRect)) {
         selectedIds.push(id);
       }
     });
