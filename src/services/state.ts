@@ -117,6 +117,7 @@ function createEmptyProject(): BookletProject {
     name: 'Untitled Booklet',
     files: [],
     mainDocument: null,
+    measurementUnit: 'in',
     outputOptions: { ...defaultOutputOptions },
     layoutOptions: JSON.parse(JSON.stringify(defaultLayoutOptions)),
     fontOptions: JSON.parse(JSON.stringify(defaultFontOptions)),
@@ -316,6 +317,17 @@ class AppState {
     this.requestReflow();
   }
 
+  // Measurement unit - project-wide setting
+  getMeasurementUnit(): import('../types').MarginUnit {
+    return this.project.measurementUnit || 'in';
+  }
+
+  setMeasurementUnit(unit: import('../types').MarginUnit): void {
+    this.updateProject({ measurementUnit: unit });
+    // Also update editor marginUnit for backward compatibility
+    this.updateEditor({ marginUnit: unit });
+  }
+
   // Blank pages
   addBlankPage(afterPageNumber: number): void {
     const blankPages = [...this.project.blankPages, afterPageNumber].sort((a, b) => a - b);
@@ -329,82 +341,259 @@ class AppState {
     this.requestReflow();
   }
 
+  // Static spreads (exist independently of markdown)
+  addStaticSpread(): void {
+    const prevState = this.project;
+    const staticSpreads = [...(this.project.staticSpreads || [])];
+
+    const newIndex = staticSpreads.length;
+    const basePageNumber = 1000 + newIndex * 2; // Use high numbers to avoid conflicts
+
+    const newSpread: import('../types').StaticSpread = {
+      id: crypto.randomUUID(),
+      index: newIndex,
+      verso: {
+        id: crypto.randomUUID(),
+        pageNumber: basePageNumber,
+        sections: [],
+        isBlank: true,
+        isRecto: false,
+        isStatic: true,
+        items: [],
+      },
+      recto: {
+        id: crypto.randomUUID(),
+        pageNumber: basePageNumber + 1,
+        sections: [],
+        isBlank: true,
+        isRecto: true,
+        isStatic: true,
+        items: [],
+      },
+    };
+
+    staticSpreads.push(newSpread);
+    this.project = { ...this.project, staticSpreads };
+    this.notifyProjectListeners(prevState);
+
+    // Trigger reflow to merge static spreads
+    this.requestReflow();
+  }
+
+  addStaticPage(position: 'verso' | 'recto' = 'recto'): void {
+    const prevState = this.project;
+    const staticSpreads = [...(this.project.staticSpreads || [])];
+
+    // Find the last static spread or create a new one
+    let targetSpread = staticSpreads[staticSpreads.length - 1];
+    const basePageNumber = 1000 + staticSpreads.length * 2;
+
+    // If no spreads exist, or the last spread already has a page in the requested position
+    if (!targetSpread || (position === 'verso' && targetSpread.verso) || (position === 'recto' && targetSpread.recto)) {
+      // Create a new spread with just this page
+      const newSpread: import('../types').StaticSpread = {
+        id: crypto.randomUUID(),
+        index: staticSpreads.length,
+        verso: position === 'verso' ? {
+          id: crypto.randomUUID(),
+          pageNumber: basePageNumber,
+          sections: [],
+          isBlank: true,
+          isRecto: false,
+          isStatic: true,
+          items: [],
+        } : null,
+        recto: position === 'recto' ? {
+          id: crypto.randomUUID(),
+          pageNumber: basePageNumber + 1,
+          sections: [],
+          isBlank: true,
+          isRecto: true,
+          isStatic: true,
+          items: [],
+        } : null,
+      };
+      staticSpreads.push(newSpread);
+    } else {
+      // Add page to existing spread
+      const pageNumber = position === 'verso' ? basePageNumber - 2 : basePageNumber - 1;
+      targetSpread[position] = {
+        id: crypto.randomUUID(),
+        pageNumber,
+        sections: [],
+        isBlank: true,
+        isRecto: position === 'recto',
+        isStatic: true,
+        items: [],
+      };
+    }
+
+    this.project = { ...this.project, staticSpreads };
+    this.notifyProjectListeners(prevState);
+    this.requestReflow();
+  }
+
+  removeStaticSpread(spreadId: string): void {
+    const prevState = this.project;
+    const staticSpreads = (this.project.staticSpreads || []).filter(s => s.id !== spreadId);
+
+    // Reindex remaining spreads
+    staticSpreads.forEach((spread, index) => {
+      spread.index = index;
+    });
+
+    this.project = { ...this.project, staticSpreads };
+    this.notifyProjectListeners(prevState);
+    this.requestReflow();
+  }
+
+  getStaticSpreads(): import('../types').StaticSpread[] {
+    return this.project.staticSpreads || [];
+  }
+
+  // Spanning items (items that bridge across verso and recto)
+  addSpanningItemToSpread(spreadId: string, item: import('../types').SpanningItem): void {
+    const prevState = this.project;
+    const staticSpreads = (this.project.staticSpreads || []).map(spread => {
+      if (spread.id !== spreadId) return spread;
+      return {
+        ...spread,
+        spanningItems: [...(spread.spanningItems || []), item],
+      };
+    });
+    this.project = { ...this.project, staticSpreads };
+    this.notifyProjectListeners(prevState);
+  }
+
+  updateSpanningItem(spreadId: string, itemId: string, updates: Partial<import('../types').SpanningItem>): void {
+    const prevState = this.project;
+    const staticSpreads = (this.project.staticSpreads || []).map(spread => {
+      if (spread.id !== spreadId) return spread;
+      return {
+        ...spread,
+        spanningItems: (spread.spanningItems || []).map(item =>
+          item.id === itemId ? { ...item, ...updates } as import('../types').SpanningItem : item
+        ),
+      };
+    });
+    this.project = { ...this.project, staticSpreads };
+    this.notifyProjectListeners(prevState);
+  }
+
+  deleteSpanningItem(spreadId: string, itemId: string): void {
+    const prevState = this.project;
+    const staticSpreads = (this.project.staticSpreads || []).map(spread => {
+      if (spread.id !== spreadId) return spread;
+      return {
+        ...spread,
+        spanningItems: (spread.spanningItems || []).filter(item => item.id !== itemId),
+      };
+    });
+    this.project = { ...this.project, staticSpreads };
+    this.notifyProjectListeners(prevState);
+
+    if (this.editor.selectedItemId === itemId) {
+      this.updateEditor({ selectedItemId: null });
+    }
+  }
+
   // Page items (for static pages)
   addItemToPage(pageNumber: number, item: PageItem): void {
     const prevState = this.project;
 
+    // Helper to update a page
+    const updatePage = (page: import('../types').PageContent | null) => {
+      if (!page || page.pageNumber !== pageNumber) return page;
+      return {
+        ...page,
+        items: [...(page.items || []), item],
+      };
+    };
+
     // Find the page in signatures and add the item
     const signatures = this.project.signatures.map(sig => ({
       ...sig,
-      spreads: sig.spreads.map(spread => {
-        const updatePage = (page: typeof spread.verso) => {
-          if (!page || page.pageNumber !== pageNumber) return page;
-          return {
-            ...page,
-            items: [...(page.items || []), item],
-          };
-        };
-        return {
-          ...spread,
-          verso: updatePage(spread.verso),
-          recto: updatePage(spread.recto),
-        };
-      }),
+      spreads: sig.spreads.map(spread => ({
+        ...spread,
+        verso: updatePage(spread.verso),
+        recto: updatePage(spread.recto),
+      })),
     }));
 
-    this.project = { ...this.project, signatures };
+    // Also check static spreads
+    const staticSpreads = (this.project.staticSpreads || []).map(spread => ({
+      ...spread,
+      verso: updatePage(spread.verso),
+      recto: updatePage(spread.recto),
+    }));
+
+    this.project = { ...this.project, signatures, staticSpreads };
     this.notifyProjectListeners(prevState);
   }
 
   updateItemOnPage(pageNumber: number, itemId: string, updates: Partial<PageItem>): void {
     const prevState = this.project;
 
+    // Helper to update a page
+    const updatePage = (page: import('../types').PageContent | null) => {
+      if (!page || page.pageNumber !== pageNumber) return page;
+      return {
+        ...page,
+        items: (page.items || []).map(item =>
+          item.id === itemId ? { ...item, ...updates } as PageItem : item
+        ),
+      };
+    };
+
     const signatures = this.project.signatures.map(sig => ({
       ...sig,
-      spreads: sig.spreads.map(spread => {
-        const updatePage = (page: typeof spread.verso) => {
-          if (!page || page.pageNumber !== pageNumber) return page;
-          return {
-            ...page,
-            items: (page.items || []).map(item =>
-              item.id === itemId ? { ...item, ...updates } as PageItem : item
-            ),
-          };
-        };
-        return {
-          ...spread,
-          verso: updatePage(spread.verso),
-          recto: updatePage(spread.recto),
-        };
-      }),
+      spreads: sig.spreads.map(spread => ({
+        ...spread,
+        verso: updatePage(spread.verso),
+        recto: updatePage(spread.recto),
+      })),
     }));
 
-    this.project = { ...this.project, signatures };
+    // Also check static spreads
+    const staticSpreads = (this.project.staticSpreads || []).map(spread => ({
+      ...spread,
+      verso: updatePage(spread.verso),
+      recto: updatePage(spread.recto),
+    }));
+
+    this.project = { ...this.project, signatures, staticSpreads };
     this.notifyProjectListeners(prevState);
   }
 
   deleteItemFromPage(pageNumber: number, itemId: string): void {
     const prevState = this.project;
 
+    // Helper to update a page
+    const updatePage = (page: import('../types').PageContent | null) => {
+      if (!page || page.pageNumber !== pageNumber) return page;
+      return {
+        ...page,
+        items: (page.items || []).filter(item => item.id !== itemId),
+      };
+    };
+
     const signatures = this.project.signatures.map(sig => ({
       ...sig,
-      spreads: sig.spreads.map(spread => {
-        const updatePage = (page: typeof spread.verso) => {
-          if (!page || page.pageNumber !== pageNumber) return page;
-          return {
-            ...page,
-            items: (page.items || []).filter(item => item.id !== itemId),
-          };
-        };
-        return {
-          ...spread,
-          verso: updatePage(spread.verso),
-          recto: updatePage(spread.recto),
-        };
-      }),
+      spreads: sig.spreads.map(spread => ({
+        ...spread,
+        verso: updatePage(spread.verso),
+        recto: updatePage(spread.recto),
+      })),
     }));
 
-    this.project = { ...this.project, signatures };
+    // Also check static spreads
+    const staticSpreads = (this.project.staticSpreads || []).map(spread => ({
+      ...spread,
+      verso: updatePage(spread.verso),
+      recto: updatePage(spread.recto),
+    }));
+
+    this.project = { ...this.project, signatures, staticSpreads };
     this.notifyProjectListeners(prevState);
 
     // Clear selection if the deleted item was selected
@@ -413,18 +602,153 @@ class AppState {
     }
   }
 
-  getItemFromPage(pageNumber: number, itemId: string): PageItem | null {
+  updatePageBackground(pageNumber: number, backgroundFill: import('../types').FillConfig | undefined): void {
+    const prevState = this.project;
+
+    // Helper to update a page
+    const updatePage = (page: import('../types').PageContent | null) => {
+      if (!page || page.pageNumber !== pageNumber) return page;
+      return { ...page, backgroundFill };
+    };
+
+    const signatures = this.project.signatures.map(sig => ({
+      ...sig,
+      spreads: sig.spreads.map(spread => ({
+        ...spread,
+        verso: updatePage(spread.verso),
+        recto: updatePage(spread.recto),
+      })),
+    }));
+
+    // Also check static spreads
+    const staticSpreads = (this.project.staticSpreads || []).map(spread => ({
+      ...spread,
+      verso: updatePage(spread.verso),
+      recto: updatePage(spread.recto),
+    }));
+
+    this.project = { ...this.project, signatures, staticSpreads };
+    this.notifyProjectListeners(prevState);
+  }
+
+  getPageBackground(pageNumber: number): import('../types').FillConfig | undefined {
+    // Check signatures
     for (const sig of this.project.signatures) {
       for (const spread of sig.spreads) {
-        const checkPage = (page: typeof spread.verso) => {
-          if (!page || page.pageNumber !== pageNumber) return null;
-          return page.items?.find(item => item.id === itemId) || null;
-        };
+        if (spread.verso?.pageNumber === pageNumber) return spread.verso.backgroundFill;
+        if (spread.recto?.pageNumber === pageNumber) return spread.recto.backgroundFill;
+      }
+    }
+    // Check static spreads
+    for (const spread of this.project.staticSpreads || []) {
+      if (spread.verso?.pageNumber === pageNumber) return spread.verso.backgroundFill;
+      if (spread.recto?.pageNumber === pageNumber) return spread.recto.backgroundFill;
+    }
+    return undefined;
+  }
+
+  getItemFromPage(pageNumber: number, itemId: string): PageItem | null {
+    const checkPage = (page: import('../types').PageContent | null) => {
+      if (!page || page.pageNumber !== pageNumber) return null;
+      return page.items?.find(item => item.id === itemId) || null;
+    };
+
+    // Check signatures
+    for (const sig of this.project.signatures) {
+      for (const spread of sig.spreads) {
         const item = checkPage(spread.verso) || checkPage(spread.recto);
         if (item) return item;
       }
     }
+    // Check static spreads
+    for (const spread of this.project.staticSpreads || []) {
+      const item = checkPage(spread.verso) || checkPage(spread.recto);
+      if (item) return item;
+    }
     return null;
+  }
+
+  /**
+   * Move item to the front (highest z-index) on its page
+   */
+  bringItemToFront(pageNumber: number, itemId: string): void {
+    this.reorderItemInPage(pageNumber, itemId, 'front');
+  }
+
+  /**
+   * Move item to the back (lowest z-index) on its page
+   */
+  sendItemToBack(pageNumber: number, itemId: string): void {
+    this.reorderItemInPage(pageNumber, itemId, 'back');
+  }
+
+  /**
+   * Move item one step forward in z-order
+   */
+  moveItemForward(pageNumber: number, itemId: string): void {
+    this.reorderItemInPage(pageNumber, itemId, 'forward');
+  }
+
+  /**
+   * Move item one step backward in z-order
+   */
+  moveItemBackward(pageNumber: number, itemId: string): void {
+    this.reorderItemInPage(pageNumber, itemId, 'backward');
+  }
+
+  /**
+   * Internal helper to reorder items on a page
+   */
+  private reorderItemInPage(pageNumber: number, itemId: string, direction: 'front' | 'back' | 'forward' | 'backward'): void {
+    const prevState = this.project;
+
+    const signatures = this.project.signatures.map(sig => ({
+      ...sig,
+      spreads: sig.spreads.map(spread => {
+        const updatePage = (page: typeof spread.verso) => {
+          if (!page || page.pageNumber !== pageNumber || !page.items) return page;
+
+          const items = [...page.items];
+          const index = items.findIndex(item => item.id === itemId);
+          if (index === -1) return page;
+
+          const [item] = items.splice(index, 1);
+
+          switch (direction) {
+            case 'front':
+              items.push(item);
+              break;
+            case 'back':
+              items.unshift(item);
+              break;
+            case 'forward':
+              if (index < items.length) {
+                items.splice(index + 1, 0, item);
+              } else {
+                items.push(item);
+              }
+              break;
+            case 'backward':
+              if (index > 0) {
+                items.splice(index - 1, 0, item);
+              } else {
+                items.unshift(item);
+              }
+              break;
+          }
+
+          return { ...page, items };
+        };
+        return {
+          ...spread,
+          verso: updatePage(spread.verso),
+          recto: updatePage(spread.recto),
+        };
+      }),
+    }));
+
+    this.project = { ...this.project, signatures };
+    this.notifyProjectListeners(prevState);
   }
 
   // Reflow

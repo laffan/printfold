@@ -15,6 +15,7 @@ import type {
   HeaderFooterOptions,
   FontStyle,
   Margins,
+  StaticSpread,
 } from '../types';
 import { SHEET_SIZES } from '../types';
 import { appState } from './state';
@@ -82,16 +83,65 @@ export class TextFlowEngine {
     // Insert blank pages
     const pagesWithBlanks = this.insertBlankPages(pages, project.blankPages);
 
-    // Create spreads and signatures
-    const spreads = this.createSpreads(pagesWithBlanks);
+    // Create spreads and signatures from markdown content
+    let spreads = this.createSpreads(pagesWithBlanks);
+
+    // Merge static spreads (independent of markdown)
+    const staticSpreads = project.staticSpreads || [];
+    if (staticSpreads.length > 0) {
+      spreads = this.mergeStaticSpreads(spreads, staticSpreads);
+    }
+
     const signatures = this.createSignatures(spreads);
+
+    // Calculate total pages including static spreads
+    const totalPages = pagesWithBlanks.length + staticSpreads.length * 2;
 
     return {
       pages: pagesWithBlanks,
       spreads,
       signatures,
-      totalPages: pagesWithBlanks.length,
+      totalPages,
     };
+  }
+
+  /**
+   * Merge static spreads with content spreads
+   * Static spreads are appended after content
+   */
+  private mergeStaticSpreads(contentSpreads: Spread[], staticSpreads: StaticSpread[]): Spread[] {
+    const merged = [...contentSpreads];
+
+    // Calculate base spread number for static spreads
+    const baseSpreadNumber = merged.length > 0
+      ? Math.max(...merged.map(s => s.spreadNumber)) + 1
+      : 1;
+
+    // Convert static spreads to regular spreads
+    staticSpreads.forEach((staticSpread, index) => {
+      const spreadNumber = baseSpreadNumber + index;
+      const basePageNumber = contentSpreads.length * 2 + index * 2 + 1;
+
+      // Update page numbers in static spread
+      const verso = staticSpread.verso ? {
+        ...staticSpread.verso,
+        pageNumber: basePageNumber,
+      } : null;
+
+      const recto = staticSpread.recto ? {
+        ...staticSpread.recto,
+        pageNumber: basePageNumber + 1,
+      } : null;
+
+      merged.push({
+        id: staticSpread.id,
+        spreadNumber,
+        verso,
+        recto,
+      });
+    });
+
+    return merged;
   }
 
   /**

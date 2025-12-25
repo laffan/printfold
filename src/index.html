@@ -41,6 +41,9 @@
           <div id="file-list" class="file-list"></div>
         </div>
 
+        <!-- Resizer between Files and Preview -->
+        <div class="panel-resizer" data-resizer="files-preview"></div>
+
         <!-- File Preview / Editor -->
         <div class="panel panel-preview">
           <div class="panel-header collapsible">
@@ -55,6 +58,9 @@
           </div>
         </div>
       </section>
+
+      <!-- Resizer between Input and Editor -->
+      <div class="column-resizer" data-resizer="input-editor"></div>
 
       <!-- Column 2: Editor / Preview -->
       <section class="column column-editor">
@@ -78,13 +84,38 @@
                 <button id="btn-zoom-fit" class="btn btn-icon" title="Fit to View">⊡</button>
               </div>
               <div class="toolbar-group">
-                <button id="btn-add-blank-page" class="btn btn-secondary btn-small">+ Blank Page</button>
+                <button id="btn-add-blank-page" class="btn btn-secondary btn-small">+ Spread</button>
+                <button id="btn-add-single-page" class="btn btn-secondary btn-small">+ Page</button>
               </div>
               <div class="toolbar-group">
                 <label class="toolbar-label">
                   <input type="checkbox" id="chk-show-margins">
                   <span>Show Margins</span>
                 </label>
+              </div>
+              <div class="toolbar-spacer"></div>
+              <div id="toolbar-add-items" class="toolbar-group toolbar-add-items" style="display: none;">
+                <button id="btn-add-text" class="btn btn-icon" title="Add Text">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2 3h12v2H9v8H7V5H2V3z"/></svg>
+                </button>
+                <button id="btn-add-rect" class="btn btn-icon" title="Add Rectangle">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1"/></svg>
+                </button>
+                <button id="btn-add-ellipse" class="btn btn-icon" title="Add Ellipse">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="8" cy="8" rx="6" ry="4"/></svg>
+                </button>
+                <button id="btn-add-circle" class="btn btn-icon" title="Add Circle">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="5"/></svg>
+                </button>
+                <button id="btn-add-line" class="btn btn-icon" title="Add Line">
+                  <svg width="16" height="16" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.5"><line x1="2" y1="14" x2="14" y2="2"/></svg>
+                </button>
+                <button id="btn-add-arrow" class="btn btn-icon" title="Add Arrow">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2 8.5h10.5l-3.5 3.5 1 1 5.5-5.5L10 2l-1 1 3.5 3.5H2v2z"/></svg>
+                </button>
+                <button id="btn-add-image" class="btn btn-icon" title="Add Image">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1"/><circle cx="5.5" cy="6.5" r="1.5" fill="currentColor"/><path d="M2 11l3-3 2 2 4-4 3 3"/></svg>
+                </button>
               </div>
             </div>
             <div id="spread-editor" class="spread-editor">
@@ -108,10 +139,74 @@
         </div>
       </section>
 
+      <!-- Resizer between Editor and Options -->
+      <div class="column-resizer" data-resizer="editor-options"></div>
+
       <!-- Column 3: Options -->
       <section class="column column-options">
         <div class="column-header">
           <h2>Options</h2>
+        </div>
+
+        <!-- Info Panel (Document + Selected Page) -->
+        <div class="panel panel-info" data-panel="info">
+          <div class="panel-header collapsible">
+            <h3>Info</h3>
+            <span class="collapse-icon">▼</span>
+          </div>
+          <div class="panel-content">
+            <!-- Measurement Unit -->
+            <div class="info-item">
+              <span class="info-label">Units:</span>
+              <select id="opt-measurement-unit" class="info-value unit-select">
+                <option value="in">Inches</option>
+                <option value="cm">Centimeters</option>
+                <option value="pt">Points</option>
+                <option value="px">Pixels</option>
+              </select>
+            </div>
+            <div class="section-divider"></div>
+            <!-- Document Info -->
+            <div class="info-item">
+              <span class="info-label">Pages:</span>
+              <span id="info-pages" class="info-value">0</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Spreads:</span>
+              <span id="info-spreads" class="info-value">0</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Signatures:</span>
+              <span id="info-signatures" class="info-value">0</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Sheets:</span>
+              <span id="info-sheets" class="info-value">0</span>
+            </div>
+
+            <!-- Selected Page Info (shown when a page is selected) -->
+            <div id="selected-page-section" class="selected-page-section" style="display: none;">
+              <div class="section-divider"></div>
+              <div class="info-item">
+                <span class="info-label">Selected:</span>
+                <span id="selected-page-number" class="info-value">–</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Position:</span>
+                <span id="selected-page-position" class="info-value">–</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Type:</span>
+                <span id="selected-page-type" class="info-value">–</span>
+              </div>
+              <div id="static-page-actions" class="page-actions" style="display: none;">
+                <button id="btn-delete-page" class="btn btn-secondary btn-small btn-danger">Delete Page</button>
+              </div>
+              <div id="normal-page-actions" class="page-actions" style="display: none;">
+                <button id="btn-add-blank-after" class="btn btn-secondary btn-small">Add Blank Page After</button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Output Options -->
@@ -152,13 +247,17 @@
               <div class="inline-inputs">
                 <label>
                   <span>Width</span>
-                  <input type="number" id="opt-custom-width" step="0.1" min="1">
-                  <span class="unit">pt</span>
+                  <div class="input-with-cap">
+                    <input type="number" id="opt-custom-width" step="0.1" min="1">
+                    <span class="input-cap" data-for="opt-custom-width" id="custom-width-unit">in</span>
+                  </div>
                 </label>
                 <label>
                   <span>Height</span>
-                  <input type="number" id="opt-custom-height" step="0.1" min="1">
-                  <span class="unit">pt</span>
+                  <div class="input-with-cap">
+                    <input type="number" id="opt-custom-height" step="0.1" min="1">
+                    <span class="input-cap" data-for="opt-custom-height" id="custom-height-unit">in</span>
+                  </div>
                 </label>
               </div>
             </div>
@@ -184,31 +283,35 @@
           </div>
           <div class="panel-content">
             <div class="form-group">
-              <div class="label-with-dropdown">
-                <label>Margins</label>
-                <select id="opt-margin-unit" class="unit-dropdown">
-                  <option value="pt">Points</option>
-                  <option value="in" selected>Inches</option>
-                  <option value="cm">Centimeters</option>
-                  <option value="px">Pixels</option>
-                </select>
-              </div>
+              <label>Margins</label>
               <div class="margin-inputs">
                 <label>
                   <span>Top</span>
-                  <input type="number" id="opt-margin-top" value="54" min="0" step="any">
+                  <div class="input-with-cap">
+                    <input type="number" id="opt-margin-top" value="54" min="0" step="any">
+                    <span class="input-cap" data-for="opt-margin-top">in</span>
+                  </div>
                 </label>
                 <label>
                   <span>Bottom</span>
-                  <input type="number" id="opt-margin-bottom" value="54" min="0" step="any">
+                  <div class="input-with-cap">
+                    <input type="number" id="opt-margin-bottom" value="54" min="0" step="any">
+                    <span class="input-cap" data-for="opt-margin-bottom">in</span>
+                  </div>
                 </label>
                 <label>
                   <span>Inner</span>
-                  <input type="number" id="opt-margin-inner" value="54" min="0" step="any">
+                  <div class="input-with-cap">
+                    <input type="number" id="opt-margin-inner" value="54" min="0" step="any">
+                    <span class="input-cap" data-for="opt-margin-inner">in</span>
+                  </div>
                 </label>
                 <label>
                   <span>Outer</span>
-                  <input type="number" id="opt-margin-outer" value="36" min="0" step="any">
+                  <div class="input-with-cap">
+                    <input type="number" id="opt-margin-outer" value="36" min="0" step="any">
+                    <span class="input-cap" data-for="opt-margin-outer">in</span>
+                  </div>
                 </label>
               </div>
             </div>
@@ -219,16 +322,25 @@
               </label>
             </div>
             <div class="form-group">
-              <label for="opt-spacing-h1">Spacing above H1 (pt)</label>
-              <input type="number" id="opt-spacing-h1" value="72" min="0">
+              <label for="opt-spacing-h1">Spacing above H1</label>
+              <div class="input-with-cap">
+                <input type="number" id="opt-spacing-h1" value="72" min="0">
+                <span class="input-cap" data-for="opt-spacing-h1">pt</span>
+              </div>
             </div>
             <div class="form-group">
               <label for="opt-line-height">Line Height</label>
-              <input type="number" id="opt-line-height" value="1.5" min="1" max="3" step="0.1">
+              <div class="input-with-cap">
+                <input type="number" id="opt-line-height" value="1.5" min="1" max="3" step="0.1">
+                <span class="input-cap" data-for="opt-line-height">×</span>
+              </div>
             </div>
             <div class="form-group">
-              <label for="opt-paragraph-spacing">Paragraph Spacing (pt)</label>
-              <input type="number" id="opt-paragraph-spacing" value="12" min="0">
+              <label for="opt-paragraph-spacing">Paragraph Spacing</label>
+              <div class="input-with-cap">
+                <input type="number" id="opt-paragraph-spacing" value="12" min="0">
+                <span class="input-cap" data-for="opt-paragraph-spacing">pt</span>
+              </div>
             </div>
           </div>
         </div>
@@ -268,7 +380,10 @@
                 </label>
                 <label>
                   <span>Size</span>
-                  <input type="number" id="opt-header-font-size" value="10" min="6" max="16">
+                  <div class="input-with-cap">
+                    <input type="number" id="opt-header-font-size" value="10" min="6" max="16">
+                    <span class="input-cap" data-for="opt-header-font-size">pt</span>
+                  </div>
                 </label>
                 <label>
                   <span>Color</span>
@@ -311,7 +426,10 @@
                 </label>
                 <label>
                   <span>Size</span>
-                  <input type="number" id="opt-footer-font-size" value="10" min="6" max="16">
+                  <div class="input-with-cap">
+                    <input type="number" id="opt-footer-font-size" value="10" min="6" max="16">
+                    <span class="input-cap" data-for="opt-footer-font-size">pt</span>
+                  </div>
                 </label>
                 <label>
                   <span>Color</span>
@@ -345,11 +463,17 @@
               <div class="form-group inline-sizes">
                 <label>
                   <span>Size</span>
-                  <input type="number" id="opt-font-size-body" value="12" min="6" max="24">
+                  <div class="input-with-cap">
+                    <input type="number" id="opt-font-size-body" value="12" min="6" max="24">
+                    <span class="input-cap" data-for="opt-font-size-body">pt</span>
+                  </div>
                 </label>
                 <label>
                   <span>Line Height</span>
-                  <input type="number" id="opt-line-height-fonts" value="1.5" min="1" max="3" step="0.1">
+                  <div class="input-with-cap">
+                    <input type="number" id="opt-line-height-fonts" value="1.5" min="1" max="3" step="0.1">
+                    <span class="input-cap" data-for="opt-line-height-fonts">×</span>
+                  </div>
                 </label>
               </div>
               <div class="form-group inline-sizes">
@@ -380,15 +504,24 @@
               <div class="form-group inline-sizes">
                 <label>
                   <span>H1</span>
-                  <input type="number" id="opt-font-size-h1" value="24" min="12" max="72">
+                  <div class="input-with-cap">
+                    <input type="number" id="opt-font-size-h1" value="24" min="12" max="72">
+                    <span class="input-cap" data-for="opt-font-size-h1">pt</span>
+                  </div>
                 </label>
                 <label>
                   <span>H2</span>
-                  <input type="number" id="opt-font-size-h2" value="20" min="10" max="48">
+                  <div class="input-with-cap">
+                    <input type="number" id="opt-font-size-h2" value="20" min="10" max="48">
+                    <span class="input-cap" data-for="opt-font-size-h2">pt</span>
+                  </div>
                 </label>
                 <label>
                   <span>H3</span>
-                  <input type="number" id="opt-font-size-h3" value="16" min="8" max="36">
+                  <div class="input-with-cap">
+                    <input type="number" id="opt-font-size-h3" value="16" min="8" max="36">
+                    <span class="input-cap" data-for="opt-font-size-h3">pt</span>
+                  </div>
                 </label>
               </div>
               <div class="form-group">
@@ -399,82 +532,60 @@
           </div>
         </div>
 
-        <!-- Selected Page Panel -->
-        <div id="selected-page-panel" class="panel panel-selected-page" style="display: none;">
-          <div class="panel-header">
-            <h3>Selected Page</h3>
-          </div>
-          <div class="panel-content">
-            <div class="info-item">
-              <span class="info-label">Page:</span>
-              <span id="selected-page-number" class="info-value">–</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Position:</span>
-              <span id="selected-page-position" class="info-value">–</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Type:</span>
-              <span id="selected-page-type" class="info-value">–</span>
-            </div>
-            <div id="static-page-actions" class="page-actions" style="display: none;">
-              <button id="btn-delete-page" class="btn btn-secondary btn-small btn-danger">Delete Page</button>
-            </div>
-            <div id="normal-page-actions" class="page-actions" style="display: none;">
-              <button id="btn-add-blank-after" class="btn btn-secondary btn-small">Add Blank Page After</button>
-            </div>
-          </div>
-        </div>
-
         <!-- Edit Page Panel (for static pages) -->
         <div id="edit-page-panel" class="panel panel-edit-page" style="display: none;">
           <div class="panel-header">
-            <h3>Edit Page</h3>
+            <h3>Edit Selected</h3>
           </div>
-          <div class="panel-content">
-            <!-- Add Section -->
-            <div class="edit-section">
-              <h4 class="edit-section-header">Add</h4>
-              <div class="add-buttons">
-                <button id="btn-add-text" class="btn btn-secondary btn-small">+ Text</button>
-                <button id="btn-add-rect" class="btn btn-secondary btn-small">+ Rectangle</button>
-                <button id="btn-add-ellipse" class="btn btn-secondary btn-small">+ Ellipse</button>
-                <button id="btn-add-line" class="btn btn-secondary btn-small">+ Line</button>
-                <button id="btn-add-image" class="btn btn-secondary btn-small">+ Image</button>
-              </div>
-            </div>
-
-            <!-- Edit Selected Section -->
-            <div id="edit-selected-section" class="edit-section" style="display: none;">
-              <h4 class="edit-section-header">Edit Selected</h4>
-
+          <div id="edit-selected-section" class="panel-content" style="display: none;">
               <!-- Common properties -->
               <div class="edit-properties">
                 <div class="form-group inline-sizes">
                   <label>
                     <span>X</span>
-                    <input type="number" id="item-x" step="1">
+                    <div class="input-with-cap">
+                      <input type="number" id="item-x" step="1">
+                      <span class="input-cap" data-for="item-x">px</span>
+                    </div>
                   </label>
                   <label>
                     <span>Y</span>
-                    <input type="number" id="item-y" step="1">
+                    <div class="input-with-cap">
+                      <input type="number" id="item-y" step="1">
+                      <span class="input-cap" data-for="item-y">px</span>
+                    </div>
                   </label>
                 </div>
                 <div class="form-group inline-sizes">
                   <label>
                     <span>W</span>
-                    <input type="number" id="item-width" step="1" min="1">
+                    <div class="input-with-cap">
+                      <input type="number" id="item-width" step="1" min="1">
+                      <span class="input-cap" data-for="item-width">px</span>
+                    </div>
                   </label>
                   <label>
                     <span>H</span>
-                    <input type="number" id="item-height" step="1" min="1">
+                    <div class="input-with-cap">
+                      <input type="number" id="item-height" step="1" min="1">
+                      <span class="input-cap" data-for="item-height">px</span>
+                    </div>
                   </label>
                 </div>
-                <div class="form-group">
+                <div class="form-group inline-sizes">
                   <label>
                     <span>Rotation</span>
-                    <input type="number" id="item-rotation" step="1" min="-360" max="360" value="0">
-                    <span class="unit">°</span>
+                    <div class="input-with-cap">
+                      <input type="number" id="item-rotation" step="1" min="-360" max="360" value="0">
+                      <span class="input-cap" data-for="item-rotation">°</span>
+                    </div>
+                  </label>
+                  <label>
+                    <span>Opacity</span>
+                    <div class="input-with-cap">
+                      <input type="number" id="item-opacity" step="0.1" min="0" max="1" value="1">
+                      <span class="input-cap" data-for="item-opacity">%</span>
+                    </div>
                   </label>
                 </div>
               </div>
@@ -484,7 +595,7 @@
                 <div class="form-group inline-sizes">
                   <label>
                     <span>Fill</span>
-                    <input type="color" id="item-fill" value="#cccccc">
+                    <div id="item-fill-picker"></div>
                   </label>
                   <label>
                     <span>Stroke</span>
@@ -494,7 +605,10 @@
                 <div class="form-group">
                   <label>
                     <span>Stroke Width</span>
-                    <input type="number" id="item-stroke-width" step="0.5" min="0" value="1">
+                    <div class="input-with-cap">
+                      <input type="number" id="item-stroke-width" step="0.5" min="0" value="1">
+                      <span class="input-cap" data-for="item-stroke-width">px</span>
+                    </div>
                   </label>
                 </div>
               </div>
@@ -514,7 +628,10 @@
                 <div class="form-group inline-sizes">
                   <label>
                     <span>Size</span>
-                    <input type="number" id="item-font-size" step="1" min="6" value="16">
+                    <div class="input-with-cap">
+                      <input type="number" id="item-font-size" step="1" min="6" value="16">
+                      <span class="input-cap" data-for="item-font-size">pt</span>
+                    </div>
                   </label>
                   <label>
                     <span>Color</span>
@@ -538,37 +655,33 @@
                 </div>
               </div>
 
+              <!-- Z-Order -->
+              <div class="form-group">
+                <label>Layer Order</label>
+                <div class="btn-group">
+                  <button id="btn-bring-front" class="btn btn-icon btn-small" title="Bring to Front">⬆⬆</button>
+                  <button id="btn-move-forward" class="btn btn-icon btn-small" title="Move Forward">⬆</button>
+                  <button id="btn-move-backward" class="btn btn-icon btn-small" title="Move Backward">⬇</button>
+                  <button id="btn-send-back" class="btn btn-icon btn-small" title="Send to Back">⬇⬇</button>
+                </div>
+              </div>
+
               <!-- Actions -->
               <div class="edit-actions">
                 <button id="btn-duplicate-item" class="btn btn-secondary btn-small">Duplicate</button>
                 <button id="btn-delete-item" class="btn btn-secondary btn-small btn-danger">Delete</button>
               </div>
-            </div>
           </div>
-        </div>
 
-        <!-- Document Info -->
-        <div class="panel panel-info">
-          <div class="panel-header">
-            <h3>Document Info</h3>
-          </div>
-          <div class="panel-content">
-            <div class="info-item">
-              <span class="info-label">Pages:</span>
-              <span id="info-pages" class="info-value">0</span>
+          <!-- Page Background Section (shown when page selected but no item) -->
+          <div id="page-background-section" class="panel-content" style="display: none;">
+            <div class="form-group">
+              <label>
+                <span>Page Background</span>
+                <div id="page-background-picker"></div>
+              </label>
             </div>
-            <div class="info-item">
-              <span class="info-label">Spreads:</span>
-              <span id="info-spreads" class="info-value">0</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Signatures:</span>
-              <span id="info-signatures" class="info-value">0</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Sheets:</span>
-              <span id="info-sheets" class="info-value">0</span>
-            </div>
+            <p class="hint">Select an item to edit its properties, or set a background fill for this page.</p>
           </div>
         </div>
       </section>

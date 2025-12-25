@@ -1,32 +1,63 @@
 /**
  * ZipHandler Service
  * Handles import and export of project files as ZIP archives
+ *
+ * Export format:
+ * /project.json         - Project manifest with settings
+ * /text/*.md           - Markdown text files
+ * /images/*            - Image files (png, jpg, etc.)
+ * /static/*.json       - Static page content (items on blank/static pages)
  */
 
 import JSZip from 'jszip';
 import { appState } from './state';
-import type { ProjectFile, BookletProject } from '../types';
+import type { ProjectFile, BookletProject, PageItem } from '../types';
 
+/**
+ * File entry in the manifest
+ */
+interface ManifestFile {
+  id: string;
+  name: string;
+  type: string;
+  path: string; // Path within the zip (e.g., "text/chapter1.md")
+  lastModified: number;
+}
+
+/**
+ * Static page content stored in the zip
+ */
+interface StaticPageContent {
+  pageNumber: number;
+  items: PageItem[];
+}
+
+/**
+ * Project manifest stored as project.json
+ */
 interface ProjectManifest {
   version: string;
   name: string;
+  projectId: string;
   mainDocument: string | null;
   outputOptions: BookletProject['outputOptions'];
   layoutOptions: BookletProject['layoutOptions'];
   fontOptions: BookletProject['fontOptions'];
   headerFooter: BookletProject['headerFooter'];
   blankPages: number[];
-  files: Array<{
-    id: string;
-    name: string;
-    type: string;
-    lastModified: number;
-  }>;
+  files: ManifestFile[];
+  fileOrder: string[]; // IDs in order for concatenation
 }
 
 export class ZipHandler {
-  private static readonly MANIFEST_FILENAME = 'printfold.json';
-  private static readonly VERSION = '1.0.0';
+  private static readonly MANIFEST_FILENAME = 'project.json';
+  private static readonly VERSION = '2.0.0';
+  private static readonly TEXT_FOLDER = 'text';
+  private static readonly IMAGES_FOLDER = 'images';
+  private static readonly STATIC_FOLDER = 'static';
+
+  // Store pending static page items to apply after reflow
+  private pendingStaticItems: Map<number, PageItem[]> = new Map();
 
   /**
    * Export current project to ZIP
@@ -35,38 +66,70 @@ export class ZipHandler {
     const project = appState.getProject();
     const zip = new JSZip();
 
+    // Create folders
+    const textFolder = zip.folder(ZipHandler.TEXT_FOLDER)!;
+    const imagesFolder = zip.folder(ZipHandler.IMAGES_FOLDER)!;
+    const staticFolder = zip.folder(ZipHandler.STATIC_FOLDER)!;
+
+    // Build file manifest and add files to appropriate folders
+    const manifestFiles: ManifestFile[] = [];
+    const fileOrder: string[] = [];
+
+    for (const file of project.files) {
+      const baseName = this.getBaseName(file.name);
+
+      if (file.type === 'markdown') {
+        const path = `${ZipHandler.TEXT_FOLDER}/${baseName}`;
+        textFolder.file(baseName, file.content);
+        manifestFiles.push({
+          id: file.id,
+          name: file.name,
+          type: file.type,
+          path,
+          lastModified: file.lastModified,
+        });
+        fileOrder.push(file.id);
+      } else if (file.type === 'image') {
+        const path = `${ZipHandler.IMAGES_FOLDER}/${baseName}`;
+        const binaryData = this.base64ToArrayBuffer(file.content);
+        imagesFolder.file(baseName, binaryData);
+        manifestFiles.push({
+          id: file.id,
+          name: file.name,
+          type: file.type,
+          path,
+          lastModified: file.lastModified,
+        });
+      }
+    }
+
+    // Export static page content (items on blank/static pages)
+    const staticPages = this.collectStaticPageItems(project);
+    for (const [pageNumber, items] of staticPages) {
+      if (items.length > 0) {
+        const content: StaticPageContent = { pageNumber, items };
+        const hash = this.generateHash(pageNumber);
+        staticFolder.file(`${hash}.json`, JSON.stringify(content, null, 2));
+      }
+    }
+
     // Create manifest
     const manifest: ProjectManifest = {
       version: ZipHandler.VERSION,
       name: project.name,
+      projectId: project.id,
       mainDocument: project.mainDocument,
       outputOptions: project.outputOptions,
       layoutOptions: project.layoutOptions,
       fontOptions: project.fontOptions,
       headerFooter: project.headerFooter,
       blankPages: project.blankPages,
-      files: project.files.map(f => ({
-        id: f.id,
-        name: f.name,
-        type: f.type,
-        lastModified: f.lastModified,
-      })),
+      files: manifestFiles,
+      fileOrder,
     };
 
-    // Add manifest
+    // Add manifest to root
     zip.file(ZipHandler.MANIFEST_FILENAME, JSON.stringify(manifest, null, 2));
-
-    // Add files
-    for (const file of project.files) {
-      if (file.isBase64) {
-        // Binary file (image)
-        const binaryData = this.base64ToArrayBuffer(file.content);
-        zip.file(file.name, binaryData);
-      } else {
-        // Text file (markdown)
-        zip.file(file.name, file.content);
-      }
-    }
 
     return zip.generateAsync({ type: 'uint8array' });
   }
@@ -85,34 +148,61 @@ export class ZipHandler {
   async importFromArrayBuffer(content: ArrayBuffer): Promise<void> {
     const zip = await JSZip.loadAsync(content);
 
-    // Check for manifest
-    const manifestFile = zip.file(ZipHandler.MANIFEST_FILENAME);
+    // Try to load manifest (project.json or legacy printfold.json)
     let manifest: ProjectManifest | null = null;
+    const manifestFile = zip.file(ZipHandler.MANIFEST_FILENAME) || zip.file('printfold.json');
 
     if (manifestFile) {
       const manifestContent = await manifestFile.async('string');
       manifest = JSON.parse(manifestContent);
     }
 
-    // Load files
+    // Reset state before importing
+    appState.reset();
+
+    // Load files from folders or root (legacy support)
     const files: ProjectFile[] = [];
     const filePromises: Promise<void>[] = [];
+    const staticItems: Map<number, PageItem[]> = new Map();
 
     zip.forEach((relativePath, zipEntry) => {
-      if (relativePath === ZipHandler.MANIFEST_FILENAME) return;
-      if (zipEntry.dir) return;
+      // Skip manifest files and directories
+      if (relativePath === ZipHandler.MANIFEST_FILENAME ||
+          relativePath === 'printfold.json' ||
+          zipEntry.dir) {
+        return;
+      }
 
-      const ext = relativePath.split('.').pop()?.toLowerCase() || '';
-      const allowedExtensions = ['md', 'png', 'jpg', 'jpeg', 'webp'];
+      const pathParts = relativePath.split('/');
+      const folder = pathParts.length > 1 ? pathParts[0] : null;
+      const fileName = pathParts[pathParts.length - 1];
+      const ext = fileName.split('.').pop()?.toLowerCase() || '';
 
-      if (!allowedExtensions.includes(ext)) return;
+      // Handle static page content
+      if (folder === ZipHandler.STATIC_FOLDER && ext === 'json') {
+        const promise = (async () => {
+          const jsonContent = await zipEntry.async('string');
+          const staticContent: StaticPageContent = JSON.parse(jsonContent);
+          staticItems.set(staticContent.pageNumber, staticContent.items);
+        })();
+        filePromises.push(promise);
+        return;
+      }
+
+      // Handle text and image files
+      const isTextFile = ext === 'md';
+      const isImageFile = ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext);
+
+      if (!isTextFile && !isImageFile) return;
 
       const promise = (async () => {
-        const manifestEntry = manifest?.files.find(f => f.name === relativePath);
-        const isText = ext === 'md';
+        // Find file info in manifest
+        const manifestEntry = manifest?.files.find(f =>
+          f.path === relativePath || f.name === relativePath || f.name === fileName
+        );
 
         let content: string;
-        if (isText) {
+        if (isTextFile) {
           content = await zipEntry.async('string');
         } else {
           const arrayBuffer = await zipEntry.async('arraybuffer');
@@ -121,10 +211,10 @@ export class ZipHandler {
 
         files.push({
           id: manifestEntry?.id || crypto.randomUUID(),
-          name: relativePath,
+          name: manifestEntry?.name || fileName,
           type: this.getFileType(ext),
           content,
-          isBase64: !isText,
+          isBase64: !isTextFile,
           lastModified: manifestEntry?.lastModified || Date.now(),
         });
       })();
@@ -134,20 +224,35 @@ export class ZipHandler {
 
     await Promise.all(filePromises);
 
-    // Update state
+    // Sort files according to manifest order
+    if (manifest?.fileOrder) {
+      files.sort((a, b) => {
+        const indexA = manifest.fileOrder.indexOf(a.id);
+        const indexB = manifest.fileOrder.indexOf(b.id);
+        // Files not in order list go to the end
+        if (indexA === -1) return 1;
+        if (indexB === -1) return -1;
+        return indexA - indexB;
+      });
+    }
+
+    // Store static items to apply after reflow
+    this.pendingStaticItems = staticItems;
+
+    // Update project settings from manifest
     if (manifest) {
-      // Full project import
       appState.updateProject({
+        id: manifest.projectId || crypto.randomUUID(),
         name: manifest.name,
         outputOptions: manifest.outputOptions,
         layoutOptions: manifest.layoutOptions,
         fontOptions: manifest.fontOptions,
         headerFooter: manifest.headerFooter,
-        blankPages: manifest.blankPages,
+        blankPages: manifest.blankPages || [],
       });
     }
 
-    // Add files
+    // Add files (this triggers reflow)
     appState.addFiles(files);
 
     // Set main document if specified in manifest
@@ -156,6 +261,13 @@ export class ZipHandler {
       if (mainFile) {
         appState.setMainDocument(mainFile.id);
       }
+    }
+
+    // Apply static page items after a short delay to allow reflow to complete
+    if (this.pendingStaticItems.size > 0) {
+      setTimeout(() => {
+        this.applyStaticItems();
+      }, 100);
     }
   }
 
@@ -167,6 +279,67 @@ export class ZipHandler {
     await this.importFromArrayBuffer(arrayBuffer);
   }
 
+  /**
+   * Apply pending static page items after reflow
+   */
+  private applyStaticItems(): void {
+    for (const [pageNumber, items] of this.pendingStaticItems) {
+      for (const item of items) {
+        appState.addItemToPage(pageNumber, item);
+      }
+    }
+    this.pendingStaticItems.clear();
+  }
+
+  /**
+   * Collect all items from static/blank pages in the project
+   */
+  private collectStaticPageItems(project: BookletProject): Map<number, PageItem[]> {
+    const result = new Map<number, PageItem[]>();
+
+    for (const sig of project.signatures) {
+      for (const spread of sig.spreads) {
+        // Check verso page
+        if (spread.verso && (spread.verso.isBlank || spread.verso.isStatic)) {
+          const items = spread.verso.items || [];
+          if (items.length > 0) {
+            result.set(spread.verso.pageNumber, items);
+          }
+        }
+        // Check recto page
+        if (spread.recto && (spread.recto.isBlank || spread.recto.isStatic)) {
+          const items = spread.recto.items || [];
+          if (items.length > 0) {
+            result.set(spread.recto.pageNumber, items);
+          }
+        }
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Generate a unique hash for a page number
+   */
+  private generateHash(pageNumber: number): string {
+    const data = `page-${pageNumber}-${Date.now()}`;
+    let hash = 0;
+    for (let i = 0; i < data.length; i++) {
+      const char = data.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    return `page${pageNumber}-${Math.abs(hash).toString(16)}`;
+  }
+
+  /**
+   * Get just the filename from a path
+   */
+  private getBaseName(path: string): string {
+    return path.split('/').pop() || path;
+  }
+
   private getFileType(ext: string): ProjectFile['type'] {
     switch (ext) {
       case 'md':
@@ -175,6 +348,7 @@ export class ZipHandler {
       case 'jpg':
       case 'jpeg':
       case 'webp':
+      case 'gif':
         return 'image';
       case 'zip':
         return 'archive';

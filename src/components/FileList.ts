@@ -226,20 +226,37 @@ export class FileList {
       item.classList.add('selected');
     }
 
-    const icon = this.getFileIcon(file.type);
     const isTextFile = file.type === 'markdown';
+    const isImageFile = file.type === 'image';
 
     // Add drag handle for text files
     const dragHandle = isTextFile ? '<span class="drag-handle" title="Drag to reorder">⋮⋮</span>' : '';
 
-    item.innerHTML = `
-      ${dragHandle}
-      <span class="file-icon">${icon}</span>
-      <span class="file-name" title="${file.name}">${file.name}</span>
-      <div class="file-actions">
-        <button class="btn btn-icon btn-remove" title="Remove file">×</button>
-      </div>
-    `;
+    if (isImageFile && file.isBase64) {
+      // Image file: show thumbnail
+      item.className = 'file-item file-item-image';
+      item.innerHTML = `
+        <div class="file-thumbnail">
+          <img src="data:image/png;base64,${file.content}" alt="${file.name}" draggable="false">
+        </div>
+        <span class="file-name" title="${file.name}">${file.name}</span>
+        <div class="file-actions">
+          <button class="btn btn-icon btn-remove" title="Remove file">×</button>
+        </div>
+      `;
+    } else {
+      // Text file: show icon and name
+      item.classList.add('file-item-text');
+      const icon = this.getFileIcon(file.type);
+      item.innerHTML = `
+        ${dragHandle}
+        <span class="file-icon">${icon}</span>
+        <span class="file-name" title="${file.name}">${file.name}</span>
+        <div class="file-actions">
+          <button class="btn btn-icon btn-remove" title="Remove file">×</button>
+        </div>
+      `;
+    }
 
     // Make text files draggable
     if (isTextFile) {
@@ -295,6 +312,24 @@ export class FileList {
             appState.reorderFiles(textFiles.map(f => f.id));
           }
         }
+      });
+    }
+
+    // Make image files draggable for adding to static pages
+    if (isImageFile) {
+      item.draggable = true;
+
+      item.addEventListener('dragstart', (e) => {
+        if (e.dataTransfer) {
+          e.dataTransfer.effectAllowed = 'copy';
+          e.dataTransfer.setData('application/x-printfold-image', file.id);
+          e.dataTransfer.setData('text/plain', file.id);
+        }
+        item.classList.add('dragging');
+      });
+
+      item.addEventListener('dragend', () => {
+        item.classList.remove('dragging');
       });
     }
 

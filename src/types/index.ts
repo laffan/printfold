@@ -1,3 +1,84 @@
+// Fill types for static page items
+export type FillType = 'color' | 'linearGradient' | 'radialGradient' | 'pattern';
+
+export interface GradientStop {
+  offset: number; // 0-1
+  color: string;  // hex color
+}
+
+export interface LinearGradientConfig {
+  angle: number; // degrees, 0 = left to right
+  stops: GradientStop[];
+}
+
+export interface RadialGradientConfig {
+  centerX: number; // 0-1, relative to shape
+  centerY: number; // 0-1, relative to shape
+  radius: number;  // 0-1, relative to shape size
+  stops: GradientStop[];
+}
+
+export interface PatternConfig {
+  imageFileId: string; // Reference to project file
+  repeat: 'repeat' | 'repeat-x' | 'repeat-y' | 'no-repeat';
+  scale: number;
+  offsetX: number;
+  offsetY: number;
+  rotation: number; // degrees
+}
+
+export interface FillConfig {
+  type: FillType;
+  color?: string;
+  linearGradient?: LinearGradientConfig;
+  radialGradient?: RadialGradientConfig;
+  pattern?: PatternConfig;
+}
+
+// Helper to create default fill configs
+export function createDefaultFill(type: FillType): FillConfig {
+  switch (type) {
+    case 'color':
+      return { type: 'color', color: '#3b82f6' };
+    case 'linearGradient':
+      return {
+        type: 'linearGradient',
+        linearGradient: {
+          angle: 0,
+          stops: [
+            { offset: 0, color: '#3b82f6' },
+            { offset: 1, color: '#8b5cf6' }
+          ]
+        }
+      };
+    case 'radialGradient':
+      return {
+        type: 'radialGradient',
+        radialGradient: {
+          centerX: 0.5,
+          centerY: 0.5,
+          radius: 0.5,
+          stops: [
+            { offset: 0, color: '#ffffff' },
+            { offset: 1, color: '#3b82f6' }
+          ]
+        }
+      };
+    case 'pattern':
+      return {
+        type: 'pattern',
+        pattern: {
+          imageFileId: '',
+          repeat: 'repeat',
+          scale: 1,
+          offsetX: 0,
+          offsetY: 0,
+          rotation: 0
+        }
+      };
+  }
+}
+
 // File types
 export interface ProjectFile {
   id: string;
@@ -28,6 +109,7 @@ export interface PageContent {
   isRecto: boolean; // Right-hand page
   isStatic: boolean; // Static pages don't receive text flow
   items?: PageItem[]; // Items placed on static pages
+  backgroundFill?: FillConfig; // Optional background fill for the page
 }
 
 // Items that can be placed on static pages
@@ -41,6 +123,8 @@ export interface PageItemBase {
   width: number;
   height: number;
   rotation?: number; // Degrees
+  opacity?: number; // 0-1, defaults to 1
+  zIndex?: number; // Layer order
 }
 
 export interface TextPageItem extends PageItemBase {
@@ -56,8 +140,9 @@ export interface TextPageItem extends PageItemBase {
 
 export interface ShapePageItem extends PageItemBase {
   type: 'shape';
-  shapeType: 'rectangle' | 'ellipse' | 'line';
-  fillColor?: string;
+  shapeType: 'rectangle' | 'ellipse' | 'circle' | 'line' | 'arrow';
+  fillColor?: string; // Deprecated: use fill instead
+  fill?: FillConfig;
   strokeColor?: string;
   strokeWidth?: number;
 }
@@ -181,18 +266,51 @@ export interface HeaderFooterOptions {
   };
 }
 
+// Static spread - exists independently of markdown flow
+export interface StaticSpread {
+  id: string;
+  index: number; // Position in the static spreads list
+  verso: PageContent | null;
+  recto: PageContent | null;
+  // Items can span across both pages
+  spanningItems?: SpanningItem[];
+}
+
+// Item that spans across a spread (verso + recto)
+export interface SpanningItem extends PageItemBase {
+  // Position relative to the full spread (verso left edge = 0)
+  // x can extend from 0 to 2*pageWidth
+  type: PageItemType;
+  // Additional properties based on type
+  content?: string;
+  fontFamily?: string;
+  fontSize?: number;
+  fontWeight?: 'normal' | 'bold';
+  fontStyle?: 'normal' | 'italic';
+  color?: string;
+  textAlign?: 'left' | 'center' | 'right';
+  shapeType?: 'rectangle' | 'ellipse' | 'circle' | 'line' | 'arrow';
+  fillColor?: string;
+  fill?: FillConfig;
+  strokeColor?: string;
+  strokeWidth?: number;
+  imageFileId?: string;
+}
+
 // Complete project state
 export interface BookletProject {
   id: string;
   name: string;
   files: ProjectFile[];
   mainDocument: string | null; // ID of main markdown file
+  measurementUnit: MarginUnit; // Project-wide measurement unit
   outputOptions: OutputOptions;
   layoutOptions: LayoutOptions;
   fontOptions: FontOptions;
   headerFooter: HeaderFooterOptions;
   signatures: Signature[];
   blankPages: number[]; // Page numbers where blank pages should be inserted
+  staticSpreads?: StaticSpread[]; // Spreads that exist without markdown
 }
 
 // Template definitions
