@@ -217,7 +217,8 @@ Konva.js-based visual editor for spreads.
 
 **Modules:**
 - `component.ts` - Main editor class
-- `items.ts` - Page item rendering
+- `items.ts` - Page item rendering and interaction
+- `selection.ts` - Marquee selection and context menu
 - `content.ts` - Text content drawing
 - `margins.ts` - Margin guides and dragging
 - `thumbnails.ts` - Navigation thumbnails
@@ -226,6 +227,10 @@ Konva.js-based visual editor for spreads.
 - Interactive page view
 - Drag-to-adjust margins
 - Item creation and manipulation
+- Multi-item selection (marquee, Shift+click, Cmd/Ctrl+A)
+- Option+drag to duplicate items
+- Copy/paste (Cmd/Ctrl+C/V)
+- Right-click context menu with align/distribute
 - Zoom and pan
 - Keyboard shortcuts
 
