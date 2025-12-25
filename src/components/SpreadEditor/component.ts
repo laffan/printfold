@@ -552,9 +552,24 @@ export class SpreadEditor {
       return;
     }
 
+    // Check if this is the first spread and handle back cover display
+    const isFirstSpread = this.currentSpreadIndex === 0;
+    const signatureCount = project.signatures.length;
+    const isBackCover = spread.verso && (spread.verso as PageContent & { isBackCover?: boolean }).isBackCover;
+
     // Draw verso (left) page
     if (spread.verso) {
-      this.drawPage(spread.verso, 0, 0, pageDimensions);
+      if (isFirstSpread && isBackCover) {
+        if (signatureCount === 1) {
+          // Single signature: show back cover with indicator
+          this.drawBackCoverPage(0, 0, pageDimensions);
+        } else {
+          // Multiple signatures: hide the back cover (don't show internal signature page)
+          this.drawHiddenPage(0, 0, pageDimensions);
+        }
+      } else {
+        this.drawPage(spread.verso, 0, 0, pageDimensions);
+      }
     } else {
       this.drawPageOutline(0, 0, pageDimensions.width, pageDimensions.height);
     }
@@ -794,6 +809,106 @@ export class SpreadEditor {
       shadowOffset: { x: 2, y: 2 },
     });
     this.layer.add(page);
+  }
+
+  /**
+   * Draw the back cover page with a red dashed border and "Back Cover" label
+   * Shown for single-signature booklets on the first spread's verso
+   */
+  private drawBackCoverPage(x: number, y: number, dimensions: { width: number; height: number }): void {
+    const { width, height } = dimensions;
+    const padding = 10;
+
+    // Draw white page background
+    const page = new Konva.Rect({
+      x,
+      y,
+      width,
+      height,
+      fill: '#fafafa',
+      stroke: '#cccccc',
+      strokeWidth: 1,
+      shadowColor: 'black',
+      shadowBlur: 10,
+      shadowOpacity: 0.2,
+      shadowOffset: { x: 2, y: 2 },
+    });
+    this.layer.add(page);
+
+    // Draw red dashed border
+    const dashedBorder = new Konva.Rect({
+      x: x + padding,
+      y: y + padding,
+      width: width - padding * 2,
+      height: height - padding * 2,
+      stroke: '#dc2626',
+      strokeWidth: 2,
+      dash: [8, 4],
+      fill: 'transparent',
+    });
+    this.layer.add(dashedBorder);
+
+    // Draw "Back Cover" label at the top
+    const label = new Konva.Text({
+      x: x + width / 2,
+      y: y + padding + 15,
+      text: 'Back Cover',
+      fontSize: 14,
+      fontStyle: 'bold',
+      fill: '#dc2626',
+      align: 'center',
+    });
+    label.offsetX(label.width() / 2);
+    this.layer.add(label);
+
+    // Draw helper text
+    const helperText = new Konva.Text({
+      x: x + width / 2,
+      y: y + height / 2,
+      text: 'This page will be the\nback cover when folded',
+      fontSize: 11,
+      fill: '#9ca3af',
+      align: 'center',
+      lineHeight: 1.4,
+    });
+    helperText.offsetX(helperText.width() / 2);
+    helperText.offsetY(helperText.height() / 2);
+    this.layer.add(helperText);
+  }
+
+  /**
+   * Draw a hidden/collapsed page placeholder
+   * Shown for multi-signature booklets where showing internal signature pages would be confusing
+   */
+  private drawHiddenPage(x: number, y: number, dimensions: { width: number; height: number }): void {
+    const { width, height } = dimensions;
+
+    // Draw a grayed out, narrower representation
+    const collapsedWidth = 30;
+
+    // Draw collapsed page indicator
+    const page = new Konva.Rect({
+      x: x + width - collapsedWidth,
+      y,
+      width: collapsedWidth,
+      height,
+      fill: '#e5e7eb',
+      stroke: '#d1d5db',
+      strokeWidth: 1,
+    });
+    this.layer.add(page);
+
+    // Draw fold lines
+    for (let i = 1; i < 4; i++) {
+      const lineY = y + (height / 4) * i;
+      const line = new Konva.Line({
+        points: [x + width - collapsedWidth + 5, lineY, x + width - 5, lineY],
+        stroke: '#9ca3af',
+        strokeWidth: 1,
+        dash: [3, 3],
+      });
+      this.layer.add(line);
+    }
   }
 
   private drawPageBackground(x: number, y: number, width: number, height: number, backgroundFill?: FillConfig): void {

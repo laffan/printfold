@@ -652,23 +652,54 @@ export class TextFlowEngine {
 
   /**
    * Create spreads from pages
+   *
+   * For booklet printing, this creates spreads in reading order:
+   * - Spread 1: [Back Cover indicator | Page 1 (front cover)]
+   * - Spread 2: [Page 2 | Page 3]
+   * - Spread 3: [Page 4 | Page 5]
+   * - etc.
+   *
+   * The back cover is a special placeholder that represents where the
+   * last page of the signature will appear when the booklet is folded.
    */
   private createSpreads(pages: PageContent[]): Spread[] {
     const spreads: Spread[] = [];
 
-    // Pad to even number of pages
-    const paddedPages = [...pages];
-    while (paddedPages.length % 2 !== 0) {
-      paddedPages.push(this.createEmptyPage(paddedPages.length + 1, true));
+    if (pages.length === 0) {
+      return spreads;
     }
 
-    for (let i = 0; i < paddedPages.length; i += 2) {
+    // For reading order display, the first spread is [back cover | page 1]
+    // Create a special back cover page for display purposes
+    const backCoverPage = this.createEmptyPage(0, true);
+    (backCoverPage as PageContent & { isBackCover?: boolean }).isBackCover = true;
+    backCoverPage.isRecto = false;
+
+    // First spread: back cover placeholder on left, page 1 on right
+    spreads.push({
+      id: crypto.randomUUID(),
+      spreadNumber: 1,
+      verso: backCoverPage,
+      recto: pages[0], // Page 1 on recto (front cover)
+    });
+
+    // Remaining pages in reading order: [page 2, page 3], [page 4, page 5], etc.
+    for (let i = 1; i < pages.length; i += 2) {
+      const verso = pages[i];
+      const recto = pages[i + 1] || null;
+
       spreads.push({
         id: crypto.randomUUID(),
-        spreadNumber: Math.floor(i / 2) + 1,
-        verso: paddedPages[i],
-        recto: paddedPages[i + 1] || null,
+        spreadNumber: spreads.length + 1,
+        verso,
+        recto,
       });
+    }
+
+    // Ensure last spread has a recto if needed
+    const lastSpread = spreads[spreads.length - 1];
+    if (!lastSpread.recto && pages.length > 1) {
+      lastSpread.recto = this.createEmptyPage(pages.length + 1, true);
     }
 
     return spreads;

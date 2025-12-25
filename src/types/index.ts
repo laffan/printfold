@@ -108,6 +108,7 @@ export interface PageContent {
   isBlank: boolean;
   isRecto: boolean; // Right-hand page
   isStatic: boolean; // Static pages don't receive text flow
+  isBackCover?: boolean; // Special back cover page (verso of first spread)
   items?: PageItem[]; // Items placed on static pages
   backgroundFill?: FillConfig; // Optional background fill for the page
 }
