@@ -331,11 +331,16 @@ export class SpreadEditor {
     this.stage.on('click', (e) => {
       // Deselect item if clicking on stage, layer, or a non-item shape
       const target = e.target;
-      const isStageOrLayer = target === this.stage || target.getLayer() === this.layer || target.getLayer() === this.marginLayer;
-      const isItem = target.getAttr('itemId') !== undefined;
+      const targetLayer = target.getLayer?.();
+      const isOnAnyLayer = target === this.stage ||
+                           targetLayer === this.layer ||
+                           targetLayer === this.marginLayer ||
+                           targetLayer === this.itemsLayer;
+      const isItem = target.getAttr?.('itemId') !== undefined;
+      const isTransformer = target.getParent?.()?.getClassName?.() === 'Transformer';
 
-      if (isStageOrLayer && !isItem) {
-        // Only deselect the item, not the page (page selection handled by page click areas)
+      if (isOnAnyLayer && !isItem && !isTransformer) {
+        // Deselect the item when clicking on background
         appState.updateEditor({ selectedItemId: null });
         this.updateTransformer();
       }

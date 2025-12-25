@@ -55,6 +55,7 @@ export class OptionsPanel {
           state.selectedPagePosition !== prevState.selectedPagePosition) {
         updateSelectedPagePanel();
         updateEditPagePanel();
+        updateEditSelectedSection();
       }
       if (state.selectedItemId !== prevState.selectedItemId) {
         updateEditSelectedSection();

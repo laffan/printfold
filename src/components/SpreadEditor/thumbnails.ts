@@ -46,9 +46,25 @@ export function renderThumbnails(
     const ctx = canvas.getContext('2d')!;
     ctx.scale(2, 2);
 
-    // Draw page backgrounds
-    ctx.fillStyle = '#ffffff';
+    // Draw page backgrounds (use backgroundFill if present)
+    const getBackgroundColor = (page: typeof spread.verso) => {
+      if (!page?.backgroundFill) return '#ffffff';
+      if (page.backgroundFill.type === 'color') {
+        return page.backgroundFill.color || '#ffffff';
+      }
+      // For gradients, use the first stop color
+      if (page.backgroundFill.type === 'linearGradient' && page.backgroundFill.linearGradient?.stops?.length) {
+        return page.backgroundFill.linearGradient.stops[0].color;
+      }
+      if (page.backgroundFill.type === 'radialGradient' && page.backgroundFill.radialGradient?.stops?.length) {
+        return page.backgroundFill.radialGradient.stops[0].color;
+      }
+      return '#ffffff';
+    };
+
+    ctx.fillStyle = getBackgroundColor(spread.verso);
     ctx.fillRect(0, 0, thumbWidth / 2, thumbHeight);
+    ctx.fillStyle = getBackgroundColor(spread.recto);
     ctx.fillRect(thumbWidth / 2, 0, thumbWidth / 2, thumbHeight);
 
     // Draw spine line

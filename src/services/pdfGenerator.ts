@@ -1039,8 +1039,26 @@ export class PDFGenerator {
       for (const spread of sig.spreads) {
         const pages = [spread.verso, spread.recto].filter(Boolean) as PageContent[];
         for (const page of pages) {
-          if ((page.isBlank || page.isStatic) && (page.items?.length || page.backgroundFill)) {
-            const adjacentPage = page.isRecto ? spread.verso : spread.recto;
+          if (!(page.isBlank || page.isStatic)) continue;
+
+          const adjacentPage = page.isRecto ? spread.verso : spread.recto;
+
+          // Check if this page needs rendering:
+          // 1. Has its own items
+          // 2. Has a background fill
+          // 3. Has crossing items from adjacent page
+          const hasOwnContent = page.items?.length || page.backgroundFill;
+          const hasCrossingItems = adjacentPage?.items?.some(item => {
+            if (page.isRecto) {
+              // This is recto, check if verso items extend past verso boundary
+              return item.x + item.width > pageWidth;
+            } else {
+              // This is verso, check if recto items have negative x
+              return item.x < 0;
+            }
+          });
+
+          if (hasOwnContent || hasCrossingItems) {
             pagesToRender.push({ page, adjacentPage: adjacentPage || null });
           }
         }
