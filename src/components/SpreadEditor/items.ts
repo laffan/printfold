@@ -292,53 +292,206 @@ export function createItemNode(
       });
     }
 
-    // Handle Option+drag to duplicate
+    // Multi-item drag state
     let isDuplicateDrag = false;
-    let originalItemIds: string[] = [];
+    let dragStartNodePositions: Map<string, { x: number; y: number }> = new Map();
+    let initialDragPos = { x: 0, y: 0 };
+    let dragStartItemData: Map<string, PageItem> = new Map(); // Store complete item data for duplication
+    let originalOpacities: Map<string, number> = new Map(); // Store original opacities for restore
+    let ghostNodes: Konva.Node[] = []; // Visual indicators showing where originals stay
 
     node.on('dragstart', (e) => {
-      const editorState = appState.getEditor();
       const isAltKey = e.evt?.altKey || false;
+      let editorState = appState.getEditor();
+      let selectedIds = editorState.selectedItemIds;
 
-      // If Alt/Option key is held and this item is selected, duplicate all selected items
-      if (isAltKey && editorState.selectedItemIds.includes(item.id)) {
+      // Store initial node position
+      initialDragPos = { x: node!.x(), y: node!.y() };
+
+      // Option+drag: prepare for duplication with visual feedback
+      if (isAltKey) {
         isDuplicateDrag = true;
-        originalItemIds = [...editorState.selectedItemIds];
 
-        // Duplicate all selected items and select the duplicates
-        appState.duplicateSelectedItems();
+        // If this item isn't selected, select it first
+        if (!selectedIds.includes(item.id)) {
+          const position = xOffset === 0 ? 'verso' : 'recto';
+          appState.updateEditor({
+            selectedPageNumber: pageNumber,
+            selectedPagePosition: position,
+          });
+          appState.selectItem(item.id, false);
+        }
+
+        // Refresh state after potential selection change
+        editorState = appState.getEditor();
+        selectedIds = editorState.selectedItemIds;
+
+        // Store complete item data and create visual ghosts for all selected items
+        dragStartItemData.clear();
+        originalOpacities.clear();
+        ghostNodes.forEach(g => g.destroy());
+        ghostNodes = [];
+
+        for (const id of selectedIds) {
+          const itemData = appState.getItemFromPage(pageNumber, id);
+          const itemNode = id === item.id ? node : itemsLayer.findOne((n: Konva.Node) => n.getAttr('itemId') === id);
+          if (itemData && itemNode) {
+            // Deep clone the item data
+            dragStartItemData.set(id, JSON.parse(JSON.stringify(itemData)));
+
+            // Store original opacity and make dragged node semi-transparent
+            originalOpacities.set(id, itemNode.opacity());
+            itemNode.opacity(0.5);
+
+            // Create a ghost (dashed outline) at the original position to show where original stays
+            const ghost = new Konva.Rect({
+              x: itemNode.x(),
+              y: itemNode.y(),
+              width: itemNode.width() || 50,
+              height: itemNode.height() || 50,
+              stroke: '#3b82f6',
+              strokeWidth: 1,
+              dash: [4, 4],
+              fill: 'transparent',
+              listening: false,
+            });
+            itemsLayer.add(ghost);
+            ghostNodes.push(ghost);
+          }
+        }
+        itemsLayer.batchDraw();
+      }
+
+      // Refresh state
+      editorState = appState.getEditor();
+      selectedIds = editorState.selectedItemIds;
+
+      // If this item is part of a multi-selection, store node positions for synchronized movement
+      if (selectedIds.includes(item.id) && selectedIds.length > 1) {
+        dragStartNodePositions.clear();
+        for (const id of selectedIds) {
+          if (id !== item.id) {
+            const otherNode = itemsLayer.findOne((n: Konva.Node) => n.getAttr('itemId') === id);
+            if (otherNode) {
+              dragStartNodePositions.set(id, { x: otherNode.x(), y: otherNode.y() });
+            }
+          }
+        }
+        // Detach transformer during multi-item drag to prevent jittering
+        transformer.nodes([]);
+        itemsLayer.batchDraw();
       }
     });
 
-    // Handle drag move to keep transformer in sync
+    // Handle drag move - synchronize all selected items
     node.on('dragmove', () => {
-      // Force transformer to update during drag
-      itemsLayer.batchDraw();
+      const editorState = appState.getEditor();
+      const selectedIds = editorState.selectedItemIds;
+
+      // If multi-selection, move all other selected items by the same delta
+      if (selectedIds.includes(item.id) && selectedIds.length > 1 && dragStartNodePositions.size > 0) {
+        const dx = node!.x() - initialDragPos.x;
+        const dy = node!.y() - initialDragPos.y;
+
+        dragStartNodePositions.forEach((startPos, id) => {
+          const otherNode = itemsLayer.findOne((n: Konva.Node) => n.getAttr('itemId') === id);
+          if (otherNode) {
+            otherNode.x(startPos.x + dx);
+            otherNode.y(startPos.y + dy);
+          }
+        });
+
+        itemsLayer.batchDraw();
+      }
     });
 
-    // Handle drag end to update position
+    // Handle drag end to update positions
     node.on('dragend', () => {
+      const editorState = appState.getEditor();
+      const selectedIds = editorState.selectedItemIds;
+
+      // Calculate the final delta
+      const dx = node!.x() - initialDragPos.x;
+      const dy = node!.y() - initialDragPos.y;
+
+      // Clean up ghost nodes and restore opacities
+      ghostNodes.forEach(g => g.destroy());
+      ghostNodes = [];
+      originalOpacities.forEach((opacity, id) => {
+        const itemNode = id === item.id ? node : itemsLayer.findOne((n: Konva.Node) => n.getAttr('itemId') === id);
+        if (itemNode) {
+          itemNode.opacity(opacity);
+        }
+      });
+      originalOpacities.clear();
+
+      // If Option+drag, create copies at NEW positions and reset originals to their start positions
+      if (isDuplicateDrag && dragStartItemData.size > 0) {
+        const newItemIds: string[] = [];
+
+        // Create copies at the new (dragged) positions
+        for (const [originalId, originalItemData] of dragStartItemData) {
+          // Create a copy with new ID at the NEW position (where user dropped)
+          const copy: PageItem = {
+            ...originalItemData,
+            id: crypto.randomUUID(),
+            x: originalItemData.x + dx,
+            y: originalItemData.y + dy,
+          };
+          appState.addItemToPage(pageNumber, copy);
+          newItemIds.push(copy.id);
+        }
+
+        // Select the new copies (this triggers render which re-attaches transformer)
+        if (newItemIds.length > 0) {
+          appState.selectItems(newItemIds);
+        }
+
+        dragStartItemData.clear();
+        isDuplicateDrag = false;
+        dragStartNodePositions.clear();
+        // Transformer will be re-attached by the render triggered by addItemToPage/selectItems
+        return; // Don't update original positions - they stay where they were
+      }
+
       // Reset duplicate drag state
       isDuplicateDrag = false;
-      originalItemIds = [];
 
-      let newX = node!.x() - xOffset;
-      let newY = node!.y();
-
-      // For centered shapes, convert back from center position to top-left
-      if (item.type === 'shape') {
-        const shapeItem = item as ShapePageItem;
-        if (shapeItem.shapeType === 'ellipse') {
-          newX -= item.width / 2;
-          newY -= item.height / 2;
-        } else if (shapeItem.shapeType === 'circle') {
-          const radius = Math.min(item.width, item.height) / 2;
-          newX -= radius;
-          newY -= radius;
+      // Update all selected items' positions
+      if (selectedIds.includes(item.id) && selectedIds.length > 1) {
+        // Multi-item drag: update all selected items
+        for (const id of selectedIds) {
+          const currentItem = appState.getItemFromPage(pageNumber, id);
+          if (currentItem) {
+            appState.updateItemOnPage(pageNumber, id, {
+              x: currentItem.x + dx,
+              y: currentItem.y + dy,
+            });
+          }
         }
+      } else {
+        // Single item drag
+        let newX = node!.x() - xOffset;
+        let newY = node!.y();
+
+        // For centered shapes, convert back from center position to top-left
+        if (item.type === 'shape') {
+          const shapeItem = item as ShapePageItem;
+          if (shapeItem.shapeType === 'ellipse') {
+            newX -= item.width / 2;
+            newY -= item.height / 2;
+          } else if (shapeItem.shapeType === 'circle') {
+            const radius = Math.min(item.width, item.height) / 2;
+            newX -= radius;
+            newY -= radius;
+          }
+        }
+
+        appState.updateItemOnPage(pageNumber, item.id, { x: newX, y: newY });
       }
 
-      appState.updateItemOnPage(pageNumber, item.id, { x: newX, y: newY });
+      // Clear drag state
+      dragStartNodePositions.clear();
     });
 
     // Handle transform end to update size/rotation

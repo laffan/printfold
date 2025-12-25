@@ -18,6 +18,7 @@ The SpreadEditor provides:
 SpreadEditor/
 ├── component.ts   # Main SpreadEditor class
 ├── items.ts       # Page item rendering and interaction
+├── selection.ts   # Marquee selection and context menu
 ├── content.ts     # Page content rendering
 ├── margins.ts     # Margin guides and dragging
 ├── thumbnails.ts  # Thumbnail strip rendering
@@ -38,9 +39,11 @@ SpreadEditor
 │   │   ├── margin lines
 │   │   ├── margin labels
 │   │   └── selection indicator
-│   └── itemsLayer
-│       ├── page items (shapes, text, images)
-│       └── transformer
+│   ├── itemsLayer
+│   │   ├── page items (shapes, text, images)
+│   │   └── transformer
+│   └── selectionLayer
+│       └── marquee selection rectangle
 └── thumbnailContainer (DOM)
 ```
 
@@ -114,9 +117,71 @@ Renders a single page:
 | Key | Action |
 |-----|--------|
 | Arrow Left/Right | Navigate spreads |
-| Delete/Backspace | Delete selected item |
-| Escape | Deselect item |
-| Cmd/Ctrl+D | Duplicate selected item |
+| Delete/Backspace | Delete selected items |
+| Escape | Deselect items, hide context menu |
+| Cmd/Ctrl+C | Copy selected items to clipboard |
+| Cmd/Ctrl+V | Paste items from clipboard |
+| Cmd/Ctrl+D | Duplicate selected items |
+| Cmd/Ctrl+A | Select all items on current page |
+
+### Selection Handling
+
+#### Marquee Selection (Drag-to-Select)
+
+Click and drag on empty space to create a selection marquee. All items that intersect with the marquee rectangle will be selected when the mouse is released.
+
+```typescript
+// Marquee coordinates use getClientRect() for reliable intersection
+const marqueeClientRect = marquee.rect.getClientRect();
+itemNodes.forEach((node, id) => {
+  const nodeClientRect = node.getClientRect();
+  if (intersects(marqueeClientRect, nodeClientRect)) {
+    selectedIds.push(id);
+  }
+});
+```
+
+#### Multi-Item Selection
+
+- **Shift+Click**: Add/remove items from selection
+- **Marquee**: Select multiple items by drawing a rectangle
+- **Cmd/Ctrl+A**: Select all items on current page
+
+#### Multi-Item Drag
+
+When multiple items are selected, dragging any selected item moves all items together. The transformer is temporarily detached during drag to prevent visual jittering.
+
+```typescript
+// Store initial positions for synchronized movement
+dragStartNodePositions.set(id, { x: node.x(), y: node.y() });
+
+// Apply delta to all selected items during drag
+const dx = node.x() - initialDragPos.x;
+const dy = node.y() - initialDragPos.y;
+dragStartNodePositions.forEach((startPos, id) => {
+  otherNode.x(startPos.x + dx);
+  otherNode.y(startPos.y + dy);
+});
+```
+
+#### Option+Drag (Duplicate)
+
+Hold Option/Alt while dragging to duplicate items:
+
+1. Ghost outlines appear at original positions (dashed blue rectangles)
+2. Dragged items become semi-transparent (50% opacity)
+3. On release, copies are created at the drop position
+4. Original items remain at their original positions
+5. The new copies become selected
+
+### Context Menu
+
+Right-click on selected items to show context menu with options:
+- Duplicate
+- Copy
+- Delete
+- Align options (when multiple items selected)
+- Distribute options (when 3+ items selected)
 
 ### Image Drop Zone
 
@@ -163,10 +228,11 @@ Applies FillConfig to Konva shapes:
 
 Each item node has:
 
-- **click/tap**: Selects item and page
+- **click/tap**: Selects item and page (Shift+click for additive selection)
 - **dblclick/dbltap**: Text editing (for text items)
-- **dragmove**: Updates transformer
-- **dragend**: Updates item position in state
+- **dragstart**: Stores initial positions; if Option/Alt held, prepares for duplication with visual feedback
+- **dragmove**: Synchronizes all selected items' positions during multi-item drag
+- **dragend**: Updates item positions in state; creates copies for Option+drag
 - **transformend**: Updates item size/rotation in state
 
 ### Text Editing
@@ -190,6 +256,43 @@ Renders all items on a page with proper offset.
 #### `renderSpanningItems(items, spreadId, dimensions, ...): void`
 
 Renders items that span across the full spread width.
+
+## Selection Module (`selection.ts`)
+
+Handles marquee selection and context menus.
+
+### Marquee Selection
+
+#### `createSelectionMarquee(layer, stage, itemNodes, onComplete): MarqueeHandlers`
+
+Creates a draggable selection rectangle:
+
+```typescript
+interface MarqueeHandlers {
+  startMarquee(x: number, y: number): void;
+  updateMarquee(x: number, y: number): void;
+  endMarquee(): void;
+}
+```
+
+The marquee uses `getClientRect()` for intersection detection, which ensures correct behavior across zoom levels and pan positions.
+
+### Context Menu
+
+#### `showContextMenu(x: number, y: number, items: MenuItem[]): void`
+
+Displays a context menu at the specified screen position.
+
+#### `hideContextMenu(): void`
+
+Hides the active context menu.
+
+#### `createItemContextMenu(pageNumber: number, itemIds: string[]): MenuItem[]`
+
+Creates menu items for selected items:
+
+- **Single item**: Duplicate, Copy, Delete
+- **Multiple items**: Above + Align (Left, Center, Right, Top, Middle, Bottom) + Distribute (Horizontal, Vertical)
 
 ## Content Module (`content.ts`)
 
@@ -261,7 +364,10 @@ appState.onEditorChange((state, prevState) => {
   if (state.marginUnit !== prevState.marginUnit) {
     this.render();
   }
-  if (state.selectedItemId !== prevState.selectedItemId) {
+  // Multi-item selection support
+  const idsChanged = state.selectedItemIds.length !== prevState.selectedItemIds.length ||
+    state.selectedItemIds.some((id, i) => id !== prevState.selectedItemIds[i]);
+  if (idsChanged || state.selectedItemId !== prevState.selectedItemId) {
     this.updateTransformer();
   }
 });
@@ -269,7 +375,21 @@ appState.onEditorChange((state, prevState) => {
 // Project changes
 appState.onProjectChange(() => {
   this.render();
+  this.updateTransformer(); // Re-attach after new nodes created
 });
+```
+
+### Selection State
+
+The editor tracks selection in `EditorState`:
+
+```typescript
+interface EditorState {
+  selectedItemId: string | null;      // Primary selected item (for backwards compat)
+  selectedItemIds: string[];          // All selected items (multi-selection)
+  clipboard: PageItem[];              // Items copied via Cmd/Ctrl+C
+  // ...
+}
 ```
 
 ## Page Dimensions

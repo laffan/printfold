@@ -2093,6 +2093,19 @@ body {
   justify-content: center;
 }
 
+.align-buttons .btn-icon svg,
+.distribute-buttons .btn-icon svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.align-buttons .btn-icon:disabled,
+.distribute-buttons .btn-icon:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .multi-select-info {
   font-size: 11px;
   color: var(--color-text-muted);

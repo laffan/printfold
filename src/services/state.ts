@@ -1110,6 +1110,69 @@ class AppState {
   }
 
   /**
+   * Duplicate selected items at the same position (for Option+drag)
+   * The originals stay in place, duplicates are created and selected
+   */
+  duplicateItemsAtPosition(): PageItem[] {
+    const pageNumber = this.editor.selectedPageNumber;
+    if (pageNumber === null) return [];
+
+    const items = this.getSelectedItems();
+    if (items.length === 0) return [];
+
+    const duplicatedItems: PageItem[] = [];
+    const newIds: string[] = [];
+
+    for (const item of items) {
+      const newItem: PageItem = {
+        ...JSON.parse(JSON.stringify(item)),
+        id: crypto.randomUUID(),
+        // Same position - the duplicates will be dragged
+        x: item.x,
+        y: item.y,
+      };
+      duplicatedItems.push(newItem);
+      newIds.push(newItem.id);
+      this.addItemToPage(pageNumber, newItem);
+    }
+
+    // Select the duplicated items - they will be the ones being dragged
+    this.selectItems(newIds);
+    return duplicatedItems;
+  }
+
+  /**
+   * Duplicate selected items in place (for Option+drag)
+   * Creates duplicates at the same position but keeps originals selected.
+   * The originals continue to be dragged (appearing as the "copy"),
+   * while duplicates stay behind (appearing as the "original").
+   */
+  duplicateItemsInPlace(): PageItem[] {
+    const pageNumber = this.editor.selectedPageNumber;
+    if (pageNumber === null) return [];
+
+    const items = this.getSelectedItems();
+    if (items.length === 0) return [];
+
+    const duplicatedItems: PageItem[] = [];
+
+    for (const item of items) {
+      const newItem: PageItem = {
+        ...JSON.parse(JSON.stringify(item)),
+        id: crypto.randomUUID(),
+        x: item.x,
+        y: item.y,
+      };
+      duplicatedItems.push(newItem);
+      // Add duplicate but don't select it - it stays behind
+      this.addItemToPage(pageNumber, newItem);
+    }
+
+    // Keep originals selected - they continue to be dragged
+    return duplicatedItems;
+  }
+
+  /**
    * Align selected items
    */
   alignItems(alignment: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom'): void {

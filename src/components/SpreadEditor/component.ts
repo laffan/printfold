@@ -211,13 +211,50 @@ export class SpreadEditor {
    */
   private onMarqueeSelectionComplete(itemIds: string[]): void {
     if (itemIds.length > 0) {
+      // Get the page info from the first selected item's node
+      const firstNode = this.itemNodes.get(itemIds[0]);
+      if (firstNode) {
+        const pageNumber = firstNode.getAttr('pageNumber');
+        const xOffset = firstNode.getAttr('xOffset');
+        const position = xOffset === 0 ? 'verso' : 'recto';
+
+        // Set page context before selecting items
+        appState.updateEditor({
+          selectedPageNumber: pageNumber,
+          selectedPagePosition: position,
+        });
+      }
+
       appState.selectItems(itemIds);
       switchToSelectedTab();
     } else {
       appState.clearSelection();
     }
     this.isMarqueeSelecting = false;
-    this.updateTransformer();
+
+    // Force immediate transformer update with requestAnimationFrame to ensure
+    // all state changes have propagated and the canvas is ready
+    requestAnimationFrame(() => {
+      // Get the nodes to attach to transformer
+      const nodes: Konva.Node[] = [];
+      for (const itemId of itemIds) {
+        const node = this.itemNodes.get(itemId);
+        if (node && !node.getAttr('imageLoading')) {
+          nodes.push(node);
+        }
+      }
+
+      if (nodes.length > 0) {
+        // Configure and attach transformer
+        this.transformer.enabledAnchors(['top-left', 'top-right', 'bottom-left', 'bottom-right', 'middle-left', 'middle-right', 'top-center', 'bottom-center']);
+        this.transformer.rotateEnabled(true);
+        this.transformer.nodes(nodes);
+        this.transformer.moveToTop();
+      }
+
+      // Force a complete redraw of all layers
+      this.stage.batchDraw();
+    });
   }
 
   /**
