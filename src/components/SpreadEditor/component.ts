@@ -232,10 +232,29 @@ export class SpreadEditor {
     }
     this.isMarqueeSelecting = false;
 
-    // Force immediate transformer update and redraw
-    this.updateTransformer();
-    this.transformer.moveToTop();
-    this.stage.draw();
+    // Force immediate transformer update with requestAnimationFrame to ensure
+    // all state changes have propagated and the canvas is ready
+    requestAnimationFrame(() => {
+      // Get the nodes to attach to transformer
+      const nodes: Konva.Node[] = [];
+      for (const itemId of itemIds) {
+        const node = this.itemNodes.get(itemId);
+        if (node && !node.getAttr('imageLoading')) {
+          nodes.push(node);
+        }
+      }
+
+      if (nodes.length > 0) {
+        // Configure and attach transformer
+        this.transformer.enabledAnchors(['top-left', 'top-right', 'bottom-left', 'bottom-right', 'middle-left', 'middle-right', 'top-center', 'bottom-center']);
+        this.transformer.rotateEnabled(true);
+        this.transformer.nodes(nodes);
+        this.transformer.moveToTop();
+      }
+
+      // Force a complete redraw of all layers
+      this.stage.batchDraw();
+    });
   }
 
   /**
