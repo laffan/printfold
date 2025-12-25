@@ -125,6 +125,10 @@ export interface PageItemBase {
   rotation?: number; // Degrees
   opacity?: number; // 0-1, defaults to 1
   zIndex?: number; // Layer order
+  // Array duplication properties
+  arrayCount?: number; // Number of duplicates (1 = no duplication)
+  arrayOffsetX?: number; // X offset between each duplicate
+  arrayOffsetY?: number; // Y offset between each duplicate
 }
 
 export interface TextPageItem extends PageItemBase {
@@ -134,8 +138,14 @@ export interface TextPageItem extends PageItemBase {
   fontSize: number;
   fontWeight: 'normal' | 'bold';
   fontStyle: 'normal' | 'italic';
-  color: string;
+  color: string; // Deprecated: use fill instead
   textAlign: 'left' | 'center' | 'right';
+  // Fill and stroke properties (like shapes)
+  fill?: FillConfig;
+  hasFill?: boolean; // Whether fill is enabled (default: true)
+  strokeColor?: string;
+  strokeWidth?: number;
+  hasStroke?: boolean; // Whether stroke is enabled (default: false)
 }
 
 export interface ShapePageItem extends PageItemBase {
@@ -143,8 +153,10 @@ export interface ShapePageItem extends PageItemBase {
   shapeType: 'rectangle' | 'ellipse' | 'circle' | 'line' | 'arrow';
   fillColor?: string; // Deprecated: use fill instead
   fill?: FillConfig;
+  hasFill?: boolean; // Whether fill is enabled (default: true for shapes, false for lines)
   strokeColor?: string;
   strokeWidth?: number;
+  hasStroke?: boolean; // Whether stroke is enabled (default: true)
 }
 
 export interface ImagePageItem extends PageItemBase {
@@ -189,6 +201,9 @@ export interface OutputOptions {
   pagesPerSignature: 4 | 8 | 12 | 16 | 20 | 24;
   orientation: 'portrait' | 'landscape';
   fillAvailableSpace: boolean; // Print multiple rows of spreads per sheet when possible
+  // Creep compensation - narrows inner pages to prevent outer edges from extending
+  creepEnabled?: boolean;
+  creepPerSheet?: number; // Amount to reduce each successive sheet (in points), default 0.0625 * 72 for bond paper
 }
 
 /**
@@ -292,8 +307,10 @@ export interface SpanningItem extends PageItemBase {
   shapeType?: 'rectangle' | 'ellipse' | 'circle' | 'line' | 'arrow';
   fillColor?: string;
   fill?: FillConfig;
+  hasFill?: boolean;
   strokeColor?: string;
   strokeWidth?: number;
+  hasStroke?: boolean;
   imageFileId?: string;
 }
 

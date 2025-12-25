@@ -127,6 +127,16 @@ export class OptionsPanel {
     setCheckboxValue('opt-fill-space', project.outputOptions.fillAvailableSpace);
     updateFillSpaceVisibility();
 
+    // Creep compensation
+    setCheckboxValue('opt-creep-enabled', project.outputOptions.creepEnabled ?? false);
+    const creepSettings = document.getElementById('creep-settings');
+    if (creepSettings) {
+      creepSettings.style.display = project.outputOptions.creepEnabled ? 'block' : 'none';
+    }
+    // Convert points back to inches for display
+    const creepPerSheetInches = (project.outputOptions.creepPerSheet ?? (0.0625 * 72)) / 72;
+    setInputValue('opt-creep-per-sheet', creepPerSheetInches.toFixed(4));
+
     // Layout options - margins are converted to display unit
     setMarginInputValue('opt-margin-top', project.layoutOptions.margins.top, unit);
     setMarginInputValue('opt-margin-bottom', project.layoutOptions.margins.bottom, unit);

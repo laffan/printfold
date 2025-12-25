@@ -36,10 +36,12 @@ const defaultHeadingStyle = (size: number, weight: 'bold' | 'normal' = 'bold'): 
 // Default options
 export const defaultOutputOptions: OutputOptions = {
   sheetSize: 'letter',
-  bookletSize: 'half-letter',
+  bookletSize: 'quarter-letter',
   pagesPerSignature: 8,
   orientation: 'portrait',
-  fillAvailableSpace: false,
+  fillAvailableSpace: true,
+  creepEnabled: false,
+  creepPerSheet: 0.0625 * 72, // 0.0625 inches in points (typical for bond paper)
 };
 
 export const defaultLayoutOptions: LayoutOptions = {

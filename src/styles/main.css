@@ -1203,6 +1203,34 @@ body {
   color: var(--color-text-secondary);
 }
 
+.inline-sizes.three-col {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* Toggle sections for fill/stroke */
+.toggle-section {
+  margin-bottom: 8px;
+}
+
+.toggle-section > .checkbox-label {
+  margin-bottom: 8px;
+}
+
+.toggle-section > div:not(.checkbox-label) {
+  margin-left: 22px;
+  padding: 8px;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-sm);
+}
+
+/* Help text */
+.help-text {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--color-text-secondary);
+}
+
 /* Info panel */
 .info-item {
   display: flex;

@@ -11,6 +11,7 @@ import type { PageItem, TextPageItem, ShapePageItem, ImagePageItem, ProjectFile,
 // Module-level instances
 let itemFontDropdown: FontDropdown | null = null;
 let itemFillPicker: FillPicker | null = null;
+let textFillPicker: FillPicker | null = null;
 let pageBackgroundPicker: FillPicker | null = null;
 
 /**
@@ -157,9 +158,28 @@ function setupEditPropertyInputs(updateEditSelectedSectionFn: () => void): void 
     });
   };
 
-  // Fill picker for shapes (handled separately)
+  // Shape stroke properties
   setupColorInput('item-stroke', 'strokeColor');
   setupPropInput('item-stroke-width', 'strokeWidth');
+
+  // Shape fill/stroke toggle handlers
+  const shapeHasFill = document.getElementById('shape-has-fill') as HTMLInputElement;
+  const shapeFillSection = document.getElementById('shape-fill-section');
+  shapeHasFill?.addEventListener('change', () => {
+    const editorState = appState.getEditor();
+    if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+    appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { hasFill: shapeHasFill.checked });
+    if (shapeFillSection) shapeFillSection.style.display = shapeHasFill.checked ? 'block' : 'none';
+  });
+
+  const shapeHasStroke = document.getElementById('shape-has-stroke') as HTMLInputElement;
+  const shapeStrokeSection = document.getElementById('shape-stroke-section');
+  shapeHasStroke?.addEventListener('change', () => {
+    const editorState = appState.getEditor();
+    if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+    appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { hasStroke: shapeHasStroke.checked });
+    if (shapeStrokeSection) shapeStrokeSection.style.display = shapeHasStroke.checked ? 'block' : 'none';
+  });
 
   // Text properties - use custom font dropdown
   itemFontDropdown = createFontDropdown('item-font-family', (value) => {
@@ -169,7 +189,29 @@ function setupEditPropertyInputs(updateEditSelectedSectionFn: () => void): void 
   });
 
   setupPropInput('item-font-size', 'fontSize');
-  setupColorInput('item-text-color', 'color');
+
+  // Text fill/stroke toggle handlers
+  const textHasFill = document.getElementById('text-has-fill') as HTMLInputElement;
+  const textFillSection = document.getElementById('text-fill-section');
+  textHasFill?.addEventListener('change', () => {
+    const editorState = appState.getEditor();
+    if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+    appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { hasFill: textHasFill.checked });
+    if (textFillSection) textFillSection.style.display = textHasFill.checked ? 'block' : 'none';
+  });
+
+  const textHasStroke = document.getElementById('text-has-stroke') as HTMLInputElement;
+  const textStrokeSection = document.getElementById('text-stroke-section');
+  textHasStroke?.addEventListener('change', () => {
+    const editorState = appState.getEditor();
+    if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+    appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { hasStroke: textHasStroke.checked });
+    if (textStrokeSection) textStrokeSection.style.display = textHasStroke.checked ? 'block' : 'none';
+  });
+
+  // Text stroke properties
+  setupColorInput('text-stroke-color', 'strokeColor');
+  setupPropInput('text-stroke-width', 'strokeWidth');
 
   // Text align buttons
   ['left', 'center', 'right'].forEach(align => {
@@ -207,6 +249,11 @@ function setupEditPropertyInputs(updateEditSelectedSectionFn: () => void): void 
       updateEditSelectedSectionFn();
     }
   });
+
+  // Array duplication inputs
+  setupPropInput('item-array-count', 'arrayCount');
+  setupPropInput('item-array-offset-x', 'arrayOffsetX');
+  setupPropInput('item-array-offset-y', 'arrayOffsetY');
 }
 
 /**
@@ -433,11 +480,33 @@ export function updateEditSelectedSection(): void {
   (document.getElementById('item-rotation') as HTMLInputElement).value = (item.rotation || 0).toString();
   (document.getElementById('item-opacity') as HTMLInputElement).value = (item.opacity ?? 1).toString();
 
+  // Update array properties (common to all items)
+  (document.getElementById('item-array-count') as HTMLInputElement).value = (item.arrayCount || 1).toString();
+  (document.getElementById('item-array-offset-x') as HTMLInputElement).value = (item.arrayOffsetX || 20).toString();
+  (document.getElementById('item-array-offset-y') as HTMLInputElement).value = (item.arrayOffsetY || 20).toString();
+
   // Show/hide type-specific properties
   if (item.type === 'shape') {
     const shapeItem = item as ShapePageItem;
     shapeProps!.style.display = 'block';
     textProps!.style.display = 'none';
+
+    // Determine default fill/stroke based on shape type
+    const isLinear = shapeItem.shapeType === 'line' || shapeItem.shapeType === 'arrow';
+    const hasFill = shapeItem.hasFill ?? !isLinear;
+    const hasStroke = shapeItem.hasStroke ?? true;
+
+    // Update fill toggle
+    const shapeHasFillCheckbox = document.getElementById('shape-has-fill') as HTMLInputElement;
+    const shapeFillSection = document.getElementById('shape-fill-section');
+    if (shapeHasFillCheckbox) shapeHasFillCheckbox.checked = hasFill;
+    if (shapeFillSection) shapeFillSection.style.display = hasFill ? 'block' : 'none';
+
+    // Update stroke toggle
+    const shapeHasStrokeCheckbox = document.getElementById('shape-has-stroke') as HTMLInputElement;
+    const shapeStrokeSection = document.getElementById('shape-stroke-section');
+    if (shapeHasStrokeCheckbox) shapeHasStrokeCheckbox.checked = hasStroke;
+    if (shapeStrokeSection) shapeStrokeSection.style.display = hasStroke ? 'block' : 'none';
 
     // Set up fill picker
     const fillPickerContainer = document.getElementById('item-fill-picker');
@@ -477,7 +546,50 @@ export function updateEditSelectedSection(): void {
       itemFontDropdown.setValue(textItem.fontFamily);
     }
     (document.getElementById('item-font-size') as HTMLInputElement).value = textItem.fontSize.toString();
-    (document.getElementById('item-text-color') as HTMLInputElement).value = textItem.color;
+
+    // Update fill toggle (default: true for text)
+    const hasFill = textItem.hasFill ?? true;
+    const textHasFillCheckbox = document.getElementById('text-has-fill') as HTMLInputElement;
+    const textFillSection = document.getElementById('text-fill-section');
+    if (textHasFillCheckbox) textHasFillCheckbox.checked = hasFill;
+    if (textFillSection) textFillSection.style.display = hasFill ? 'block' : 'none';
+
+    // Update stroke toggle (default: false for text)
+    const hasStroke = textItem.hasStroke ?? false;
+    const textHasStrokeCheckbox = document.getElementById('text-has-stroke') as HTMLInputElement;
+    const textStrokeSection = document.getElementById('text-stroke-section');
+    if (textHasStrokeCheckbox) textHasStrokeCheckbox.checked = hasStroke;
+    if (textStrokeSection) textStrokeSection.style.display = hasStroke ? 'block' : 'none';
+
+    // Set up text fill picker
+    const textFillPickerContainer = document.getElementById('text-fill-picker');
+    if (textFillPickerContainer) {
+      // Get current fill, falling back to color for backwards compatibility
+      const currentFill: FillConfig = textItem.fill || {
+        type: 'color',
+        color: textItem.color || '#000000'
+      };
+
+      if (textFillPicker) {
+        textFillPicker.setFill(currentFill);
+      } else {
+        textFillPicker = createFillPicker(textFillPickerContainer, currentFill, (fill) => {
+          const editorState = appState.getEditor();
+          if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+
+          // Update fill property
+          appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, {
+            fill,
+            // Also update color for backwards compatibility
+            color: fill.type === 'color' ? (fill.color || '#000000') : '#000000'
+          });
+        });
+      }
+    }
+
+    // Update stroke properties
+    (document.getElementById('text-stroke-color') as HTMLInputElement).value = textItem.strokeColor || '#000000';
+    (document.getElementById('text-stroke-width') as HTMLInputElement).value = (textItem.strokeWidth || 1).toString();
 
     // Update align button states
     ['left', 'center', 'right'].forEach(align => {

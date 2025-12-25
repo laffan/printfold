@@ -230,15 +230,15 @@
               <label for="opt-booklet-size">Booklet Size</label>
               <select id="opt-booklet-size">
                 <option value="half-letter">Half Letter</option>
-                <option value="quarter-letter">Quarter Letter</option>
+                <option value="quarter-letter" selected>Quarter Letter</option>
                 <option value="half-a4">Half A4</option>
                 <option value="quarter-a4">Quarter A4</option>
                 <option value="custom">Custom</option>
               </select>
             </div>
-            <div class="form-group" id="fill-space-group" style="display: none;">
+            <div class="form-group" id="fill-space-group">
               <label class="checkbox-label">
-                <input type="checkbox" id="opt-fill-space">
+                <input type="checkbox" id="opt-fill-space" checked>
                 <span>Fill available space</span>
               </label>
               <p class="hint" id="fill-space-hint">Print multiple rows per sheet, then cut</p>
@@ -271,6 +271,22 @@
                 <option value="20">20 pages</option>
                 <option value="24">24 pages</option>
               </select>
+            </div>
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="opt-creep-enabled">
+                <span>Creep Compensation</span>
+              </label>
+              <div id="creep-settings" style="display: none;">
+                <label>
+                  <span>Per Sheet</span>
+                  <div class="input-with-cap">
+                    <input type="number" id="opt-creep-per-sheet" value="0.0625" min="0" step="0.0001">
+                    <span class="input-cap" data-for="opt-creep-per-sheet">in</span>
+                  </div>
+                </label>
+                <small class="help-text">Amount to narrow each successive sheet (0.0625" typical for bond paper)</small>
+              </div>
             </div>
           </div>
         </div>
@@ -592,24 +608,35 @@
 
               <!-- Shape properties -->
               <div id="shape-properties" class="edit-properties" style="display: none;">
-                <div class="form-group inline-sizes">
-                  <label>
+                <div class="form-group toggle-section">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="shape-has-fill" checked>
                     <span>Fill</span>
+                  </label>
+                  <div id="shape-fill-section">
                     <div id="item-fill-picker"></div>
-                  </label>
-                  <label>
-                    <span>Stroke</span>
-                    <input type="color" id="item-stroke" value="#000000">
-                  </label>
+                  </div>
                 </div>
-                <div class="form-group">
-                  <label>
-                    <span>Stroke Width</span>
-                    <div class="input-with-cap">
-                      <input type="number" id="item-stroke-width" step="0.5" min="0" value="1">
-                      <span class="input-cap" data-for="item-stroke-width">px</span>
-                    </div>
+                <div class="form-group toggle-section">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="shape-has-stroke" checked>
+                    <span>Stroke</span>
                   </label>
+                  <div id="shape-stroke-section">
+                    <div class="inline-sizes">
+                      <label>
+                        <span>Color</span>
+                        <input type="color" id="item-stroke" value="#000000">
+                      </label>
+                      <label>
+                        <span>Width</span>
+                        <div class="input-with-cap">
+                          <input type="number" id="item-stroke-width" step="0.5" min="0" value="1">
+                          <span class="input-cap" data-for="item-stroke-width">px</span>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -633,10 +660,6 @@
                       <span class="input-cap" data-for="item-font-size">pt</span>
                     </div>
                   </label>
-                  <label>
-                    <span>Color</span>
-                    <input type="color" id="item-text-color" value="#000000">
-                  </label>
                 </div>
                 <div class="form-group">
                   <label>Align</label>
@@ -652,6 +675,61 @@
                     <button id="item-bold" class="btn btn-icon btn-small" title="Bold"><b>B</b></button>
                     <button id="item-italic" class="btn btn-icon btn-small" title="Italic"><i>I</i></button>
                   </div>
+                </div>
+                <div class="form-group toggle-section">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="text-has-fill" checked>
+                    <span>Fill</span>
+                  </label>
+                  <div id="text-fill-section">
+                    <div id="text-fill-picker"></div>
+                  </div>
+                </div>
+                <div class="form-group toggle-section">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="text-has-stroke">
+                    <span>Stroke</span>
+                  </label>
+                  <div id="text-stroke-section" style="display: none;">
+                    <div class="inline-sizes">
+                      <label>
+                        <span>Color</span>
+                        <input type="color" id="text-stroke-color" value="#000000">
+                      </label>
+                      <label>
+                        <span>Width</span>
+                        <div class="input-with-cap">
+                          <input type="number" id="text-stroke-width" step="0.5" min="0" value="1">
+                          <span class="input-cap" data-for="text-stroke-width">px</span>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Array Duplication -->
+              <div id="array-section" class="form-group">
+                <label>Array</label>
+                <div class="inline-sizes three-col">
+                  <label>
+                    <span>Count</span>
+                    <input type="number" id="item-array-count" step="1" min="1" max="50" value="1">
+                  </label>
+                  <label>
+                    <span>X Offset</span>
+                    <div class="input-with-cap">
+                      <input type="number" id="item-array-offset-x" step="1" value="20">
+                      <span class="input-cap">pt</span>
+                    </div>
+                  </label>
+                  <label>
+                    <span>Y Offset</span>
+                    <div class="input-with-cap">
+                      <input type="number" id="item-array-offset-y" step="1" value="20">
+                      <span class="input-cap">pt</span>
+                    </div>
+                  </label>
                 </div>
               </div>
 

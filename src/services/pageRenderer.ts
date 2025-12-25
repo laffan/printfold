@@ -107,6 +107,13 @@ function createRenderNode(
 
   if (item.type === 'shape') {
     const shapeItem = item as ShapePageItem;
+    const isLinear = shapeItem.shapeType === 'line' || shapeItem.shapeType === 'arrow';
+    const hasFill = shapeItem.hasFill ?? !isLinear;
+    const hasStroke = shapeItem.hasStroke ?? true;
+    const strokeProps = hasStroke ? {
+      stroke: shapeItem.strokeColor || '#000000',
+      strokeWidth: (shapeItem.strokeWidth || 1) * scale,
+    } : {};
 
     if (shapeItem.shapeType === 'rectangle') {
       const rect = new Konva.Rect({
@@ -114,12 +121,13 @@ function createRenderNode(
         y,
         width,
         height,
-        stroke: shapeItem.strokeColor || '#000000',
-        strokeWidth: (shapeItem.strokeWidth || 1) * scale,
+        ...strokeProps,
         rotation: item.rotation || 0,
         opacity,
       });
-      applyFillToShape(rect, shapeItem.fill, shapeItem.fillColor, width, height, imageLoadPromises);
+      if (hasFill) {
+        applyFillToShape(rect, shapeItem.fill, shapeItem.fillColor, width, height, imageLoadPromises);
+      }
       return rect;
     } else if (shapeItem.shapeType === 'ellipse') {
       const ellipse = new Konva.Ellipse({
@@ -127,12 +135,13 @@ function createRenderNode(
         y: y + height / 2,
         radiusX: width / 2,
         radiusY: height / 2,
-        stroke: shapeItem.strokeColor || '#000000',
-        strokeWidth: (shapeItem.strokeWidth || 1) * scale,
+        ...strokeProps,
         rotation: item.rotation || 0,
         opacity,
       });
-      applyFillToShape(ellipse, shapeItem.fill, shapeItem.fillColor, width, height, imageLoadPromises);
+      if (hasFill) {
+        applyFillToShape(ellipse, shapeItem.fill, shapeItem.fillColor, width, height, imageLoadPromises);
+      }
       return ellipse;
     } else if (shapeItem.shapeType === 'circle') {
       const radius = Math.min(width, height) / 2;
@@ -140,25 +149,26 @@ function createRenderNode(
         x: x + radius,
         y: y + radius,
         radius,
-        stroke: shapeItem.strokeColor || '#000000',
-        strokeWidth: (shapeItem.strokeWidth || 1) * scale,
+        ...strokeProps,
         rotation: item.rotation || 0,
         opacity,
       });
-      applyFillToShape(circle, shapeItem.fill, shapeItem.fillColor, radius * 2, radius * 2, imageLoadPromises);
+      if (hasFill) {
+        applyFillToShape(circle, shapeItem.fill, shapeItem.fillColor, radius * 2, radius * 2, imageLoadPromises);
+      }
       return circle;
     } else if (shapeItem.shapeType === 'line') {
       return new Konva.Line({
         points: [x, y, x + width, y + height],
-        stroke: shapeItem.strokeColor || '#000000',
-        strokeWidth: (shapeItem.strokeWidth || 2) * scale,
+        stroke: hasStroke ? (shapeItem.strokeColor || '#000000') : undefined,
+        strokeWidth: hasStroke ? (shapeItem.strokeWidth || 2) * scale : 0,
         opacity,
       });
     } else if (shapeItem.shapeType === 'arrow') {
       return new Konva.Arrow({
         points: [x, y, x + width, y + height],
-        stroke: shapeItem.strokeColor || '#000000',
-        strokeWidth: (shapeItem.strokeWidth || 2) * scale,
+        stroke: hasStroke ? (shapeItem.strokeColor || '#000000') : undefined,
+        strokeWidth: hasStroke ? (shapeItem.strokeWidth || 2) * scale : 0,
         pointerLength: 10 * scale,
         pointerWidth: 10 * scale,
         opacity,
@@ -166,7 +176,10 @@ function createRenderNode(
     }
   } else if (item.type === 'text') {
     const textItem = item as TextPageItem;
-    return new Konva.Text({
+    const hasFill = textItem.hasFill ?? true;
+    const hasStroke = textItem.hasStroke ?? false;
+
+    const textNode = new Konva.Text({
       x,
       y,
       width,
@@ -176,11 +189,23 @@ function createRenderNode(
       fontFamily: textItem.fontFamily,
       fontStyle: textItem.fontStyle === 'italic' ? 'italic' : 'normal',
       fontVariant: textItem.fontWeight === 'bold' ? 'bold' : 'normal',
-      fill: textItem.color,
       align: textItem.textAlign || 'left',
       rotation: item.rotation || 0,
       opacity,
     });
+
+    // Apply fill if enabled
+    if (hasFill) {
+      applyFillToShape(textNode, textItem.fill, textItem.color, width, height, imageLoadPromises);
+    }
+
+    // Apply stroke if enabled
+    if (hasStroke) {
+      textNode.stroke(textItem.strokeColor || '#000000');
+      textNode.strokeWidth((textItem.strokeWidth || 1) * scale);
+    }
+
+    return textNode;
   } else if (item.type === 'image') {
     const imageItem = item as ImagePageItem;
     const file = appState.getProject().files.find(f => f.id === imageItem.imageFileId);

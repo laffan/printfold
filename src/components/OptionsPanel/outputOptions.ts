@@ -68,6 +68,32 @@ export function setupOutputOptions(debounce: (fn: DebounceCallback) => void): vo
   bindSelect('opt-pages-per-sig', (value) => {
     appState.updateOutputOptions({ pagesPerSignature: parseInt(value) as OutputOptions['pagesPerSignature'] });
   }, debounce);
+
+  // Creep compensation
+  const creepEnabledCheckbox = document.getElementById('opt-creep-enabled') as HTMLInputElement;
+  const creepSettings = document.getElementById('creep-settings');
+  if (creepEnabledCheckbox) {
+    creepEnabledCheckbox.addEventListener('change', () => {
+      appState.updateOutputOptions({ creepEnabled: creepEnabledCheckbox.checked });
+      if (creepSettings) {
+        creepSettings.style.display = creepEnabledCheckbox.checked ? 'block' : 'none';
+      }
+    });
+  }
+
+  // Creep per sheet - convert from inches to points
+  const creepInput = document.getElementById('opt-creep-per-sheet') as HTMLInputElement;
+  if (creepInput) {
+    creepInput.addEventListener('input', () => {
+      const inchValue = parseFloat(creepInput.value);
+      if (isNaN(inchValue)) return;
+      // Convert inches to points (1 inch = 72 points)
+      const pointsValue = inchValue * 72;
+      debounce(() => {
+        appState.updateOutputOptions({ creepPerSheet: pointsValue });
+      });
+    });
+  }
 }
 
 /**

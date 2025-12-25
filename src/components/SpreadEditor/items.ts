@@ -101,19 +101,28 @@ export function createItemNode(
 
   if (item.type === 'shape') {
     const shapeItem = item as ShapePageItem;
+    const isLinear = shapeItem.shapeType === 'line' || shapeItem.shapeType === 'arrow';
+    const hasFill = shapeItem.hasFill ?? !isLinear;
+    const hasStroke = shapeItem.hasStroke ?? true;
+    const strokeProps = hasStroke ? {
+      stroke: shapeItem.strokeColor || '#000000',
+      strokeWidth: shapeItem.strokeWidth || 1,
+    } : {};
+
     if (shapeItem.shapeType === 'rectangle') {
       const rect = new Konva.Rect({
         x: xOffset + item.x,
         y: item.y,
         width: item.width,
         height: item.height,
-        stroke: shapeItem.strokeColor || '#000000',
-        strokeWidth: shapeItem.strokeWidth || 1,
+        ...strokeProps,
         rotation: item.rotation || 0,
         opacity,
         draggable: true,
       });
-      applyFillToShape(rect, shapeItem.fill, shapeItem.fillColor, item.width, item.height);
+      if (hasFill) {
+        applyFillToShape(rect, shapeItem.fill, shapeItem.fillColor, item.width, item.height);
+      }
       node = rect;
     } else if (shapeItem.shapeType === 'ellipse') {
       const ellipse = new Konva.Ellipse({
@@ -121,14 +130,15 @@ export function createItemNode(
         y: item.y + item.height / 2,
         radiusX: item.width / 2,
         radiusY: item.height / 2,
-        stroke: shapeItem.strokeColor || '#000000',
-        strokeWidth: shapeItem.strokeWidth || 1,
+        ...strokeProps,
         rotation: item.rotation || 0,
         opacity,
         draggable: true,
         offset: { x: 0, y: 0 },
       });
-      applyFillToShape(ellipse, shapeItem.fill, shapeItem.fillColor, item.width, item.height);
+      if (hasFill) {
+        applyFillToShape(ellipse, shapeItem.fill, shapeItem.fillColor, item.width, item.height);
+      }
       node = ellipse;
     } else if (shapeItem.shapeType === 'circle') {
       // Circle uses the minimum of width/height for radius
@@ -137,21 +147,22 @@ export function createItemNode(
         x: xOffset + item.x + radius,
         y: item.y + radius,
         radius: radius,
-        stroke: shapeItem.strokeColor || '#000000',
-        strokeWidth: shapeItem.strokeWidth || 1,
+        ...strokeProps,
         rotation: item.rotation || 0,
         opacity,
         draggable: true,
       });
-      applyFillToShape(circle, shapeItem.fill, shapeItem.fillColor, radius * 2, radius * 2);
+      if (hasFill) {
+        applyFillToShape(circle, shapeItem.fill, shapeItem.fillColor, radius * 2, radius * 2);
+      }
       node = circle;
     } else if (shapeItem.shapeType === 'line') {
       node = new Konva.Line({
         x: xOffset + item.x,
         y: item.y,
         points: [0, 0, item.width, 0],
-        stroke: shapeItem.strokeColor || '#000000',
-        strokeWidth: shapeItem.strokeWidth || 2,
+        stroke: hasStroke ? (shapeItem.strokeColor || '#000000') : undefined,
+        strokeWidth: hasStroke ? (shapeItem.strokeWidth || 2) : 0,
         rotation: item.rotation || 0,
         opacity,
         draggable: true,
@@ -161,8 +172,8 @@ export function createItemNode(
         x: xOffset + item.x,
         y: item.y,
         points: [0, 0, item.width, 0],
-        stroke: shapeItem.strokeColor || '#000000',
-        strokeWidth: shapeItem.strokeWidth || 2,
+        stroke: hasStroke ? (shapeItem.strokeColor || '#000000') : undefined,
+        strokeWidth: hasStroke ? (shapeItem.strokeWidth || 2) : 0,
         fill: shapeItem.strokeColor || '#000000',
         pointerLength: 10,
         pointerWidth: 8,
@@ -173,7 +184,10 @@ export function createItemNode(
     }
   } else if (item.type === 'text') {
     const textItem = item as TextPageItem;
-    node = new Konva.Text({
+    const hasFill = textItem.hasFill ?? true;
+    const hasStroke = textItem.hasStroke ?? false;
+
+    const textNode = new Konva.Text({
       x: xOffset + item.x,
       y: item.y,
       width: item.width,
@@ -181,12 +195,24 @@ export function createItemNode(
       fontSize: textItem.fontSize,
       fontFamily: textItem.fontFamily,
       fontStyle: `${textItem.fontWeight === 'bold' ? 'bold' : ''} ${textItem.fontStyle === 'italic' ? 'italic' : ''}`.trim() || 'normal',
-      fill: textItem.color,
       align: textItem.textAlign,
       rotation: item.rotation || 0,
       opacity,
       draggable: true,
     });
+
+    // Apply fill if enabled
+    if (hasFill) {
+      applyFillToShape(textNode, textItem.fill, textItem.color, item.width, textNode.height());
+    }
+
+    // Apply stroke if enabled
+    if (hasStroke) {
+      textNode.stroke(textItem.strokeColor || '#000000');
+      textNode.strokeWidth(textItem.strokeWidth || 1);
+    }
+
+    node = textNode;
   } else if (item.type === 'image') {
     const imageItem = item as ImagePageItem;
     const imageFile = appState.getProject().files.find(f => f.id === imageItem.imageFileId);
@@ -452,10 +478,35 @@ export function renderPageItems(
   if (!page.items) return;
 
   for (const item of page.items) {
+    const arrayCount = item.arrayCount || 1;
+    const arrayOffsetX = item.arrayOffsetX || 0;
+    const arrayOffsetY = item.arrayOffsetY || 0;
+
+    // Create the main item (interactive)
     const node = createItemNode(item, xOffset, page.pageNumber, zoomLevel, stage, itemsLayer, transformer, updateTransformerFn);
     if (node) {
       itemNodes.set(item.id, node);
       itemsLayer.add(node);
+
+      // Create array duplicates (non-interactive visual copies)
+      for (let i = 1; i < arrayCount; i++) {
+        const duplicatedItem = {
+          ...item,
+          id: `${item.id}-array-${i}`,
+          x: item.x + (arrayOffsetX * i),
+          y: item.y + (arrayOffsetY * i),
+        };
+        const duplicateNode = createItemNode(duplicatedItem, xOffset, page.pageNumber, zoomLevel, stage, itemsLayer, transformer, updateTransformerFn);
+        if (duplicateNode) {
+          // Make array duplicates non-interactive
+          duplicateNode.draggable(false);
+          duplicateNode.setAttr('isArrayDuplicate', true);
+          duplicateNode.setAttr('parentItemId', item.id);
+          // Remove click handler - duplicates shouldn't be selectable
+          duplicateNode.off('click tap');
+          itemsLayer.add(duplicateNode);
+        }
+      }
     }
   }
 }
