@@ -930,6 +930,8 @@ body {
 /* Draggable thumbnail styling */
 .spread-thumbnail.draggable-thumbnail {
   cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .spread-thumbnail.draggable-thumbnail:active {

@@ -311,7 +311,10 @@ export function renderThumbnails(
     // Create click areas for page selection (overlaid on canvas)
     const clickContainer = document.createElement('div');
     clickContainer.className = 'spread-thumbnail-clicks';
-    clickContainer.style.cssText = `position: absolute; top: 0; left: 0; width: 100%; height: ${thumbHeight}px; display: flex;`;
+    // For static spreads, disable pointer events on overlay so drag can work on thumbDiv
+    // (labels already have click handlers for page selection)
+    const pointerEvents = isUserStaticSpread ? 'pointer-events: none;' : '';
+    clickContainer.style.cssText = `position: absolute; top: 0; left: 0; width: 100%; height: ${thumbHeight}px; display: flex; ${pointerEvents}`;
 
     // Verso click area
     const versoClick = document.createElement('div');
