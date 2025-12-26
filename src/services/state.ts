@@ -448,6 +448,7 @@ class AppState {
   /**
    * Insert a static page at the currently selected position
    * Pushes existing pages forward by 1
+   * Automatically adds available pages to maintain signature boundaries
    */
   insertStaticPageAtSelection(): void {
     const prevState = this.project;
@@ -457,6 +458,8 @@ class AppState {
       console.warn('No page selected');
       return;
     }
+
+    const pagesPerSig = this.project.outputOptions.pagesPerSignature;
 
     // Collect all pages from signatures into a flat array
     const allPages: import('../types').PageContent[] = [];
@@ -489,6 +492,27 @@ class AppState {
     // Insert the new page
     allPages.splice(actualInsertIndex, 0, newPage);
 
+    // Check if we need to add available pages to maintain signature boundaries
+    const currentTotal = allPages.length;
+    const remainder = currentTotal % pagesPerSig;
+    if (remainder !== 0) {
+      // Need to add (pagesPerSig - remainder) available pages at the end
+      const pagesToAdd = pagesPerSig - remainder;
+      const maxPageNum = currentTotal; // Will be renumbered, but need unique starting point
+      for (let i = 0; i < pagesToAdd; i++) {
+        allPages.push({
+          id: crypto.randomUUID(),
+          pageNumber: maxPageNum + 1 + i, // Will be renumbered
+          pageState: 'available',
+          sections: [],
+          isBlank: true,
+          isRecto: false, // Will be recalculated
+          isStatic: false,
+          items: [],
+        });
+      }
+    }
+
     // Renumber all pages (1-based page numbers)
     allPages.forEach((page, index) => {
       const pageNum = index + 1;
@@ -508,7 +532,6 @@ class AppState {
     }
 
     // Rebuild signatures
-    const pagesPerSig = this.project.outputOptions.pagesPerSignature;
     const spreadsPerSig = pagesPerSig / 2;
     const newSignatures: import('../types').Signature[] = [];
 
