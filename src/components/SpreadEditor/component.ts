@@ -5,15 +5,21 @@
 
 import Konva from 'konva';
 import { appState } from '../../services/state';
-import type { Spread, PageContent, Margins, PageItem, ImagePageItem, FillConfig } from '../../types';
+import type { PageContent, Margins, PageItem, ImagePageItem, FillConfig } from '../../types';
 import { SHEET_SIZES } from '../../types';
 import type { MarginLine, MarginLabel } from './types';
-import { createItemNode, renderPageItems, renderSpanningItems } from './items';
+import { createItemNode, renderPageItems } from './items';
 import { renderThumbnails } from './thumbnails';
 import { drawMarginGuides, getMarginsForPage } from './margins';
 import { drawPageContent } from './content';
 import { switchToSelectedTab } from '../OptionsPanel/editPage';
 import { createSelectionMarquee, showContextMenu, createItemContextMenu, hideContextMenu } from './selection';
+
+// Type for visual spreads (reading order pairs)
+interface VisualSpread {
+  verso: PageContent | null;
+  recto: PageContent | null;
+}
 
 export class SpreadEditor {
   private container!: HTMLElement;
@@ -307,12 +313,11 @@ export class SpreadEditor {
    * Navigate to a specific page number
    */
   navigateToPage(pageNumber: number): void {
-    const project = appState.getProject();
-    const allSpreads = project.signatures.flatMap(sig => sig.spreads);
+    const visualSpreads = this.getVisualSpreads();
 
-    // Find the spread containing this page
-    for (let i = 0; i < allSpreads.length; i++) {
-      const spread = allSpreads[i];
+    // Find the visual spread containing this page
+    for (let i = 0; i < visualSpreads.length; i++) {
+      const spread = visualSpreads[i];
       if (
         (spread.verso && spread.verso.pageNumber === pageNumber) ||
         (spread.recto && spread.recto.pageNumber === pageNumber)
@@ -648,17 +653,68 @@ export class SpreadEditor {
     };
   }
 
-  private getCurrentSpread(): Spread | null {
+  /**
+   * Get all visual spreads (reading order pairs)
+   * Visual spreads show pages in reading order: [null|1], [2|3], [4|5], etc.
+   * This correctly represents page transitions across signatures
+   */
+  private getVisualSpreads(): VisualSpread[] {
     const project = appState.getProject();
-    const allSpreads = project.signatures.flatMap(sig => sig.spreads);
 
-    if (allSpreads.length === 0) return null;
-    return allSpreads[this.currentSpreadIndex] || allSpreads[0];
+    // Collect all pages from all signatures
+    const allPages: PageContent[] = [];
+    project.signatures.forEach(sig => {
+      for (const spread of sig.spreads) {
+        if (spread.verso) allPages.push(spread.verso);
+        if (spread.recto) allPages.push(spread.recto);
+      }
+    });
+
+    // Sort pages by page number
+    allPages.sort((a, b) => a.pageNumber - b.pageNumber);
+
+    if (allPages.length === 0) return [];
+
+    // Find the highest page number to determine total visual spreads
+    const maxPageNum = Math.max(...allPages.map(p => p.pageNumber));
+
+    // Create a map for quick page lookup
+    const pageMap = new Map<number, PageContent>();
+    for (const page of allPages) {
+      pageMap.set(page.pageNumber, page);
+    }
+
+    // Create visual spreads: [null|1], [2|3], [4|5], ..., [N|null]
+    const visualSpreads: VisualSpread[] = [];
+
+    // First spread: [null | page 1]
+    visualSpreads.push({
+      verso: null,
+      recto: pageMap.get(1) || null,
+    });
+
+    // Middle and last spreads: [2|3], [4|5], etc.
+    for (let versoNum = 2; versoNum <= maxPageNum; versoNum += 2) {
+      const rectoNum = versoNum + 1;
+      visualSpreads.push({
+        verso: pageMap.get(versoNum) || null,
+        recto: rectoNum <= maxPageNum ? (pageMap.get(rectoNum) || null) : null,
+      });
+    }
+
+    return visualSpreads;
+  }
+
+  private getCurrentSpread(): VisualSpread | null {
+    const visualSpreads = this.getVisualSpreads();
+
+    if (visualSpreads.length === 0) return null;
+    return visualSpreads[this.currentSpreadIndex] || visualSpreads[0];
   }
 
   private navigateSpread(delta: number): void {
-    const project = appState.getProject();
-    const totalSpreads = project.signatures.reduce((sum, sig) => sum + sig.spreads.length, 0);
+    const visualSpreads = this.getVisualSpreads();
+    const totalSpreads = visualSpreads.length;
 
     if (totalSpreads === 0) return;
 
@@ -678,8 +734,8 @@ export class SpreadEditor {
    * Navigate to a specific spread by index
    */
   navigateToSpread(spreadIndex: number): void {
-    const project = appState.getProject();
-    const totalSpreads = project.signatures.reduce((sum, sig) => sum + sig.spreads.length, 0);
+    const visualSpreads = this.getVisualSpreads();
+    const totalSpreads = visualSpreads.length;
 
     if (spreadIndex >= 0 && spreadIndex < totalSpreads) {
       this.currentSpreadIndex = spreadIndex;
@@ -691,8 +747,8 @@ export class SpreadEditor {
   }
 
   private updateSpreadIndicator(): void {
-    const project = appState.getProject();
-    const totalSpreads = project.signatures.reduce((sum, sig) => sum + sig.spreads.length, 0);
+    const visualSpreads = this.getVisualSpreads();
+    const totalSpreads = visualSpreads.length;
     const indicator = document.getElementById('spread-indicator')!;
     indicator.textContent = `Spread ${this.currentSpreadIndex + 1} of ${Math.max(1, totalSpreads)}`;
   }
@@ -747,35 +803,24 @@ export class SpreadEditor {
       return;
     }
 
-    // Check if this is the first spread and handle back cover display
-    // The back cover is identified by: first spread (index 0) with verso page number 0
-    const isFirstSpread = this.currentSpreadIndex === 0;
-    const signatureCount = project.signatures.length;
-    const isBackCoverPage = isFirstSpread && spread.verso?.pageNumber === 0;
+    // Visual spreads use reading order: [null|1], [2|3], [4|5], etc.
+    // Null pages only appear at booklet edges (first spread verso, or last spread recto)
+    // These are rendered as transparent placeholders, not white pages
 
     // Draw verso (left) page
     if (spread.verso) {
-      if (isBackCoverPage) {
-        if (signatureCount === 1) {
-          // Single signature: draw as normal editable page with "Back Cover" label above
-          this.drawPage(spread.verso, 0, 0, pageDimensions);
-          this.drawBackCoverLabel(0, pageDimensions.width);
-        } else {
-          // Multiple signatures: collapse the left side (internal signature page is confusing)
-          this.drawHiddenPage(0, 0, pageDimensions);
-        }
-      } else {
-        this.drawPage(spread.verso, 0, 0, pageDimensions);
-      }
+      this.drawPage(spread.verso, 0, 0, pageDimensions);
     } else {
-      this.drawPageOutline(0, 0, pageDimensions.width, pageDimensions.height);
+      // First spread has null verso - draw transparent placeholder
+      this.drawTransparentPlaceholder(0, 0, pageDimensions.width, pageDimensions.height);
     }
 
     // Draw recto (right) page
     if (spread.recto) {
       this.drawPage(spread.recto, pageDimensions.width, 0, pageDimensions);
     } else {
-      this.drawPageOutline(pageDimensions.width, 0, pageDimensions.width, pageDimensions.height);
+      // Last spread may have null recto - draw transparent placeholder
+      this.drawTransparentPlaceholder(pageDimensions.width, 0, pageDimensions.width, pageDimensions.height);
     }
 
     // Draw selected page indicator
@@ -797,7 +842,7 @@ export class SpreadEditor {
    * Draw a solid green bar below the selected page
    */
   private drawSelectedPageIndicator(
-    spread: Spread,
+    spread: VisualSpread,
     pageDimensions: { width: number; height: number },
     editorState: ReturnType<typeof appState.getEditor>
   ): void {
@@ -831,7 +876,7 @@ export class SpreadEditor {
    * Add invisible click areas for page selection
    */
   private addPageClickAreas(
-    spread: Spread,
+    spread: VisualSpread,
     pageDimensions: { width: number; height: number }
   ): void {
     // Verso click area
@@ -882,9 +927,7 @@ export class SpreadEditor {
    * Render items on static pages in the current spread
    */
   private renderItems(): void {
-    const project = appState.getProject();
-    const allSpreads = project.signatures.flatMap(sig => sig.spreads);
-    const spread = allSpreads[this.currentSpreadIndex];
+    const spread = this.getCurrentSpread();
     const pageDimensions = this.getPageDimensions();
 
     if (!spread) return;
@@ -941,24 +984,89 @@ export class SpreadEditor {
       );
     }
 
-    // Check if this spread is a static spread and render spanning items
-    const staticSpreads = project.staticSpreads || [];
-    const staticSpread = staticSpreads.find(s => s.id === spread.id);
-    if (staticSpread?.spanningItems && staticSpread.spanningItems.length > 0) {
-      renderSpanningItems(
-        staticSpread.spanningItems,
-        staticSpread.id,
-        pageDimensions,
-        this.itemNodes,
-        this.itemsLayer,
-        this.zoomLevel,
-        this.stage,
-        this.transformer,
-        () => this.updateTransformer()
-      );
-    }
+    // Render crossing items from adjacent pages
+    // These are items that extend past the page boundary into the adjacent page
+    this.renderCrossingItems(spread, pageDimensions);
 
     this.itemsLayer.draw();
+  }
+
+  /**
+   * Render items from adjacent pages that cross into the current page
+   * This ensures items spanning page boundaries are fully visible
+   */
+  private renderCrossingItems(
+    spread: VisualSpread,
+    pageDimensions: { width: number; height: number }
+  ): void {
+    const pageWidth = pageDimensions.width;
+
+    // Render verso items that extend into recto (x + width > pageWidth)
+    // These items are already rendered at xOffset=0, but we need to ensure
+    // the crossing portion is visible above the recto page background
+    if (spread.verso?.items && spread.recto) {
+      const crossingToRecto = spread.verso.items.filter(item =>
+        item.x + item.width > pageWidth
+      );
+
+      for (const item of crossingToRecto) {
+        // Create a clipped version of the item for the recto side only
+        // This renders at xOffset=0 but represents the portion from pageWidth onwards
+        const crossingNode = createItemNode(
+          item,
+          0, // Same xOffset as original - positioned relative to verso
+          spread.verso.pageNumber,
+          this.zoomLevel,
+          this.stage,
+          this.itemsLayer,
+          this.transformer,
+          () => this.updateTransformer()
+        );
+
+        if (crossingNode) {
+          // Mark as crossing item so it's not registered for selection/interaction
+          crossingNode.setAttr('isCrossingItem', true);
+          crossingNode.setAttr('originalItemId', item.id);
+          // Disable interaction - the original item handles it
+          crossingNode.draggable(false);
+          crossingNode.listening(false);
+          // Move to top so it's visible above the recto page background
+          crossingNode.moveToTop();
+          this.itemsLayer.add(crossingNode);
+        }
+      }
+    }
+
+    // Render recto items that extend into verso (x < 0)
+    // These items are rendered at xOffset=pageWidth, so items with negative x
+    // extend into verso territory
+    if (spread.recto?.items && spread.verso) {
+      const crossingToVerso = spread.recto.items.filter(item => item.x < 0);
+
+      for (const item of crossingToVerso) {
+        // Create a version of the item for the verso side
+        const crossingNode = createItemNode(
+          item,
+          pageWidth, // Same xOffset as original - positioned relative to recto
+          spread.recto.pageNumber,
+          this.zoomLevel,
+          this.stage,
+          this.itemsLayer,
+          this.transformer,
+          () => this.updateTransformer()
+        );
+
+        if (crossingNode) {
+          // Mark as crossing item
+          crossingNode.setAttr('isCrossingItem', true);
+          crossingNode.setAttr('originalItemId', item.id);
+          crossingNode.draggable(false);
+          crossingNode.listening(false);
+          crossingNode.moveToTop();
+          this.itemsLayer.add(crossingNode);
+        }
+      }
+    }
   }
 
   /**
@@ -1032,56 +1140,36 @@ export class SpreadEditor {
   }
 
   /**
-   * Draw a "Back Cover" label above the page
-   * Shown for single-signature booklets on the first spread's verso
+   * Draw a transparent placeholder for booklet edges
+   * Shown for first spread verso (before page 1) and last spread recto (after last even page)
+   * Uses a subtle transparent overlay to indicate no page exists there
    */
-  private drawBackCoverLabel(x: number, pageWidth: number): void {
+  private drawTransparentPlaceholder(x: number, y: number, width: number, height: number): void {
+    // Draw a subtle transparent rectangle with dashed border
+    const placeholder = new Konva.Rect({
+      x,
+      y,
+      width,
+      height,
+      fill: 'rgba(128, 128, 128, 0.1)',
+      stroke: '#aaaaaa',
+      strokeWidth: 1,
+      dash: [8, 4],
+    });
+    this.layer.add(placeholder);
+
+    // Add a label indicating this is the booklet edge
     const label = new Konva.Text({
-      x: x + pageWidth / 2,
-      y: -25,
-      text: 'Back Cover',
-      fontSize: 12,
-      fontStyle: 'bold',
-      fill: '#dc2626',
+      x: x + width / 2,
+      y: y + height / 2,
+      text: '(outside cover)',
+      fontSize: 11,
+      fill: '#888888',
       align: 'center',
     });
     label.offsetX(label.width() / 2);
+    label.offsetY(label.height() / 2);
     this.layer.add(label);
-  }
-
-  /**
-   * Draw a hidden/collapsed page placeholder
-   * Shown for multi-signature booklets where showing internal signature pages would be confusing
-   */
-  private drawHiddenPage(x: number, y: number, dimensions: { width: number; height: number }): void {
-    const { width, height } = dimensions;
-
-    // Draw a grayed out, narrower representation
-    const collapsedWidth = 30;
-
-    // Draw collapsed page indicator
-    const page = new Konva.Rect({
-      x: x + width - collapsedWidth,
-      y,
-      width: collapsedWidth,
-      height,
-      fill: '#e5e7eb',
-      stroke: '#d1d5db',
-      strokeWidth: 1,
-    });
-    this.layer.add(page);
-
-    // Draw fold lines
-    for (let i = 1; i < 4; i++) {
-      const lineY = y + (height / 4) * i;
-      const line = new Konva.Line({
-        points: [x + width - collapsedWidth + 5, lineY, x + width - 5, lineY],
-        stroke: '#9ca3af',
-        strokeWidth: 1,
-        dash: [3, 3],
-      });
-      this.layer.add(line);
-    }
   }
 
   private drawPageBackground(x: number, y: number, width: number, height: number, backgroundFill?: FillConfig): void {

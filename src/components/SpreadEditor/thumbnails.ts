@@ -241,12 +241,12 @@ export function renderThumbnails(
       thumbDiv.appendChild(promptContainer);
     }
 
-    // Click areas for page selection
+    // Click areas for page selection AND drag/drop
     const clickContainer = document.createElement('div');
     clickContainer.className = 'spread-thumbnail-clicks';
     clickContainer.style.cssText = `position: absolute; top: 0; left: 0; width: 100%; height: ${thumbHeight}px; display: flex;`;
 
-    // Verso click area
+    // Verso click/drag area
     const versoClick = document.createElement('div');
     versoClick.style.cssText = 'flex: 1; cursor: pointer;';
     versoClick.addEventListener('click', (e) => {
@@ -257,9 +257,14 @@ export function renderThumbnails(
         updateSpreadIndicatorFn();
       }
     });
+
+    // Add drag/drop handlers to verso click area
+    if (vSpread.verso) {
+      setupPageDragDrop(versoClick, vSpread.verso, 'verso', thumbnailContainer);
+    }
     clickContainer.appendChild(versoClick);
 
-    // Recto click area
+    // Recto click/drag area
     const rectoClick = document.createElement('div');
     rectoClick.style.cssText = 'flex: 1; cursor: pointer;';
     rectoClick.addEventListener('click', (e) => {
@@ -270,6 +275,11 @@ export function renderThumbnails(
         updateSpreadIndicatorFn();
       }
     });
+
+    // Add drag/drop handlers to recto click area
+    if (vSpread.recto) {
+      setupPageDragDrop(rectoClick, vSpread.recto, 'recto', thumbnailContainer);
+    }
     clickContainer.appendChild(rectoClick);
 
     thumbDiv.appendChild(clickContainer);
@@ -282,6 +292,76 @@ export function renderThumbnails(
   if (activeThumbnail) {
     activeThumbnail.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
+}
+
+/**
+ * Set up drag and drop handlers for a page area (either the click area or the label)
+ * Makes the entire area draggable if the page is static or has items
+ */
+function setupPageDragDrop(
+  element: HTMLElement,
+  page: PageContent,
+  position: 'verso' | 'recto',
+  thumbnailContainer: HTMLElement
+): void {
+  const pageState = page.pageState || 'available';
+  const hasItems = page.items && page.items.length > 0;
+  const isDraggable = pageState === 'static' || hasItems;
+
+  if (isDraggable) {
+    element.setAttribute('draggable', 'true');
+    element.style.cursor = 'grab';
+
+    element.addEventListener('dragstart', (e) => {
+      e.stopPropagation();
+      draggedPageNumber = page.pageNumber;
+      e.dataTransfer!.effectAllowed = 'move';
+      e.dataTransfer!.setData('application/x-printfold-page', JSON.stringify({
+        pageNumber: page.pageNumber
+      }));
+      element.style.opacity = '0.5';
+    });
+
+    element.addEventListener('dragend', () => {
+      element.style.opacity = '1';
+      draggedPageNumber = -1;
+      // Clear all drop targets
+      thumbnailContainer.querySelectorAll('.page-drop-target').forEach(el => {
+        el.classList.remove('page-drop-target');
+      });
+    });
+  }
+
+  // Always set up as drop target (for receiving dragged pages)
+  element.addEventListener('dragover', (e) => {
+    if (draggedPageNumber === -1) return;
+    if (draggedPageNumber === page.pageNumber) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer!.dropEffect = 'move';
+    element.classList.add('page-drop-target');
+  });
+
+  element.addEventListener('dragleave', () => {
+    element.classList.remove('page-drop-target');
+  });
+
+  element.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    element.classList.remove('page-drop-target');
+
+    const dataStr = e.dataTransfer?.getData('application/x-printfold-page');
+    if (!dataStr) return;
+
+    const data = JSON.parse(dataStr);
+    const sourcePageNumber: number = data.pageNumber;
+
+    if (sourcePageNumber !== page.pageNumber) {
+      // Move to this exact page position
+      appState.moveStaticPage(sourcePageNumber, page.pageNumber);
+    }
+  });
 }
 
 /**
@@ -429,7 +509,8 @@ function drawPageContent(
 }
 
 /**
- * Create a page label element with drag/drop handling
+ * Create a page label element (page number display)
+ * Note: Drag/drop is now handled by the click areas (setupPageDragDrop)
  */
 function createPageLabel(
   page: PageContent,
@@ -447,70 +528,18 @@ function createPageLabel(
   const pageState = page.pageState || 'available';
   label.classList.add(`page-state-${pageState}`);
 
-  // Click handler
+  // Indicate if this page is draggable (for visual feedback)
+  const hasItems = page.items && page.items.length > 0;
+  const isDraggable = pageState === 'static' || hasItems;
+  if (isDraggable) {
+    label.classList.add('draggable');
+  }
+
+  // Click handler (labels are below the click areas, but this is a fallback)
   label.addEventListener('click', (e) => {
     e.stopPropagation();
     selectPageFn(page.pageNumber, position);
     updateSpreadIndicatorFn();
-  });
-
-  // Make pages draggable if they're static OR have items
-  const hasItems = page.items && page.items.length > 0;
-  const isDraggable = pageState === 'static' || hasItems;
-
-  if (isDraggable) {
-    label.setAttribute('draggable', 'true');
-    label.style.cursor = 'grab';
-
-    label.addEventListener('dragstart', (e) => {
-      e.stopPropagation();
-      draggedPageNumber = page.pageNumber;
-      e.dataTransfer!.effectAllowed = 'move';
-      e.dataTransfer!.setData('application/x-printfold-page', JSON.stringify({
-        pageNumber: page.pageNumber
-      }));
-      label.classList.add('dragging-page');
-      label.style.opacity = '0.5';
-    });
-
-    label.addEventListener('dragend', () => {
-      label.classList.remove('dragging-page');
-      label.style.opacity = '1';
-      draggedPageNumber = -1;
-      thumbnailContainer.querySelectorAll('.page-drop-target').forEach(el => {
-        el.classList.remove('page-drop-target');
-      });
-    });
-  }
-
-  // Drop target for dragged static pages
-  label.addEventListener('dragover', (e) => {
-    if (draggedPageNumber === -1) return;
-    if (draggedPageNumber === page.pageNumber) return;
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer!.dropEffect = 'move';
-    label.classList.add('page-drop-target');
-  });
-
-  label.addEventListener('dragleave', () => {
-    label.classList.remove('page-drop-target');
-  });
-
-  label.addEventListener('drop', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    label.classList.remove('page-drop-target');
-
-    const dataStr = e.dataTransfer?.getData('application/x-printfold-page');
-    if (!dataStr) return;
-
-    const data = JSON.parse(dataStr);
-    const sourcePageNumber: number = data.pageNumber;
-
-    if (sourcePageNumber !== page.pageNumber) {
-      appState.moveStaticPage(sourcePageNumber, page.pageNumber);
-    }
   });
 
   return label;
