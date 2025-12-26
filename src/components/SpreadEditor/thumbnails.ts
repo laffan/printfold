@@ -1,23 +1,19 @@
 /**
  * SpreadEditor Thumbnails Module
- * Handles rendering of spread thumbnails in the sidebar
+ * Handles rendering of page thumbnails in the sidebar
+ * Uses visual spreads (reading order pairs) instead of signature-based spreads
  */
 
 import { appState } from '../../services/state';
-import type { Spread } from '../../types';
-
-// Track drag state for spreads
-let draggedSpreadId: string | null = null;
-let dragSourceSpreadIndex: number = -1;
-
-// Track drag state for signatures
-let draggedSignatureIndex: number = -1;
+import type { PageContent } from '../../types';
 
 // Track drag state for individual pages
 let draggedPageNumber: number = -1;
 
 /**
- * Render all spread thumbnails
+ * Render all page thumbnails as visual spreads
+ * Visual spreads show pages in reading order: [null|1], [2|3], [4|5], etc.
+ * This correctly represents page transitions across signatures
  */
 export function renderThumbnails(
   thumbnailContainer: HTMLElement,
@@ -37,411 +33,197 @@ export function renderThumbnails(
     return;
   }
 
-  // Calculate thumbnail dimensions - maintain actual spread aspect ratio
+  // Collect all pages from all signatures
+  const allPages: PageContent[] = [];
+  const pageToSignature = new Map<number, number>(); // pageNumber -> signatureIndex
+
+  project.signatures.forEach((sig, sigIdx) => {
+    for (const spread of sig.spreads) {
+      if (spread.verso) {
+        allPages.push(spread.verso);
+        pageToSignature.set(spread.verso.pageNumber, sigIdx);
+      }
+      if (spread.recto) {
+        allPages.push(spread.recto);
+        pageToSignature.set(spread.recto.pageNumber, sigIdx);
+      }
+    }
+  });
+
+  // Sort pages by page number
+  allPages.sort((a, b) => a.pageNumber - b.pageNumber);
+
+  if (allPages.length === 0) {
+    return;
+  }
+
+  // Find the highest page number to determine total visual spreads
+  const maxPageNum = Math.max(...allPages.map(p => p.pageNumber));
+
+  // Create a map for quick page lookup
+  const pageMap = new Map<number, PageContent>();
+  for (const page of allPages) {
+    pageMap.set(page.pageNumber, page);
+  }
+
+  // Calculate thumbnail dimensions
   const thumbWidth = 80;
   const spreadAspect = (pageDimensions.width * 2) / pageDimensions.height;
   const thumbHeight = thumbWidth / spreadAspect;
 
-  // Track global spread index for navigation
-  let globalSpreadIndex = 0;
+  // Create visual spreads: [null|1], [2|3], [4|5], ..., [N|null]
+  // Page 1 is always recto (right), page 2 is verso (left), etc.
+  // Visual spread index 0 = [null|1], index 1 = [2|3], etc.
+  const visualSpreads: Array<{ verso: PageContent | null; recto: PageContent | null }> = [];
 
-  // Iterate through signatures to create grouped thumbnails
-  project.signatures.forEach((signature, sigIndex) => {
-    // Create signature container with dashed border
-    const sigContainer = document.createElement('div');
-    sigContainer.className = 'signature-thumbnail-group';
-    sigContainer.style.cssText = `
-      border: 1px dashed #9ca3af;
-      border-radius: 4px;
-      padding: 6px;
-      margin-bottom: 10px;
-      background: rgba(156, 163, 175, 0.05);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    `;
+  // First spread: [null | page 1]
+  visualSpreads.push({
+    verso: null,
+    recto: pageMap.get(1) || null,
+  });
 
-    // Add signature label
-    const sigLabel = document.createElement('div');
-    sigLabel.className = 'signature-label';
-    sigLabel.style.cssText = `
-      font-size: 9px;
-      color: #6b7280;
-      text-align: center;
-      margin-bottom: 4px;
-      font-weight: 500;
-    `;
-    sigLabel.textContent = `Sig ${sigIndex + 1}`;
-    sigContainer.appendChild(sigLabel);
+  // Middle and last spreads: [2|3], [4|5], etc.
+  for (let versoNum = 2; versoNum <= maxPageNum; versoNum += 2) {
+    const rectoNum = versoNum + 1;
+    visualSpreads.push({
+      verso: pageMap.get(versoNum) || null,
+      recto: rectoNum <= maxPageNum ? (pageMap.get(rectoNum) || null) : null,
+    });
+  }
 
-    // Make signatures draggable when there's more than one
-    if (project.signatures.length > 1) {
-      sigContainer.setAttribute('draggable', 'true');
-      sigContainer.style.cursor = 'grab';
+  // If maxPageNum is even, last spread ends with [maxPageNum | null]
+  // This is already handled above
 
-      // Signature drag start
-      sigContainer.addEventListener('dragstart', (e) => {
-        // Don't start signature drag if we're dragging a spread inside
-        if (draggedSpreadId !== null) {
-          e.preventDefault();
-          return;
-        }
-
-        draggedSignatureIndex = sigIndex;
-        e.dataTransfer!.effectAllowed = 'move';
-        e.dataTransfer!.setData('application/x-printfold-signature', JSON.stringify({
-          signatureIndex: sigIndex
-        }));
-
-        sigContainer.classList.add('dragging-signature');
-        sigContainer.style.opacity = '0.5';
-      });
-
-      // Signature drag end
-      sigContainer.addEventListener('dragend', () => {
-        sigContainer.classList.remove('dragging-signature');
-        sigContainer.style.opacity = '1';
-        draggedSignatureIndex = -1;
-
-        // Remove all signature drop indicators
-        thumbnailContainer.querySelectorAll('.signature-drop-target').forEach(el => {
-          el.classList.remove('signature-drop-target');
-          (el as HTMLElement).style.borderColor = '#9ca3af';
-        });
-      });
-
-      // Signature dragover (for receiving other signatures)
-      sigContainer.addEventListener('dragover', (e) => {
-        // Only handle signature drags, not spread drags
-        if (draggedSignatureIndex === -1) return;
-        if (draggedSignatureIndex === sigIndex) return;
-
-        e.preventDefault();
-        e.dataTransfer!.dropEffect = 'move';
-
-        sigContainer.classList.add('signature-drop-target');
-        sigContainer.style.borderColor = '#3b82f6';
-      });
-
-      // Signature dragleave
-      sigContainer.addEventListener('dragleave', (e) => {
-        // Check if we're leaving to a child element
-        if (sigContainer.contains(e.relatedTarget as Node)) return;
-
-        sigContainer.classList.remove('signature-drop-target');
-        sigContainer.style.borderColor = '#9ca3af';
-      });
-
-      // Signature drop
-      sigContainer.addEventListener('drop', (e) => {
-        e.preventDefault();
-        sigContainer.classList.remove('signature-drop-target');
-        sigContainer.style.borderColor = '#9ca3af';
-
-        const dataStr = e.dataTransfer?.getData('application/x-printfold-signature');
-        if (!dataStr) return;
-
-        const data = JSON.parse(dataStr);
-        const sourceIndex: number = data.signatureIndex;
-
-        if (sourceIndex === sigIndex) return;
-
-        // Reorder signatures
-        appState.reorderSignatures(sourceIndex, sigIndex);
-      });
+  // Helper to get background color
+  const getBackgroundColor = (page: PageContent | null): string | null => {
+    if (!page) return null;
+    if (!page.backgroundFill) return null; // No fill = transparent
+    if (page.backgroundFill.type === 'color') {
+      return page.backgroundFill.color || null;
     }
+    if (page.backgroundFill.type === 'linearGradient' && page.backgroundFill.linearGradient?.stops?.length) {
+      return page.backgroundFill.linearGradient.stops[0].color;
+    }
+    if (page.backgroundFill.type === 'radialGradient' && page.backgroundFill.radialGradient?.stops?.length) {
+      return page.backgroundFill.radialGradient.stops[0].color;
+    }
+    return null;
+  };
 
-    // Render spreads within this signature
-    signature.spreads.forEach((spread, spreadIdxInSig) => {
-      // Check if this is the last spread of this signature
-      const isLastSpreadOfSig = spreadIdxInSig === signature.spreads.length - 1;
-      const spreadIndex = globalSpreadIndex;
-      globalSpreadIndex++;
+  // Render each visual spread
+  visualSpreads.forEach((vSpread, vSpreadIdx) => {
+    const thumbDiv = document.createElement('div');
+    thumbDiv.className = 'spread-thumbnail' + (vSpreadIdx === currentSpreadIndex ? ' active' : '');
 
-      const thumbDiv = document.createElement('div');
-      thumbDiv.className = 'spread-thumbnail' + (spreadIndex === currentSpreadIndex ? ' active' : '');
+    // Check for signature boundary between verso and recto
+    const versoSig = vSpread.verso ? pageToSignature.get(vSpread.verso.pageNumber) : null;
+    const rectoSig = vSpread.recto ? pageToSignature.get(vSpread.recto.pageNumber) : null;
+    const hasSigBoundary = versoSig !== null && rectoSig !== null && versoSig !== rectoSig;
 
-    // Create a small canvas for the thumbnail
+    // Create canvas for thumbnail
     const canvas = document.createElement('canvas');
-    canvas.width = thumbWidth * 2; // Higher res for retina
+    canvas.width = thumbWidth * 2;
     canvas.height = thumbHeight * 2;
     canvas.style.width = `${thumbWidth}px`;
     canvas.style.height = `${thumbHeight}px`;
     const ctx = canvas.getContext('2d')!;
     ctx.scale(2, 2);
 
-    // Draw page backgrounds (use backgroundFill if present)
-    const getBackgroundColor = (page: typeof spread.verso) => {
-      if (!page?.backgroundFill) return '#ffffff';
-      if (page.backgroundFill.type === 'color') {
-        return page.backgroundFill.color || '#ffffff';
+    // Draw verso background (left side)
+    if (vSpread.verso) {
+      const bgColor = getBackgroundColor(vSpread.verso);
+      if (bgColor) {
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, thumbWidth / 2, thumbHeight);
       }
-      // For gradients, use the first stop color
-      if (page.backgroundFill.type === 'linearGradient' && page.backgroundFill.linearGradient?.stops?.length) {
-        return page.backgroundFill.linearGradient.stops[0].color;
-      }
-      if (page.backgroundFill.type === 'radialGradient' && page.backgroundFill.radialGradient?.stops?.length) {
-        return page.backgroundFill.radialGradient.stops[0].color;
-      }
-      return '#ffffff';
-    };
-
-    // Draw verso background - only if page exists (empty positions show nothing)
-    if (spread.verso) {
-      ctx.fillStyle = getBackgroundColor(spread.verso);
-      ctx.fillRect(0, 0, thumbWidth / 2, thumbHeight);
+      // If no background fill, leave transparent
     }
-    // Empty verso: show nothing (transparent)
 
-    // Draw recto background - only if page exists
-    if (spread.recto) {
-      ctx.fillStyle = getBackgroundColor(spread.recto);
-      ctx.fillRect(thumbWidth / 2, 0, thumbWidth / 2, thumbHeight);
+    // Draw recto background (right side)
+    if (vSpread.recto) {
+      const bgColor = getBackgroundColor(vSpread.recto);
+      if (bgColor) {
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(thumbWidth / 2, 0, thumbWidth / 2, thumbHeight);
+      }
     }
-    // Empty recto: show nothing (transparent)
 
-    // Draw spine line
-    ctx.strokeStyle = '#e0e0e0';
-    ctx.lineWidth = 0.5;
+    // Draw spine line (with signature boundary indicator if needed)
+    if (hasSigBoundary) {
+      // Dashed line for signature boundary
+      ctx.strokeStyle = '#f97316'; // Orange for signature boundary
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 2]);
+    } else {
+      ctx.strokeStyle = '#e0e0e0';
+      ctx.lineWidth = 0.5;
+      ctx.setLineDash([]);
+    }
     ctx.beginPath();
     ctx.moveTo(thumbWidth / 2, 0);
     ctx.lineTo(thumbWidth / 2, thumbHeight);
     ctx.stroke();
+    ctx.setLineDash([]);
 
-    // Draw content indicators (simple lines to represent text)
+    // Draw content indicators
     const contentMargin = 3;
 
-    // Verso page content - only if page exists
-    if (spread.verso) {
-      if (spread.verso.isBlank || spread.verso.isStatic) {
-        // Draw blank/static page indicator
-        ctx.fillStyle = '#f0f0f0';
-        ctx.fillRect(1, 1, thumbWidth / 2 - 2, thumbHeight - 2);
-        ctx.fillStyle = '#cccccc';
-        ctx.font = '6px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(spread.verso.isStatic ? 'S' : '∅', thumbWidth / 4, thumbHeight / 2 + 2);
-      } else if (spread.verso.sections && spread.verso.sections.length > 0) {
-        ctx.fillStyle = '#d0d0d0';
-        let yPos = contentMargin;
-        for (const section of spread.verso.sections) {
-          if (yPos > thumbHeight - contentMargin) break;
-          const lineCount = (section as { lines?: string[] }).lines?.length || 1;
-          for (let i = 0; i < Math.min(lineCount, 5); i++) {
-            if (yPos > thumbHeight - contentMargin) break;
-            const lineWidth = (thumbWidth / 2 - contentMargin * 2) * (0.6 + Math.random() * 0.35);
-            ctx.fillRect(contentMargin, yPos, lineWidth, 1);
-            yPos += 2;
-          }
-          yPos += 1;
-        }
-      }
+    // Verso content
+    if (vSpread.verso) {
+      drawPageContent(ctx, vSpread.verso, 0, thumbWidth / 2, thumbHeight, contentMargin);
     }
 
-    // Recto page content - only if page exists
-    if (spread.recto) {
-      if (spread.recto.isBlank || spread.recto.isStatic) {
-        // Draw blank/static page indicator
-        ctx.fillStyle = '#f0f0f0';
-        ctx.fillRect(thumbWidth / 2 + 1, 1, thumbWidth / 2 - 2, thumbHeight - 2);
-        ctx.fillStyle = '#cccccc';
-        ctx.font = '6px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(spread.recto.isStatic ? 'S' : '∅', thumbWidth * 3 / 4, thumbHeight / 2 + 2);
-      } else if (spread.recto.sections.length > 0) {
-        ctx.fillStyle = '#d0d0d0';
-        let yPos = contentMargin;
-        for (const section of spread.recto.sections) {
-          if (yPos > thumbHeight - contentMargin) break;
-          const lineCount = (section as { lines?: string[] }).lines?.length || 1;
-          for (let i = 0; i < Math.min(lineCount, 5); i++) {
-            if (yPos > thumbHeight - contentMargin) break;
-            const lineWidth = (thumbWidth / 2 - contentMargin * 2) * (0.6 + Math.random() * 0.35);
-            ctx.fillRect(thumbWidth / 2 + contentMargin, yPos, lineWidth, 1);
-            yPos += 2;
-          }
-          yPos += 1;
-        }
-      }
+    // Recto content
+    if (vSpread.recto) {
+      drawPageContent(ctx, vSpread.recto, thumbWidth / 2, thumbWidth / 2, thumbHeight, contentMargin);
     }
-
-    // Check selection state for labels
-    const isVersoSelected = editorState.selectedPagePosition === 'verso' &&
-      spread.verso?.pageNumber === editorState.selectedPageNumber;
-    const isRectoSelected = editorState.selectedPagePosition === 'recto' &&
-      spread.recto?.pageNumber === editorState.selectedPageNumber;
-
-    // Get page states for verso and recto
-    const versoPageState = spread.verso?.pageState || 'available';
-    const rectoPageState = spread.recto?.pageState || 'available';
-
-    // Check if either page is static (for drag/drop)
-    const hasStaticPage = versoPageState === 'static' || rectoPageState === 'static';
 
     thumbDiv.appendChild(canvas);
 
-    // Create labels container with individual page numbers
+    // Create labels container
     const labelsContainer = document.createElement('div');
     labelsContainer.className = 'spread-thumbnail-labels';
 
-    // Verso label - only show if page exists
-    if (spread.verso) {
-      const versoLabel = document.createElement('div');
-      versoLabel.className = 'spread-thumbnail-page-label' + (isVersoSelected ? ' selected' : '');
-      versoLabel.textContent = spread.verso.pageNumber.toString();
-      versoLabel.title = `Page ${spread.verso.pageNumber}`;
+    // Check selection state
+    const isVersoSelected = editorState.selectedPagePosition === 'verso' &&
+      vSpread.verso?.pageNumber === editorState.selectedPageNumber;
+    const isRectoSelected = editorState.selectedPagePosition === 'recto' &&
+      vSpread.recto?.pageNumber === editorState.selectedPageNumber;
 
-      // Add page state class for background color
-      versoLabel.classList.add(`page-state-${versoPageState}`);
-      versoLabel.addEventListener('click', (e) => {
-        e.stopPropagation();
-        setCurrentSpreadIndex(spreadIndex);
-        selectPageFn(spread.verso!.pageNumber, 'verso');
-        updateSpreadIndicatorFn();
-      });
-
-      // Make static verso page draggable
-      if (versoPageState === 'static') {
-        versoLabel.setAttribute('draggable', 'true');
-        versoLabel.style.cursor = 'grab';
-
-        versoLabel.addEventListener('dragstart', (e) => {
-          e.stopPropagation();
-          draggedPageNumber = spread.verso!.pageNumber;
-          e.dataTransfer!.effectAllowed = 'move';
-          e.dataTransfer!.setData('application/x-printfold-page', JSON.stringify({
-            pageNumber: spread.verso!.pageNumber
-          }));
-          versoLabel.classList.add('dragging-page');
-          versoLabel.style.opacity = '0.5';
-        });
-
-        versoLabel.addEventListener('dragend', () => {
-          versoLabel.classList.remove('dragging-page');
-          versoLabel.style.opacity = '1';
-          draggedPageNumber = -1;
-          thumbnailContainer.querySelectorAll('.page-drop-target').forEach(el => {
-            el.classList.remove('page-drop-target');
-          });
-        });
-      }
-
-      // Drop target for dragged static pages
-      versoLabel.addEventListener('dragover', (e) => {
-        if (draggedPageNumber === -1) return;
-        if (draggedPageNumber === spread.verso!.pageNumber) return;
-        e.preventDefault();
-        e.stopPropagation();
-        e.dataTransfer!.dropEffect = 'move';
-        versoLabel.classList.add('page-drop-target');
-      });
-
-      versoLabel.addEventListener('dragleave', () => {
-        versoLabel.classList.remove('page-drop-target');
-      });
-
-      versoLabel.addEventListener('drop', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        versoLabel.classList.remove('page-drop-target');
-
-        const dataStr = e.dataTransfer?.getData('application/x-printfold-page');
-        if (!dataStr) return;
-
-        const data = JSON.parse(dataStr);
-        const sourcePageNumber: number = data.pageNumber;
-        const targetPageNumber = spread.verso!.pageNumber;
-
-        if (sourcePageNumber !== targetPageNumber) {
-          appState.moveStaticPage(sourcePageNumber, targetPageNumber);
-        }
-      });
-
+    // Verso label
+    if (vSpread.verso) {
+      const versoLabel = createPageLabel(
+        vSpread.verso,
+        isVersoSelected,
+        vSpreadIdx,
+        'verso',
+        selectPageFn,
+        setCurrentSpreadIndex,
+        updateSpreadIndicatorFn,
+        thumbnailContainer
+      );
       labelsContainer.appendChild(versoLabel);
     } else {
-      // Empty verso - add spacer to maintain layout
       const spacer = document.createElement('div');
       spacer.className = 'spread-thumbnail-page-label empty';
       spacer.style.visibility = 'hidden';
       labelsContainer.appendChild(spacer);
     }
 
-    // Recto label - only show if page exists
-    if (spread.recto) {
-      const rectoLabel = document.createElement('div');
-      rectoLabel.className = 'spread-thumbnail-page-label' + (isRectoSelected ? ' selected' : '');
-      rectoLabel.textContent = spread.recto.pageNumber.toString();
-      rectoLabel.title = `Page ${spread.recto.pageNumber}`;
-
-      // Add page state class for background color
-      rectoLabel.classList.add(`page-state-${rectoPageState}`);
-      rectoLabel.addEventListener('click', (e) => {
-        e.stopPropagation();
-        setCurrentSpreadIndex(spreadIndex);
-        selectPageFn(spread.recto!.pageNumber, 'recto');
-        updateSpreadIndicatorFn();
-      });
-
-      // Make static recto page draggable
-      if (rectoPageState === 'static') {
-        rectoLabel.setAttribute('draggable', 'true');
-        rectoLabel.style.cursor = 'grab';
-
-        rectoLabel.addEventListener('dragstart', (e) => {
-          e.stopPropagation();
-          draggedPageNumber = spread.recto!.pageNumber;
-          e.dataTransfer!.effectAllowed = 'move';
-          e.dataTransfer!.setData('application/x-printfold-page', JSON.stringify({
-            pageNumber: spread.recto!.pageNumber
-          }));
-          rectoLabel.classList.add('dragging-page');
-          rectoLabel.style.opacity = '0.5';
-        });
-
-        rectoLabel.addEventListener('dragend', () => {
-          rectoLabel.classList.remove('dragging-page');
-          rectoLabel.style.opacity = '1';
-          draggedPageNumber = -1;
-          thumbnailContainer.querySelectorAll('.page-drop-target').forEach(el => {
-            el.classList.remove('page-drop-target');
-          });
-        });
-      }
-
-      // Drop target for dragged static pages
-      rectoLabel.addEventListener('dragover', (e) => {
-        if (draggedPageNumber === -1) return;
-        if (draggedPageNumber === spread.recto!.pageNumber) return;
-        e.preventDefault();
-        e.stopPropagation();
-        e.dataTransfer!.dropEffect = 'move';
-        rectoLabel.classList.add('page-drop-target');
-      });
-
-      rectoLabel.addEventListener('dragleave', () => {
-        rectoLabel.classList.remove('page-drop-target');
-      });
-
-      rectoLabel.addEventListener('drop', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        rectoLabel.classList.remove('page-drop-target');
-
-        const dataStr = e.dataTransfer?.getData('application/x-printfold-page');
-        if (!dataStr) return;
-
-        const data = JSON.parse(dataStr);
-        const sourcePageNumber: number = data.pageNumber;
-        const targetPageNumber = spread.recto!.pageNumber;
-
-        if (sourcePageNumber !== targetPageNumber) {
-          appState.moveStaticPage(sourcePageNumber, targetPageNumber);
-        }
-      });
-
+    // Recto label
+    if (vSpread.recto) {
+      const rectoLabel = createPageLabel(
+        vSpread.recto,
+        isRectoSelected,
+        vSpreadIdx,
+        'recto',
+        selectPageFn,
+        setCurrentSpreadIndex,
+        updateSpreadIndicatorFn,
+        thumbnailContainer
+      );
       labelsContainer.appendChild(rectoLabel);
     } else {
-      // Empty recto - add spacer to maintain layout
       const spacer = document.createElement('div');
       spacer.className = 'spread-thumbnail-page-label empty';
       spacer.style.visibility = 'hidden';
@@ -450,164 +232,28 @@ export function renderThumbnails(
 
     thumbDiv.appendChild(labelsContainer);
 
-    // Create "Make Static?" buttons container for pages with items but not static
-    const versoNeedsPrompt = spread.verso && appState.pageNeedsStaticPrompt(spread.verso.pageNumber);
-    const rectoNeedsPrompt = spread.recto && appState.pageNeedsStaticPrompt(spread.recto.pageNumber);
+    // Add "Make Static?" prompts if needed
+    const versoNeedsPrompt = vSpread.verso && appState.pageNeedsStaticPrompt(vSpread.verso.pageNumber);
+    const rectoNeedsPrompt = vSpread.recto && appState.pageNeedsStaticPrompt(vSpread.recto.pageNumber);
 
     if (versoNeedsPrompt || rectoNeedsPrompt) {
-      const promptContainer = document.createElement('div');
-      promptContainer.className = 'make-static-prompt-container';
-      promptContainer.style.cssText = `
-        display: flex;
-        gap: 2px;
-        margin-top: 2px;
-        width: 100%;
-      `;
-
-      if (versoNeedsPrompt && spread.verso) {
-        const versoBtn = document.createElement('button');
-        versoBtn.className = 'make-static-btn';
-        versoBtn.textContent = 'Static?';
-        versoBtn.title = `Make page ${spread.verso.pageNumber} static (removes from text flow)`;
-        versoBtn.style.cssText = `
-          flex: 1;
-          font-size: 8px;
-          padding: 1px 2px;
-          border: 1px solid #ea580c;
-          background: #fff7ed;
-          color: #ea580c;
-          border-radius: 2px;
-          cursor: pointer;
-        `;
-        const pageNum = spread.verso.pageNumber;
-        versoBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          appState.makePageStatic(pageNum);
-        });
-        promptContainer.appendChild(versoBtn);
-      } else {
-        // Spacer for alignment
-        const spacer = document.createElement('div');
-        spacer.style.flex = '1';
-        promptContainer.appendChild(spacer);
-      }
-
-      if (rectoNeedsPrompt && spread.recto) {
-        const rectoBtn = document.createElement('button');
-        rectoBtn.className = 'make-static-btn';
-        rectoBtn.textContent = 'Static?';
-        rectoBtn.title = `Make page ${spread.recto.pageNumber} static (removes from text flow)`;
-        rectoBtn.style.cssText = `
-          flex: 1;
-          font-size: 8px;
-          padding: 1px 2px;
-          border: 1px solid #ea580c;
-          background: #fff7ed;
-          color: #ea580c;
-          border-radius: 2px;
-          cursor: pointer;
-        `;
-        const pageNum = spread.recto.pageNumber;
-        rectoBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          appState.makePageStatic(pageNum);
-        });
-        promptContainer.appendChild(rectoBtn);
-      } else if (versoNeedsPrompt) {
-        // Spacer for alignment
-        const spacer = document.createElement('div');
-        spacer.style.flex = '1';
-        promptContainer.appendChild(spacer);
-      }
-
+      const promptContainer = createStaticPromptContainer(vSpread, versoNeedsPrompt, rectoNeedsPrompt);
       thumbDiv.appendChild(promptContainer);
     }
 
-    // Make spreads with static pages draggable
-    if (hasStaticPage) {
-      thumbDiv.setAttribute('draggable', 'true');
-      thumbDiv.classList.add('draggable-thumbnail');
-
-      // Drag start
-      thumbDiv.addEventListener('dragstart', (e) => {
-        e.stopPropagation();
-
-        draggedSpreadId = spread.id;
-        dragSourceSpreadIndex = spreadIndex;
-
-        e.dataTransfer!.effectAllowed = 'move';
-        e.dataTransfer!.setData('application/x-printfold-spread', JSON.stringify({
-          spreadId: spread.id,
-          sourceSpreadIndex: spreadIndex
-        }));
-
-        thumbDiv.classList.add('dragging');
-      });
-
-      // Drag end
-      thumbDiv.addEventListener('dragend', () => {
-        thumbDiv.classList.remove('dragging');
-        draggedSpreadId = null;
-        dragSourceSpreadIndex = -1;
-
-        // Remove all drop indicators
-        thumbnailContainer.querySelectorAll('.drop-target, .drop-before, .drop-after').forEach(el => {
-          el.classList.remove('drop-target', 'drop-before', 'drop-after');
-        });
-      });
-    }
-
-    // Drop target handling - only for spreads with static pages
-    if (hasStaticPage) {
-      thumbDiv.addEventListener('dragover', (e) => {
-        if (!draggedSpreadId) return;
-        e.preventDefault();
-        e.dataTransfer!.dropEffect = 'move';
-
-        // Don't allow dropping on self
-        if (spreadIndex === dragSourceSpreadIndex) return;
-
-        // Add visual feedback
-        thumbDiv.classList.add('drop-target');
-      });
-
-      thumbDiv.addEventListener('dragleave', () => {
-        thumbDiv.classList.remove('drop-target', 'drop-before', 'drop-after');
-      });
-
-      thumbDiv.addEventListener('drop', (e) => {
-        e.preventDefault();
-        thumbDiv.classList.remove('drop-target', 'drop-before', 'drop-after');
-
-        const dataStr = e.dataTransfer?.getData('application/x-printfold-spread');
-        if (!dataStr) return;
-
-        const data = JSON.parse(dataStr);
-        const sourceSpreadId: string = data.spreadId;
-
-        if (!sourceSpreadId) return;
-
-        // Perform the reorder using spread IDs
-        appState.reorderStaticPages(sourceSpreadId, spread.id);
-      });
-    }
-
-    // Create click areas for page selection (overlaid on canvas)
+    // Click areas for page selection
     const clickContainer = document.createElement('div');
     clickContainer.className = 'spread-thumbnail-clicks';
-    // For static spreads, disable pointer events on overlay so drag can work on thumbDiv
-    // (labels already have click handlers for page selection)
-    const pointerEvents = hasStaticPage ? 'pointer-events: none;' : '';
-    clickContainer.style.cssText = `position: absolute; top: 0; left: 0; width: 100%; height: ${thumbHeight}px; display: flex; ${pointerEvents}`;
+    clickContainer.style.cssText = `position: absolute; top: 0; left: 0; width: 100%; height: ${thumbHeight}px; display: flex;`;
 
     // Verso click area
     const versoClick = document.createElement('div');
     versoClick.style.cssText = 'flex: 1; cursor: pointer;';
     versoClick.addEventListener('click', (e) => {
       e.stopPropagation();
-      setCurrentSpreadIndex(spreadIndex);
-      if (spread.verso) {
-        selectPageFn(spread.verso.pageNumber, 'verso');
+      setCurrentSpreadIndex(vSpreadIdx);
+      if (vSpread.verso) {
+        selectPageFn(vSpread.verso.pageNumber, 'verso');
       }
       updateSpreadIndicatorFn();
     });
@@ -618,9 +264,9 @@ export function renderThumbnails(
     rectoClick.style.cssText = 'flex: 1; cursor: pointer;';
     rectoClick.addEventListener('click', (e) => {
       e.stopPropagation();
-      setCurrentSpreadIndex(spreadIndex);
-      if (spread.recto) {
-        selectPageFn(spread.recto.pageNumber, 'recto');
+      setCurrentSpreadIndex(vSpreadIdx);
+      if (vSpread.recto) {
+        selectPageFn(vSpread.recto.pageNumber, 'recto');
       }
       updateSpreadIndicatorFn();
     });
@@ -628,10 +274,7 @@ export function renderThumbnails(
 
     thumbDiv.appendChild(clickContainer);
 
-      sigContainer.appendChild(thumbDiv);
-    });
-
-    thumbnailContainer.appendChild(sigContainer);
+    thumbnailContainer.appendChild(thumbDiv);
   });
 
   // Scroll active thumbnail into view
@@ -639,4 +282,199 @@ export function renderThumbnails(
   if (activeThumbnail) {
     activeThumbnail.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
+}
+
+/**
+ * Draw page content indicators on canvas
+ */
+function drawPageContent(
+  ctx: CanvasRenderingContext2D,
+  page: PageContent,
+  xOffset: number,
+  width: number,
+  height: number,
+  margin: number
+): void {
+  if (page.isBlank || page.isStatic || page.pageState === 'available') {
+    // Don't draw anything for blank/available pages - they're transparent
+    return;
+  }
+
+  if (page.sections && page.sections.length > 0) {
+    ctx.fillStyle = '#d0d0d0';
+    let yPos = margin;
+    for (const section of page.sections) {
+      if (yPos > height - margin) break;
+      const lineCount = (section as { lines?: string[] }).lines?.length || 1;
+      for (let i = 0; i < Math.min(lineCount, 5); i++) {
+        if (yPos > height - margin) break;
+        const lineWidth = (width - margin * 2) * (0.6 + Math.random() * 0.35);
+        ctx.fillRect(xOffset + margin, yPos, lineWidth, 1);
+        yPos += 2;
+      }
+      yPos += 1;
+    }
+  }
+}
+
+/**
+ * Create a page label element with drag/drop handling
+ */
+function createPageLabel(
+  page: PageContent,
+  isSelected: boolean,
+  spreadIndex: number,
+  position: 'verso' | 'recto',
+  selectPageFn: (pageNumber: number, position: 'verso' | 'recto') => void,
+  setCurrentSpreadIndex: (index: number) => void,
+  updateSpreadIndicatorFn: () => void,
+  thumbnailContainer: HTMLElement
+): HTMLElement {
+  const label = document.createElement('div');
+  label.className = 'spread-thumbnail-page-label' + (isSelected ? ' selected' : '');
+  label.textContent = page.pageNumber.toString();
+  label.title = `Page ${page.pageNumber}`;
+
+  const pageState = page.pageState || 'available';
+  label.classList.add(`page-state-${pageState}`);
+
+  // Click handler
+  label.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setCurrentSpreadIndex(spreadIndex);
+    selectPageFn(page.pageNumber, position);
+    updateSpreadIndicatorFn();
+  });
+
+  // Make static pages draggable
+  if (pageState === 'static') {
+    label.setAttribute('draggable', 'true');
+    label.style.cursor = 'grab';
+
+    label.addEventListener('dragstart', (e) => {
+      e.stopPropagation();
+      draggedPageNumber = page.pageNumber;
+      e.dataTransfer!.effectAllowed = 'move';
+      e.dataTransfer!.setData('application/x-printfold-page', JSON.stringify({
+        pageNumber: page.pageNumber
+      }));
+      label.classList.add('dragging-page');
+      label.style.opacity = '0.5';
+    });
+
+    label.addEventListener('dragend', () => {
+      label.classList.remove('dragging-page');
+      label.style.opacity = '1';
+      draggedPageNumber = -1;
+      thumbnailContainer.querySelectorAll('.page-drop-target').forEach(el => {
+        el.classList.remove('page-drop-target');
+      });
+    });
+  }
+
+  // Drop target for dragged static pages
+  label.addEventListener('dragover', (e) => {
+    if (draggedPageNumber === -1) return;
+    if (draggedPageNumber === page.pageNumber) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer!.dropEffect = 'move';
+    label.classList.add('page-drop-target');
+  });
+
+  label.addEventListener('dragleave', () => {
+    label.classList.remove('page-drop-target');
+  });
+
+  label.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    label.classList.remove('page-drop-target');
+
+    const dataStr = e.dataTransfer?.getData('application/x-printfold-page');
+    if (!dataStr) return;
+
+    const data = JSON.parse(dataStr);
+    const sourcePageNumber: number = data.pageNumber;
+
+    if (sourcePageNumber !== page.pageNumber) {
+      appState.moveStaticPage(sourcePageNumber, page.pageNumber);
+    }
+  });
+
+  return label;
+}
+
+/**
+ * Create "Make Static?" prompt container
+ */
+function createStaticPromptContainer(
+  vSpread: { verso: PageContent | null; recto: PageContent | null },
+  versoNeedsPrompt: boolean | null,
+  rectoNeedsPrompt: boolean | null
+): HTMLElement {
+  const promptContainer = document.createElement('div');
+  promptContainer.className = 'make-static-prompt-container';
+  promptContainer.style.cssText = `
+    display: flex;
+    gap: 2px;
+    margin-top: 2px;
+    width: 100%;
+  `;
+
+  if (versoNeedsPrompt && vSpread.verso) {
+    const versoBtn = document.createElement('button');
+    versoBtn.className = 'make-static-btn';
+    versoBtn.textContent = 'Static?';
+    versoBtn.title = `Make page ${vSpread.verso.pageNumber} static (removes from text flow)`;
+    versoBtn.style.cssText = `
+      flex: 1;
+      font-size: 8px;
+      padding: 1px 2px;
+      border: 1px solid #ea580c;
+      background: #fff7ed;
+      color: #ea580c;
+      border-radius: 2px;
+      cursor: pointer;
+    `;
+    const pageNum = vSpread.verso.pageNumber;
+    versoBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      appState.makePageStatic(pageNum);
+    });
+    promptContainer.appendChild(versoBtn);
+  } else {
+    const spacer = document.createElement('div');
+    spacer.style.flex = '1';
+    promptContainer.appendChild(spacer);
+  }
+
+  if (rectoNeedsPrompt && vSpread.recto) {
+    const rectoBtn = document.createElement('button');
+    rectoBtn.className = 'make-static-btn';
+    rectoBtn.textContent = 'Static?';
+    rectoBtn.title = `Make page ${vSpread.recto.pageNumber} static (removes from text flow)`;
+    rectoBtn.style.cssText = `
+      flex: 1;
+      font-size: 8px;
+      padding: 1px 2px;
+      border: 1px solid #ea580c;
+      background: #fff7ed;
+      color: #ea580c;
+      border-radius: 2px;
+      cursor: pointer;
+    `;
+    const pageNum = vSpread.recto.pageNumber;
+    rectoBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      appState.makePageStatic(pageNum);
+    });
+    promptContainer.appendChild(rectoBtn);
+  } else if (versoNeedsPrompt) {
+    const spacer = document.createElement('div');
+    spacer.style.flex = '1';
+    promptContainer.appendChild(spacer);
+  }
+
+  return promptContainer;
 }
