@@ -244,23 +244,55 @@ export class TextFlowEngine {
 
   /**
    * Create spreads from a linear array of pages
+   * NEW LAYOUT: First page on right, last page on left
+   * - First spread: [null | page 1] - ghost placeholder for back cover
+   * - Middle spreads: [2|3], [4|5], etc.
+   * - Last spread: [lastPage | null] - back cover on left
    */
   private createSpreadsFromPages(pages: PageContent[]): Spread[] {
     const spreads: Spread[] = [];
 
-    // Page 0 is back cover (verso of first spread)
-    // Page 1 is front cover (recto of first spread)
-    // Then pages 2,3 are spread 2, pages 4,5 are spread 3, etc.
+    if (pages.length === 0) return spreads;
 
-    for (let i = 0; i < pages.length; i += 2) {
-      const verso = pages[i] || null;
-      const recto = pages[i + 1] || null;
+    // Sort pages by page number
+    const sortedPages = [...pages].sort((a, b) => a.pageNumber - b.pageNumber);
 
+    // First spread: null verso (ghost placeholder), page 1 on recto
+    const page1 = sortedPages.find(p => p.pageNumber === 1) || sortedPages[0];
+    spreads.push({
+      id: crypto.randomUUID(),
+      spreadNumber: 1,
+      verso: null, // Ghost placeholder - UI renders back cover ghost here
+      recto: page1,
+    });
+
+    // Middle spreads: pair remaining pages
+    // Skip page 1, pair pages 2-3, 4-5, etc., but save last page for final spread
+    const remainingPages = sortedPages.filter(p => p.pageNumber !== 1);
+    const lastPage = remainingPages.length > 0 ? remainingPages[remainingPages.length - 1] : null;
+    const middlePages = lastPage ? remainingPages.slice(0, -1) : [];
+
+    for (let i = 0; i < middlePages.length; i += 2) {
+      const verso = middlePages[i] || null;
+      const recto = middlePages[i + 1] || null;
+
+      if (verso || recto) {
+        spreads.push({
+          id: crypto.randomUUID(),
+          spreadNumber: spreads.length + 1,
+          verso,
+          recto,
+        });
+      }
+    }
+
+    // Last spread: back cover on left, null on right
+    if (lastPage && lastPage.pageNumber !== 1) {
       spreads.push({
         id: crypto.randomUUID(),
         spreadNumber: spreads.length + 1,
-        verso,
-        recto,
+        verso: lastPage,
+        recto: null, // Empty - back cover is on left
       });
     }
 
@@ -829,6 +861,11 @@ export class TextFlowEngine {
    *
    * The back cover is a special placeholder that represents where the
    * last page of the signature will appear when the booklet is folded.
+   *
+   * NEW LAYOUT:
+   * - First spread: [ghost/null | page 1] - ghost of back cover shown at 50% in UI
+   * - Middle spreads: [page 2 | page 3], [page 4 | page 5], etc.
+   * - Last spread: [back cover | null] - back cover on left, empty on right
    */
   private createSpreads(pages: PageContent[]): Spread[] {
     const spreads: Spread[] = [];
@@ -837,27 +874,7 @@ export class TextFlowEngine {
     const project = appState.getProject();
     const prevFirstSpread = project.signatures[0]?.spreads[0];
 
-    // Always create the back cover page (page 0) for reading order display
-    // This represents where the last page of the signature appears when folded
-    const backCoverPage = this.createEmptyPage(0, true);
-    backCoverPage.isRecto = false;
-    backCoverPage.isStatic = true; // Deprecated: kept for backward compat
-    backCoverPage.pageState = 'available'; // Back cover starts as available
-    // Preserve items and state from previous back cover
-    if (prevFirstSpread?.verso?.pageNumber === 0) {
-      if (prevFirstSpread.verso.items) {
-        backCoverPage.items = prevFirstSpread.verso.items;
-      }
-      if (prevFirstSpread.verso.backgroundFill) {
-        backCoverPage.backgroundFill = prevFirstSpread.verso.backgroundFill;
-      }
-      // Preserve pageState if it was explicitly set
-      if (prevFirstSpread.verso.pageState) {
-        backCoverPage.pageState = prevFirstSpread.verso.pageState;
-      }
-    }
-
-    // First spread: back cover on left, page 1 (front cover) on right
+    // Page 1 (front cover) - always exists
     const page1 = pages[0] || this.createEmptyPage(1, true);
     if (!pages[0]) {
       // No content - page 1 starts as available
@@ -883,32 +900,30 @@ export class TextFlowEngine {
     // Preserve the spread ID if it exists (helps with item references)
     const spreadId = prevFirstSpread?.id || crypto.randomUUID();
 
+    // First spread: null verso (ghost placeholder), page 1 on recto
+    // The ghost will be rendered by the UI as a 50% opacity clone of the back cover
     spreads.push({
       id: spreadId,
       spreadNumber: 1,
-      verso: backCoverPage,
+      verso: null, // Ghost placeholder - UI will render back cover ghost here
       recto: page1,
     });
 
-    // If we have content pages, create remaining spreads
+    // Middle pages: create spreads [2|3], [4|5], etc.
     if (pages.length > 1) {
-      // Remaining pages in reading order: [page 2, page 3], [page 4, page 5], etc.
       for (let i = 1; i < pages.length; i += 2) {
         const verso = pages[i];
         const recto = pages[i + 1] || null;
 
-        spreads.push({
-          id: crypto.randomUUID(),
-          spreadNumber: spreads.length + 1,
-          verso,
-          recto,
-        });
-      }
-
-      // Ensure last spread has a recto if needed
-      const lastSpread = spreads[spreads.length - 1];
-      if (!lastSpread.recto) {
-        lastSpread.recto = this.createEmptyPage(pages.length + 1, true);
+        // Don't add if both are null
+        if (verso || recto) {
+          spreads.push({
+            id: crypto.randomUUID(),
+            spreadNumber: spreads.length + 1,
+            verso,
+            recto,
+          });
+        }
       }
     }
 

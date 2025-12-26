@@ -151,8 +151,20 @@ export function renderThumbnails(
       });
     }
 
+    // Find the back cover page (last page of the entire booklet) for ghost rendering
+    const allSpreads = project.signatures.flatMap(s => s.spreads);
+    const allPages = allSpreads.flatMap(s => [s.verso, s.recto].filter(Boolean));
+    const backCoverPage = allPages.length > 0
+      ? allPages.reduce((max, p) => (p && p.pageNumber > (max?.pageNumber || 0)) ? p : max, allPages[0])
+      : null;
+
     // Render spreads within this signature
-    signature.spreads.forEach((spread) => {
+    signature.spreads.forEach((spread, spreadIdxInSig) => {
+      // Check if this is the first spread of the first signature (for ghost rendering)
+      const isFirstSpreadOfBooklet = sigIndex === 0 && spreadIdxInSig === 0;
+
+      // Check if this is the last spread of this signature (back cover position)
+      const isLastSpreadOfSig = spreadIdxInSig === signature.spreads.length - 1;
       const spreadIndex = globalSpreadIndex;
       globalSpreadIndex++;
 
@@ -184,10 +196,49 @@ export function renderThumbnails(
       return '#ffffff';
     };
 
-    ctx.fillStyle = getBackgroundColor(spread.verso);
-    ctx.fillRect(0, 0, thumbWidth / 2, thumbHeight);
-    ctx.fillStyle = getBackgroundColor(spread.recto);
-    ctx.fillRect(thumbWidth / 2, 0, thumbWidth / 2, thumbHeight);
+    // Determine what to show in verso position
+    const isGhostPosition = !spread.verso && isFirstSpreadOfBooklet && backCoverPage;
+    const versoPage = isGhostPosition ? backCoverPage : spread.verso;
+    const isGhost = isGhostPosition;
+
+    // Draw verso background (with ghost opacity if applicable)
+    if (versoPage) {
+      ctx.globalAlpha = isGhost ? 0.5 : 1.0;
+      ctx.fillStyle = getBackgroundColor(versoPage);
+      ctx.fillRect(0, 0, thumbWidth / 2, thumbHeight);
+      ctx.globalAlpha = 1.0;
+    } else if (!spread.verso) {
+      // Empty verso position - draw hatched/empty indicator
+      ctx.fillStyle = '#f5f5f5';
+      ctx.fillRect(0, 0, thumbWidth / 2, thumbHeight);
+      // Draw diagonal lines to indicate empty
+      ctx.strokeStyle = '#e0e0e0';
+      ctx.lineWidth = 0.3;
+      for (let i = -thumbHeight; i < thumbWidth / 2; i += 4) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i + thumbHeight, thumbHeight);
+        ctx.stroke();
+      }
+    }
+
+    // Draw recto background
+    if (spread.recto) {
+      ctx.fillStyle = getBackgroundColor(spread.recto);
+      ctx.fillRect(thumbWidth / 2, 0, thumbWidth / 2, thumbHeight);
+    } else {
+      // Empty recto position - draw hatched/empty indicator
+      ctx.fillStyle = '#f5f5f5';
+      ctx.fillRect(thumbWidth / 2, 0, thumbWidth / 2, thumbHeight);
+      ctx.strokeStyle = '#e0e0e0';
+      ctx.lineWidth = 0.3;
+      for (let i = -thumbHeight; i < thumbWidth / 2; i += 4) {
+        ctx.beginPath();
+        ctx.moveTo(thumbWidth / 2 + i, 0);
+        ctx.lineTo(thumbWidth / 2 + i + thumbHeight, thumbHeight);
+        ctx.stroke();
+      }
+    }
 
     // Draw spine line
     ctx.strokeStyle = '#e0e0e0';
@@ -203,19 +254,20 @@ export function renderThumbnails(
     const signatureCount = project.signatures.length;
 
     // Verso page content - draw blank indicator or content lines
-    if (spread.verso) {
-      if (spread.verso.isBlank || spread.verso.isStatic) {
+    if (versoPage) {
+      ctx.globalAlpha = isGhost ? 0.5 : 1.0;
+      if (versoPage.isBlank || versoPage.isStatic) {
         // Draw blank/static page indicator
         ctx.fillStyle = '#f0f0f0';
         ctx.fillRect(1, 1, thumbWidth / 2 - 2, thumbHeight - 2);
         ctx.fillStyle = '#cccccc';
         ctx.font = '6px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(spread.verso.isStatic ? 'S' : '∅', thumbWidth / 4, thumbHeight / 2 + 2);
-      } else if (spread.verso.sections.length > 0) {
+        ctx.fillText(versoPage.isStatic ? 'S' : '∅', thumbWidth / 4, thumbHeight / 2 + 2);
+      } else if (versoPage.sections && versoPage.sections.length > 0) {
         ctx.fillStyle = '#d0d0d0';
         let yPos = contentMargin;
-        for (const section of spread.verso.sections) {
+        for (const section of versoPage.sections) {
           if (yPos > thumbHeight - contentMargin) break;
           const lineCount = (section as { lines?: string[] }).lines?.length || 1;
           for (let i = 0; i < Math.min(lineCount, 5); i++) {
@@ -227,6 +279,7 @@ export function renderThumbnails(
           yPos += 1;
         }
       }
+      ctx.globalAlpha = 1.0;
     }
 
     // Recto page content
@@ -256,14 +309,18 @@ export function renderThumbnails(
       }
     }
 
-    // Check selection state for labels
+    // Determine if verso is a ghost (first spread of booklet with null verso)
+    const isGhostVerso = !spread.verso && isFirstSpreadOfBooklet && backCoverPage;
+    const actualVersoPage = isGhostVerso ? backCoverPage : spread.verso;
+
+    // Check selection state for labels (ghost selects actual back cover)
     const isVersoSelected = editorState.selectedPagePosition === 'verso' &&
-      spread.verso?.pageNumber === editorState.selectedPageNumber;
+      actualVersoPage?.pageNumber === editorState.selectedPageNumber;
     const isRectoSelected = editorState.selectedPagePosition === 'recto' &&
       spread.recto?.pageNumber === editorState.selectedPageNumber;
 
     // Get page states for verso and recto
-    const versoPageState = spread.verso?.pageState || 'available';
+    const versoPageState = actualVersoPage?.pageState || 'available';
     const rectoPageState = spread.recto?.pageState || 'available';
 
     // Check if either page is static (for drag/drop)
@@ -275,30 +332,68 @@ export function renderThumbnails(
     const labelsContainer = document.createElement('div');
     labelsContainer.className = 'spread-thumbnail-labels';
 
-    // Verso label - show "BC" for back cover (page 0) only in single-signature booklets
+    // Verso label
     const versoLabel = document.createElement('div');
     versoLabel.className = 'spread-thumbnail-page-label' + (isVersoSelected ? ' selected' : '');
-    const versoPageNum = spread.verso?.pageNumber;
-    const isBackCover = versoPageNum === 0 && signatureCount === 1;
-    versoLabel.textContent = isBackCover ? 'BC' : (versoPageNum?.toString() || '–');
-    versoLabel.title = isBackCover ? 'Back Cover' : `Page ${versoPageNum}`;
-    if (isBackCover) {
-      versoLabel.style.color = '#dc2626';
-      versoLabel.style.fontWeight = 'bold';
+
+    if (isGhostVerso && backCoverPage) {
+      // Ghost back cover - show "BC" at 50% opacity, links to actual back cover
+      versoLabel.textContent = 'BC';
+      versoLabel.title = `Back Cover (ghost of page ${backCoverPage.pageNumber})`;
+      versoLabel.style.opacity = '0.5';
+      versoLabel.style.fontStyle = 'italic';
+    } else if (spread.verso) {
+      // Normal verso page
+      const versoPageNum = spread.verso.pageNumber;
+      // Check if this is the actual back cover (last page of last signature)
+      const isActualBackCover = versoPageNum === backCoverPage?.pageNumber && isLastSpreadOfSig;
+      versoLabel.textContent = isActualBackCover ? 'BC' : versoPageNum.toString();
+      versoLabel.title = isActualBackCover ? `Back Cover (page ${versoPageNum})` : `Page ${versoPageNum}`;
+      if (isActualBackCover) {
+        versoLabel.style.color = '#dc2626';
+        versoLabel.style.fontWeight = 'bold';
+      }
+    } else {
+      // Empty position
+      versoLabel.textContent = '–';
+      versoLabel.title = 'Empty';
+      versoLabel.style.opacity = '0.3';
     }
+
     // Add page state class for background color
     versoLabel.classList.add(`page-state-${versoPageState}`);
     versoLabel.addEventListener('click', (e) => {
       e.stopPropagation();
-      setCurrentSpreadIndex(spreadIndex);
-      if (spread.verso) {
+      // Ghost clicks should select the actual back cover page
+      if (isGhostVerso && backCoverPage) {
+        // Find the spread that contains the back cover and navigate to it
+        let backCoverSpreadIdx = 0;
+        for (const sig of project.signatures) {
+          for (const sp of sig.spreads) {
+            if (sp.verso?.pageNumber === backCoverPage.pageNumber) {
+              setCurrentSpreadIndex(backCoverSpreadIdx);
+              selectPageFn(backCoverPage.pageNumber, 'verso');
+              updateSpreadIndicatorFn();
+              return;
+            }
+            if (sp.recto?.pageNumber === backCoverPage.pageNumber) {
+              setCurrentSpreadIndex(backCoverSpreadIdx);
+              selectPageFn(backCoverPage.pageNumber, 'recto');
+              updateSpreadIndicatorFn();
+              return;
+            }
+            backCoverSpreadIdx++;
+          }
+        }
+      } else if (spread.verso) {
+        setCurrentSpreadIndex(spreadIndex);
         selectPageFn(spread.verso.pageNumber, 'verso');
+        updateSpreadIndicatorFn();
       }
-      updateSpreadIndicatorFn();
     });
 
-    // Make static verso page draggable
-    if (versoPageState === 'static' && spread.verso) {
+    // Make static verso page draggable (but not ghost)
+    if (versoPageState === 'static' && spread.verso && !isGhostVerso) {
       versoLabel.setAttribute('draggable', 'true');
       versoLabel.style.cursor = 'grab';
 
@@ -361,16 +456,26 @@ export function renderThumbnails(
     // Recto label
     const rectoLabel = document.createElement('div');
     rectoLabel.className = 'spread-thumbnail-page-label' + (isRectoSelected ? ' selected' : '');
-    rectoLabel.textContent = spread.recto?.pageNumber?.toString() || '–';
+
+    if (spread.recto) {
+      rectoLabel.textContent = spread.recto.pageNumber.toString();
+      rectoLabel.title = `Page ${spread.recto.pageNumber}`;
+    } else {
+      // Empty recto position
+      rectoLabel.textContent = '–';
+      rectoLabel.title = 'Empty';
+      rectoLabel.style.opacity = '0.3';
+    }
+
     // Add page state class for background color
     rectoLabel.classList.add(`page-state-${rectoPageState}`);
     rectoLabel.addEventListener('click', (e) => {
       e.stopPropagation();
-      setCurrentSpreadIndex(spreadIndex);
       if (spread.recto) {
+        setCurrentSpreadIndex(spreadIndex);
         selectPageFn(spread.recto.pageNumber, 'recto');
+        updateSpreadIndicatorFn();
       }
-      updateSpreadIndicatorFn();
     });
 
     // Make static recto page draggable
