@@ -184,6 +184,14 @@ export function renderThumbnails(
     const staticSpreads = project.staticSpreads || [];
     const isUserStaticSpread = staticSpreads.some(ss => ss.id === spread.id);
 
+    // DEBUG: Log static spread detection
+    if (spreadIndex === 0) {
+      console.log('[DEBUG] staticSpreads array:', staticSpreads.map(s => s.id));
+    }
+    if (spread.verso?.isStatic || spread.recto?.isStatic) {
+      console.log(`[DEBUG] Spread ${spreadIndex} has static page(s). spread.id=${spread.id}, isUserStaticSpread=${isUserStaticSpread}`);
+    }
+
     // Individual page static checks (for display purposes)
     const isVersoStatic = spread.verso?.isStatic ?? false;
     const isRectoStatic = spread.recto?.isStatic ?? false;
