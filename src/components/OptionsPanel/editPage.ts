@@ -547,16 +547,16 @@ export function updateEditPagePanel(): void {
     if (selectedPage) break;
   }
 
-  // Show add items in toolbar for static/blank pages
-  const isBlankOrStatic = selectedPage?.isBlank || selectedPage?.isStatic;
+  // Show add items in toolbar for all pages (items can exist on any page type)
   if (toolbarAddItems) {
-    toolbarAddItems.style.display = isBlankOrStatic ? 'flex' : 'none';
+    toolbarAddItems.style.display = 'flex';
   }
 
   // Panel visibility is now controlled by item selection (updateEditSelectedSection)
-  // We only show the panel when an item is selected
-  if (panel && !isBlankOrStatic) {
-    panel.style.display = 'none';
+  // For text pages without selected items, we can still show the panel for page background
+  const isBlankOrStatic = selectedPage?.isBlank || selectedPage?.isStatic;
+  if (panel && !isBlankOrStatic && editorState.selectedItemIds.length === 0) {
+    // Text pages without items selected - panel will be shown by updateEditSelectedSection if needed
   }
 }
 
