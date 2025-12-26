@@ -912,18 +912,48 @@ body {
   color: white;
 }
 
-/* Static page label - dark orange background to indicate draggable */
-.spread-thumbnail-page-label.static-page-label {
-  background: #c2410c;
+/* Page state label colors */
+/* Available: medium gray - empty pages */
+.spread-thumbnail-page-label.page-state-available {
+  background: #6b7280;
   color: white;
 }
 
-.spread-thumbnail-page-label.static-page-label:hover {
-  background: #9a3412;
+.spread-thumbnail-page-label.page-state-available:hover {
+  background: #4b5563;
 }
 
-.spread-thumbnail-page-label.static-page-label.selected {
+/* Text: light gray - pages with markdown content */
+.spread-thumbnail-page-label.page-state-text {
+  background: #9ca3af;
+  color: white;
+}
+
+.spread-thumbnail-page-label.page-state-text:hover {
+  background: #6b7280;
+}
+
+/* Static: orange - pages with shapes, draggable */
+.spread-thumbnail-page-label.page-state-static {
+  background: #ea580c;
+  color: white;
+}
+
+.spread-thumbnail-page-label.page-state-static:hover {
+  background: #c2410c;
+}
+
+/* Selected state overrides all page states */
+.spread-thumbnail-page-label.page-state-available.selected,
+.spread-thumbnail-page-label.page-state-text.selected,
+.spread-thumbnail-page-label.page-state-static.selected {
   background: #22c55e;
+  color: white;
+}
+
+/* Legacy class for backward compatibility */
+.spread-thumbnail-page-label.static-page-label {
+  background: #ea580c;
   color: white;
 }
 

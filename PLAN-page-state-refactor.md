@@ -4,6 +4,14 @@
 
 Refactor the page model to have three explicit states: **available**, **text**, and **static**.
 
+### Visual Indicators (Thumbnail Page Numbers)
+
+| State | Background Color | Meaning |
+|-------|------------------|---------|
+| `available` | Medium gray (`#6b7280`) | Empty, can receive text or shapes |
+| `text` | Light gray (`#9ca3af`) | Has markdown content |
+| `static` | Orange (`#ea580c`) | Has shapes, draggable |
+
 ## Current Model (Problems)
 
 - `staticSpreads` array holds user-created static spreads separately

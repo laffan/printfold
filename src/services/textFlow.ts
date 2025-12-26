@@ -614,9 +614,18 @@ export class TextFlowEngine {
   }
 
   private createEmptyPage(pageNumber: number, isBlank = false, isStatic = false): PageContent {
+    // Determine pageState based on flags
+    let pageState: import('../types').PageState = 'available';
+    if (isStatic) {
+      pageState = 'static';
+    } else if (!isBlank) {
+      pageState = 'text'; // Will have content flowed into it
+    }
+
     return {
       id: crypto.randomUUID(),
       pageNumber,
+      pageState,
       sections: [],
       isBlank,
       isRecto: pageNumber % 2 === 1,
@@ -678,26 +687,43 @@ export class TextFlowEngine {
     // This represents where the last page of the signature appears when folded
     const backCoverPage = this.createEmptyPage(0, true);
     backCoverPage.isRecto = false;
-    backCoverPage.isStatic = true; // Back cover is editable like a static page
-    // Preserve items from previous back cover
-    if (prevFirstSpread?.verso?.pageNumber === 0 && prevFirstSpread.verso.items) {
-      backCoverPage.items = prevFirstSpread.verso.items;
-    }
-    if (prevFirstSpread?.verso?.backgroundFill) {
-      backCoverPage.backgroundFill = prevFirstSpread.verso.backgroundFill;
+    backCoverPage.isStatic = true; // Deprecated: kept for backward compat
+    backCoverPage.pageState = 'available'; // Back cover starts as available
+    // Preserve items and state from previous back cover
+    if (prevFirstSpread?.verso?.pageNumber === 0) {
+      if (prevFirstSpread.verso.items) {
+        backCoverPage.items = prevFirstSpread.verso.items;
+      }
+      if (prevFirstSpread.verso.backgroundFill) {
+        backCoverPage.backgroundFill = prevFirstSpread.verso.backgroundFill;
+      }
+      // Preserve pageState if it was explicitly set
+      if (prevFirstSpread.verso.pageState) {
+        backCoverPage.pageState = prevFirstSpread.verso.pageState;
+      }
     }
 
     // First spread: back cover on left, page 1 (front cover) on right
     const page1 = pages[0] || this.createEmptyPage(1, true);
     if (!pages[0]) {
-      page1.isStatic = true; // Make it editable when no content
-      // Preserve items from previous page 1
-      if (prevFirstSpread?.recto?.pageNumber === 1 && prevFirstSpread.recto.items) {
-        page1.items = prevFirstSpread.recto.items;
+      // No content - page 1 starts as available
+      page1.isStatic = true; // Deprecated: kept for backward compat
+      page1.pageState = 'available';
+      // Preserve items and state from previous page 1
+      if (prevFirstSpread?.recto?.pageNumber === 1) {
+        if (prevFirstSpread.recto.items) {
+          page1.items = prevFirstSpread.recto.items;
+        }
+        if (prevFirstSpread.recto.backgroundFill) {
+          page1.backgroundFill = prevFirstSpread.recto.backgroundFill;
+        }
+        if (prevFirstSpread.recto.pageState) {
+          page1.pageState = prevFirstSpread.recto.pageState;
+        }
       }
-      if (prevFirstSpread?.recto?.backgroundFill) {
-        page1.backgroundFill = prevFirstSpread.recto.backgroundFill;
-      }
+    } else {
+      // Has content - page 1 is a text page
+      page1.pageState = 'text';
     }
 
     // Preserve the spread ID if it exists (helps with item references)

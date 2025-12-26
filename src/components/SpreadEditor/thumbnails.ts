@@ -179,20 +179,12 @@ export function renderThumbnails(
     const isRectoSelected = editorState.selectedPagePosition === 'recto' &&
       spread.recto?.pageNumber === editorState.selectedPageNumber;
 
-    // Check if this spread has static pages (either from staticSpreads array or isStatic flag)
-    // Exclude spread 0 (back cover + front cover) as it's structural
-    const staticSpreads = project.staticSpreads || [];
-    const isInStaticSpreadsArray = staticSpreads.some(ss => ss.id === spread.id);
-    const hasStaticPages = spread.verso?.isStatic || spread.recto?.isStatic;
-    const isBackCoverSpread = spreadIndex === 0; // First spread contains back cover
-    const isUserStaticSpread = isInStaticSpreadsArray || (hasStaticPages && !isBackCoverSpread);
+    // Get page states for verso and recto
+    const versoPageState = spread.verso?.pageState || 'available';
+    const rectoPageState = spread.recto?.pageState || 'available';
 
-    // DEBUG: Log static spread detection
-    console.log(`[DEBUG] Spread ${spreadIndex}: hasStaticPages=${hasStaticPages}, isBackCoverSpread=${isBackCoverSpread}, inArray=${isInStaticSpreadsArray}, isUserStatic=${isUserStaticSpread}`);
-
-    // Individual page static checks (for display purposes)
-    const isVersoStatic = spread.verso?.isStatic ?? false;
-    const isRectoStatic = spread.recto?.isStatic ?? false;
+    // Check if either page is static (for drag/drop)
+    const hasStaticPage = versoPageState === 'static' || rectoPageState === 'static';
 
     thumbDiv.appendChild(canvas);
 
@@ -211,10 +203,8 @@ export function renderThumbnails(
       versoLabel.style.color = '#dc2626';
       versoLabel.style.fontWeight = 'bold';
     }
-    // Add dark orange background for user-created static spreads (not back cover)
-    if (isUserStaticSpread) {
-      versoLabel.classList.add('static-page-label');
-    }
+    // Add page state class for background color
+    versoLabel.classList.add(`page-state-${versoPageState}`);
     versoLabel.addEventListener('click', (e) => {
       e.stopPropagation();
       setCurrentSpreadIndex(spreadIndex);
@@ -229,10 +219,8 @@ export function renderThumbnails(
     const rectoLabel = document.createElement('div');
     rectoLabel.className = 'spread-thumbnail-page-label' + (isRectoSelected ? ' selected' : '');
     rectoLabel.textContent = spread.recto?.pageNumber?.toString() || '–';
-    // Add dark orange background for user-created static spreads
-    if (isUserStaticSpread) {
-      rectoLabel.classList.add('static-page-label');
-    }
+    // Add page state class for background color
+    rectoLabel.classList.add(`page-state-${rectoPageState}`);
     rectoLabel.addEventListener('click', (e) => {
       e.stopPropagation();
       setCurrentSpreadIndex(spreadIndex);
@@ -245,8 +233,8 @@ export function renderThumbnails(
 
     thumbDiv.appendChild(labelsContainer);
 
-    // Make user-created static spreads draggable
-    if (isUserStaticSpread) {
+    // Make spreads with static pages draggable
+    if (hasStaticPage) {
       thumbDiv.setAttribute('draggable', 'true');
       thumbDiv.classList.add('draggable-thumbnail');
 
@@ -279,8 +267,8 @@ export function renderThumbnails(
       });
     }
 
-    // Drop target handling - only for user-created static spreads
-    if (isUserStaticSpread) {
+    // Drop target handling - only for spreads with static pages
+    if (hasStaticPage) {
       thumbDiv.addEventListener('dragover', (e) => {
         if (!draggedSpreadId) return;
         e.preventDefault();
@@ -319,7 +307,7 @@ export function renderThumbnails(
     clickContainer.className = 'spread-thumbnail-clicks';
     // For static spreads, disable pointer events on overlay so drag can work on thumbDiv
     // (labels already have click handlers for page selection)
-    const pointerEvents = isUserStaticSpread ? 'pointer-events: none;' : '';
+    const pointerEvents = hasStaticPage ? 'pointer-events: none;' : '';
     clickContainer.style.cssText = `position: absolute; top: 0; left: 0; width: 100%; height: ${thumbHeight}px; display: flex; ${pointerEvents}`;
 
     // Verso click area

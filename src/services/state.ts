@@ -363,6 +363,7 @@ class AppState {
         verso: {
           id: crypto.randomUUID(),
           pageNumber: basePageNumber,
+          pageState: 'static',
           sections: [],
           isBlank: true,
           isRecto: false,
@@ -372,6 +373,7 @@ class AppState {
         recto: {
           id: crypto.randomUUID(),
           pageNumber: basePageNumber + 1,
+          pageState: 'static',
           sections: [],
           isBlank: true,
           isRecto: true,
@@ -404,6 +406,7 @@ class AppState {
       verso: {
         id: crypto.randomUUID(),
         pageNumber: basePageNumber,
+        pageState: 'static',
         sections: [],
         isBlank: true,
         isRecto: false,
@@ -413,6 +416,7 @@ class AppState {
       recto: {
         id: crypto.randomUUID(),
         pageNumber: basePageNumber + 1,
+        pageState: 'static',
         sections: [],
         isBlank: true,
         isRecto: true,
@@ -446,6 +450,7 @@ class AppState {
         verso: position === 'verso' ? {
           id: crypto.randomUUID(),
           pageNumber: basePageNumber,
+          pageState: 'static',
           sections: [],
           isBlank: true,
           isRecto: false,
@@ -455,6 +460,7 @@ class AppState {
         recto: position === 'recto' ? {
           id: crypto.randomUUID(),
           pageNumber: basePageNumber + 1,
+          pageState: 'static',
           sections: [],
           isBlank: true,
           isRecto: true,
@@ -469,6 +475,7 @@ class AppState {
       targetSpread[position] = {
         id: crypto.randomUUID(),
         pageNumber,
+        pageState: 'static',
         sections: [],
         isBlank: true,
         isRecto: position === 'recto',
@@ -649,11 +656,15 @@ class AppState {
     }
 
     // Helper to update a page by page number (for signatures)
+    // Also claims 'available' pages as 'static' when adding an item
     const updatePageByNumber = (page: import('../types').PageContent | null) => {
       if (!page || page.pageNumber !== pageNumber) return page;
       return {
         ...page,
         items: [...(page.items || []), item],
+        // Claim available pages as static when adding an item
+        pageState: page.pageState === 'available' ? 'static' : page.pageState,
+        isStatic: true, // Keep deprecated flag in sync
       };
     };
 
