@@ -680,8 +680,8 @@ class AppState {
     this.project = { ...this.project, signatures: newSignatures };
     this.notifyProjectListeners(prevState);
 
-    // Trigger reflow (text may flow into new available pages)
-    this.requestReflow();
+    // Don't call requestReflow() - we're adding available pages, not text content
+    // Text will flow into available pages when the user adds markdown content
   }
 
   // DEPRECATED: Old staticSpreads methods - kept for backward compatibility

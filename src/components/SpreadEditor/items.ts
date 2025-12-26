@@ -766,6 +766,7 @@ export function renderPageItems(
       const position = xOffset === 0 ? 'verso' : 'recto';
       appState.updateEditor({
         selectedItemId: item.id,
+        selectedItemIds: [item.id],
         selectedPageNumber: page.pageNumber,
         selectedPagePosition: position,
       });

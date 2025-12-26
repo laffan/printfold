@@ -105,110 +105,79 @@ export class TextFlowEngine {
   }
 
   /**
-   * Capture static pages from existing signatures
-   * Returns a map of pageNumber -> PageContent for static pages
+   * Capture static and available pages from existing signatures
+   * Returns a map of pageNumber -> PageContent for pages that should be preserved
+   * (both 'static' pages which are explicitly claimed, and 'available' pages which may have items)
    */
   private captureStaticPages(signatures: import('../types').Signature[]): Map<number, PageContent> {
-    const staticPages = new Map<number, PageContent>();
+    const preservedPages = new Map<number, PageContent>();
 
     for (const sig of signatures) {
       for (const spread of sig.spreads) {
+        // Preserve static pages (explicitly claimed for static content)
         if (spread.verso?.pageState === 'static') {
-          staticPages.set(spread.verso.pageNumber, spread.verso);
+          preservedPages.set(spread.verso.pageNumber, spread.verso);
         }
         if (spread.recto?.pageState === 'static') {
-          staticPages.set(spread.recto.pageNumber, spread.recto);
+          preservedPages.set(spread.recto.pageNumber, spread.recto);
+        }
+        // Also preserve available pages that have items
+        if (spread.verso?.pageState === 'available' && spread.verso.items?.length) {
+          preservedPages.set(spread.verso.pageNumber, spread.verso);
+        }
+        if (spread.recto?.pageState === 'available' && spread.recto.items?.length) {
+          preservedPages.set(spread.recto.pageNumber, spread.recto);
         }
       }
     }
 
-    return staticPages;
+    return preservedPages;
   }
 
   /**
-   * Merge text pages with static pages
-   * Static pages stay in their positions, text pages fill the remaining slots
+   * Merge text pages with static/available pages
+   * Preserved pages stay in their positions, text pages fill the remaining slots
    *
-   * Page 0 (back cover) is handled specially - it's always created if not static
+   * Pages are numbered starting from 1 (no page 0).
+   * The back cover is simply the LAST page of the signature.
    * Text pages from flowSections have pageNumbers 1,2,3,... which are their ORDER,
    * not their final positions. They get renumbered as they're placed.
    */
-  private mergeStaticPagesInPlace(textPages: PageContent[], staticPages: Map<number, PageContent>): PageContent[] {
-    // Get previous back cover state
-    const project = appState.getProject();
-    const prevFirstSpread = project.signatures[0]?.spreads[0];
-
-    // If no static pages, use the original flow but ensure page 0 (back cover) exists
-    if (staticPages.size === 0) {
-      const result: PageContent[] = [];
-
-      // Create page 0 (back cover)
-      const backCoverPage = this.createEmptyPage(0, true);
-      backCoverPage.isRecto = false;
-      backCoverPage.isStatic = true;
-      backCoverPage.pageState = 'available';
-      if (prevFirstSpread?.verso?.pageNumber === 0) {
-        if (prevFirstSpread.verso.items) backCoverPage.items = prevFirstSpread.verso.items;
-        if (prevFirstSpread.verso.backgroundFill) backCoverPage.backgroundFill = prevFirstSpread.verso.backgroundFill;
-        if (prevFirstSpread.verso.pageState) backCoverPage.pageState = prevFirstSpread.verso.pageState;
-      }
-      result.push(backCoverPage);
-
-      // Add text pages with corrected page numbers (starting from 1)
-      for (let i = 0; i < textPages.length; i++) {
-        const pageNum = i + 1;
-        result.push({
-          ...textPages[i],
-          pageNumber: pageNum,
-          isRecto: pageNum % 2 === 1,
-          pageState: 'text',
-        });
-      }
-
-      return result;
+  private mergeStaticPagesInPlace(textPages: PageContent[], preservedPages: Map<number, PageContent>): PageContent[] {
+    // If no preserved pages and no text, return empty
+    if (preservedPages.size === 0 && textPages.length === 0) {
+      return [];
     }
 
-    // With static pages, we need to place them at their positions
+    // If no preserved pages, just return text pages numbered from 1
+    if (preservedPages.size === 0) {
+      return textPages.map((page, i) => ({
+        ...page,
+        pageNumber: i + 1,
+        isRecto: (i + 1) % 2 === 1,
+        pageState: 'text' as const,
+      }));
+    }
+
+    // With preserved pages, we need to place them at their positions
     // and flow text into the remaining slots
 
     // Find the range of pages we need
-    const maxStaticPageNum = Math.max(...staticPages.keys());
-    // We need at least enough slots for all text + all static pages
-    // But also at least up to the max static page number
-    const minPagesNeeded = Math.max(textPages.length + staticPages.size, maxStaticPageNum + 1);
+    const maxPreservedPageNum = Math.max(...preservedPages.keys());
+    // We need at least enough slots for all text + all preserved pages
+    // But also at least up to the max preserved page number
+    const minPagesNeeded = Math.max(textPages.length + preservedPages.size, maxPreservedPageNum);
 
     const result: PageContent[] = [];
     let textPageIndex = 0;
 
-    // First, handle page 0 (back cover) specially
-    if (staticPages.has(0)) {
-      const staticPage = staticPages.get(0)!;
-      result.push({
-        ...staticPage,
-        pageNumber: 0,
-        isRecto: false,
-      });
-    } else {
-      // Create back cover as available
-      const backCoverPage = this.createEmptyPage(0, true);
-      backCoverPage.isRecto = false;
-      backCoverPage.isStatic = true;
-      backCoverPage.pageState = 'available';
-      if (prevFirstSpread?.verso?.pageNumber === 0) {
-        if (prevFirstSpread.verso.items) backCoverPage.items = prevFirstSpread.verso.items;
-        if (prevFirstSpread.verso.backgroundFill) backCoverPage.backgroundFill = prevFirstSpread.verso.backgroundFill;
-        if (prevFirstSpread.verso.pageState) backCoverPage.pageState = prevFirstSpread.verso.pageState;
-      }
-      result.push(backCoverPage);
-    }
-
-    // Now handle pages 1 through minPagesNeeded
-    for (let pageNum = 1; pageNum < minPagesNeeded; pageNum++) {
-      if (staticPages.has(pageNum)) {
-        // This position has a static page - use it
-        const staticPage = staticPages.get(pageNum)!;
+    // Handle pages 1 through minPagesNeeded
+    for (let pageNum = 1; pageNum <= minPagesNeeded; pageNum++) {
+      if (preservedPages.has(pageNum)) {
+        // This position has a preserved page - use it
+        const preservedPage = preservedPages.get(pageNum)!;
         result.push({
-          ...staticPage,
+          ...preservedPage,
           pageNumber: pageNum,
           isRecto: pageNum % 2 === 1,
         });
@@ -229,7 +198,7 @@ export class TextFlowEngine {
 
     // If there are remaining text pages, append them at the end
     while (textPageIndex < textPages.length) {
-      const pageNum = result.length;
+      const pageNum = result.length + 1;
       result.push({
         ...textPages[textPageIndex],
         pageNumber: pageNum,

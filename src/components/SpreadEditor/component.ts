@@ -202,7 +202,7 @@ export class SpreadEditor {
     };
 
     appState.addItemToPage(pageNumber, item);
-    appState.updateEditor({ selectedItemId: item.id });
+    appState.updateEditor({ selectedItemId: item.id, selectedItemIds: [item.id] });
     switchToSelectedTab();
   }
 
