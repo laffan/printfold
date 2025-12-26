@@ -18,9 +18,8 @@ let draggedPageNumber: number = -1;
 export function renderThumbnails(
   thumbnailContainer: HTMLElement,
   pageDimensions: { width: number; height: number },
-  currentSpreadIndex: number,
+  selectedPageNumber: number | null,
   selectPageFn: (pageNumber: number, position: 'verso' | 'recto') => void,
-  setCurrentSpreadIndex: (index: number) => void,
   updateSpreadIndicatorFn: () => void
 ): void {
   const project = appState.getProject();
@@ -112,8 +111,13 @@ export function renderThumbnails(
 
   // Render each visual spread
   visualSpreads.forEach((vSpread, vSpreadIdx) => {
+    // Determine if this visual spread is active based on selected page number
+    const isActive = selectedPageNumber !== null && (
+      (vSpread.verso?.pageNumber === selectedPageNumber) ||
+      (vSpread.recto?.pageNumber === selectedPageNumber)
+    );
     const thumbDiv = document.createElement('div');
-    thumbDiv.className = 'spread-thumbnail' + (vSpreadIdx === currentSpreadIndex ? ' active' : '');
+    thumbDiv.className = 'spread-thumbnail' + (isActive ? ' active' : '');
 
     // Check for signature boundary between verso and recto
     const versoSig = vSpread.verso ? pageToSignature.get(vSpread.verso.pageNumber) : null;
@@ -195,10 +199,8 @@ export function renderThumbnails(
       const versoLabel = createPageLabel(
         vSpread.verso,
         isVersoSelected,
-        vSpreadIdx,
         'verso',
         selectPageFn,
-        setCurrentSpreadIndex,
         updateSpreadIndicatorFn,
         thumbnailContainer
       );
@@ -215,10 +217,8 @@ export function renderThumbnails(
       const rectoLabel = createPageLabel(
         vSpread.recto,
         isRectoSelected,
-        vSpreadIdx,
         'recto',
         selectPageFn,
-        setCurrentSpreadIndex,
         updateSpreadIndicatorFn,
         thumbnailContainer
       );
@@ -251,11 +251,11 @@ export function renderThumbnails(
     versoClick.style.cssText = 'flex: 1; cursor: pointer;';
     versoClick.addEventListener('click', (e) => {
       e.stopPropagation();
-      setCurrentSpreadIndex(vSpreadIdx);
       if (vSpread.verso) {
+        // Select page - editor will navigate to correct spread via state listener
         selectPageFn(vSpread.verso.pageNumber, 'verso');
+        updateSpreadIndicatorFn();
       }
-      updateSpreadIndicatorFn();
     });
     clickContainer.appendChild(versoClick);
 
@@ -264,11 +264,11 @@ export function renderThumbnails(
     rectoClick.style.cssText = 'flex: 1; cursor: pointer;';
     rectoClick.addEventListener('click', (e) => {
       e.stopPropagation();
-      setCurrentSpreadIndex(vSpreadIdx);
       if (vSpread.recto) {
+        // Select page - editor will navigate to correct spread via state listener
         selectPageFn(vSpread.recto.pageNumber, 'recto');
+        updateSpreadIndicatorFn();
       }
-      updateSpreadIndicatorFn();
     });
     clickContainer.appendChild(rectoClick);
 
@@ -323,10 +323,8 @@ function drawPageContent(
 function createPageLabel(
   page: PageContent,
   isSelected: boolean,
-  spreadIndex: number,
   position: 'verso' | 'recto',
   selectPageFn: (pageNumber: number, position: 'verso' | 'recto') => void,
-  setCurrentSpreadIndex: (index: number) => void,
   updateSpreadIndicatorFn: () => void,
   thumbnailContainer: HTMLElement
 ): HTMLElement {
@@ -341,7 +339,6 @@ function createPageLabel(
   // Click handler
   label.addEventListener('click', (e) => {
     e.stopPropagation();
-    setCurrentSpreadIndex(spreadIndex);
     selectPageFn(page.pageNumber, position);
     updateSpreadIndicatorFn();
   });

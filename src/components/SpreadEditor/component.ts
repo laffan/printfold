@@ -94,8 +94,12 @@ export class SpreadEditor {
     this.setupStateListeners();
     this.setupImageDropZone();
 
-    // Initial render
-    this.render();
+    // Defer initial render to ensure container has dimensions
+    // and DOM is fully ready
+    requestAnimationFrame(() => {
+      this.fitToView();
+      this.render();
+    });
   }
 
   /**
@@ -694,13 +698,25 @@ export class SpreadEditor {
   }
 
   render(): void {
-    // Guard against rendering when container is not visible (prevents canvas errors)
+    const project = appState.getProject();
+    const editorState = appState.getEditor();
+    const pageDimensions = this.getPageDimensions();
+
+    // Always render thumbnails even if main canvas isn't ready
+    // This ensures sidebar navigation works on initial load
+    // Pass selected page number so thumbnails can determine the active visual spread
+    renderThumbnails(
+      this.thumbnailContainer,
+      pageDimensions,
+      editorState.selectedPageNumber,
+      (pageNumber, position) => this.selectPage(pageNumber, position),
+      () => this.updateSpreadIndicator()
+    );
+
+    // Guard against rendering main canvas when container is not visible
     if (this.container.clientWidth === 0 || this.container.clientHeight === 0) {
       return;
     }
-
-    const project = appState.getProject();
-    const editorState = appState.getEditor();
 
     this.layer.destroyChildren();
     this.marginLayer.destroyChildren();
@@ -708,7 +724,6 @@ export class SpreadEditor {
     this.marginLabels = [];
 
     const spread = this.getCurrentSpread();
-    const pageDimensions = this.getPageDimensions();
 
     if (!spread) {
       // Show empty state
@@ -776,16 +791,6 @@ export class SpreadEditor {
     this.renderItems();
 
     this.updateSpreadIndicator();
-
-    // Render thumbnails
-    renderThumbnails(
-      this.thumbnailContainer,
-      pageDimensions,
-      this.currentSpreadIndex,
-      (pageNumber, position) => this.selectPage(pageNumber, position),
-      (index) => { this.currentSpreadIndex = index; },
-      () => this.updateSpreadIndicator()
-    );
   }
 
   /**
