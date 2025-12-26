@@ -565,8 +565,10 @@ class AppState {
     }
 
     const pageToMove = allPages[fromIndex];
-    if (pageToMove.pageState !== 'static') {
-      console.warn('Can only move static pages');
+    // Allow moving static pages or pages with items
+    const hasItems = pageToMove.items && pageToMove.items.length > 0;
+    if (pageToMove.pageState !== 'static' && !hasItems) {
+      console.warn('Can only move static pages or pages with items');
       return;
     }
 

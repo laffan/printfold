@@ -300,6 +300,18 @@ function drawPageContent(
   const scaleX = width / pageDimensions.width;
   const scaleY = height / pageDimensions.height;
 
+  // Get actual margins from project
+  const project = appState.getProject();
+  const margins = project.layoutOptions.margins;
+
+  // Calculate scaled margins - account for recto (right) vs verso (left) pages
+  // For recto: inner margin is on LEFT (spine side), outer on RIGHT
+  // For verso: outer margin is on LEFT, inner on RIGHT (spine side)
+  const leftMargin = page.isRecto ? margins.inner * scaleX : margins.outer * scaleX;
+  const rightMargin = page.isRecto ? margins.outer * scaleX : margins.inner * scaleX;
+  const topMargin = margins.top * scaleY;
+  const bottomMargin = margins.bottom * scaleY;
+
   // Draw items on static/available pages
   if (page.items && page.items.length > 0) {
     for (const item of page.items) {
@@ -348,8 +360,16 @@ function drawPageContent(
       } else if (item.type === 'text') {
         const textItem = item as import('../../types').TextPageItem;
         ctx.fillStyle = textItem.color || '#333333';
-        // Draw text as a small rectangle representation
-        ctx.fillRect(itemX, itemY, itemW, Math.min(itemH, 2));
+        // Draw text as multiple lines within the bounding box
+        const lineHeight = 2;
+        const lineSpacing = 1.5;
+        let yPos = itemY;
+        while (yPos < itemY + itemH - lineHeight) {
+          // Vary line width slightly for natural appearance
+          const lineWidth = itemW * (0.7 + Math.random() * 0.3);
+          ctx.fillRect(itemX, yPos, lineWidth, lineHeight);
+          yPos += lineHeight + lineSpacing;
+        }
       } else if (item.type === 'image') {
         // Draw image placeholder as a light gray box with an X
         ctx.fillStyle = '#e0e0e0';
@@ -366,20 +386,44 @@ function drawPageContent(
     }
   }
 
-  // Draw text sections (for text pages)
+  // Draw text sections (for text pages) with proper margins
   if (page.sections && page.sections.length > 0 && page.pageState === 'text') {
-    ctx.fillStyle = '#d0d0d0';
-    let yPos = margin;
+    const contentX = xOffset + leftMargin;
+    const contentWidth = width - leftMargin - rightMargin;
+    const contentHeight = height - topMargin - bottomMargin;
+
+    ctx.fillStyle = '#b0b0b0';
+    let yPos = topMargin;
+    const lineHeight = 1.5;
+    const lineSpacing = 1.2;
+    const paragraphSpacing = 3;
+
     for (const section of page.sections) {
-      if (yPos > height - margin) break;
-      const lineCount = (section as { lines?: string[] }).lines?.length || 1;
-      for (let i = 0; i < Math.min(lineCount, 5); i++) {
-        if (yPos > height - margin) break;
-        const lineWidth = (width - margin * 2) * (0.6 + Math.random() * 0.35);
-        ctx.fillRect(xOffset + margin, yPos, lineWidth, 1);
-        yPos += 2;
+      if (yPos > height - bottomMargin) break;
+
+      // Check for headings - draw them bolder/larger
+      const sectionType = (section as { type?: string }).type;
+      const isHeading = sectionType?.startsWith('heading');
+
+      if (isHeading) {
+        // Draw heading as a slightly thicker, shorter line
+        ctx.fillStyle = '#808080';
+        const headingWidth = contentWidth * (0.3 + Math.random() * 0.4);
+        ctx.fillRect(contentX, yPos, headingWidth, 2);
+        yPos += 4;
+        ctx.fillStyle = '#b0b0b0';
       }
-      yPos += 1;
+
+      // Draw content lines
+      const lineCount = (section as { lines?: string[] }).lines?.length || 3;
+      for (let i = 0; i < Math.min(lineCount, 8); i++) {
+        if (yPos > height - bottomMargin) break;
+        // Vary line width for natural text appearance
+        const lineWidth = contentWidth * (0.6 + Math.random() * 0.35);
+        ctx.fillRect(contentX, yPos, lineWidth, lineHeight);
+        yPos += lineHeight + lineSpacing;
+      }
+      yPos += paragraphSpacing;
     }
   }
 }
@@ -410,8 +454,11 @@ function createPageLabel(
     updateSpreadIndicatorFn();
   });
 
-  // Make static pages draggable
-  if (pageState === 'static') {
+  // Make pages draggable if they're static OR have items
+  const hasItems = page.items && page.items.length > 0;
+  const isDraggable = pageState === 'static' || hasItems;
+
+  if (isDraggable) {
     label.setAttribute('draggable', 'true');
     label.style.cursor = 'grab';
 
