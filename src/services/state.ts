@@ -346,6 +346,50 @@ class AppState {
   }
 
   /**
+   * Explicitly make a page static (removes it from text flow)
+   * Used when user confirms they want to claim a page for static content
+   */
+  makePageStatic(pageNumber: number): void {
+    const prevState = this.project;
+
+    const signatures = this.project.signatures.map(sig => ({
+      ...sig,
+      spreads: sig.spreads.map(spread => ({
+        ...spread,
+        verso: spread.verso?.pageNumber === pageNumber
+          ? { ...spread.verso, pageState: 'static' as const, isStatic: true }
+          : spread.verso,
+        recto: spread.recto?.pageNumber === pageNumber
+          ? { ...spread.recto, pageState: 'static' as const, isStatic: true }
+          : spread.recto,
+      })),
+    }));
+
+    this.project = { ...this.project, signatures };
+    this.notifyProjectListeners(prevState);
+
+    // Trigger reflow - text will now flow around this static page
+    this.requestReflow();
+  }
+
+  /**
+   * Check if a page has items but is not static (needs "make static?" prompt)
+   */
+  pageNeedsStaticPrompt(pageNumber: number): boolean {
+    for (const sig of this.project.signatures) {
+      for (const spread of sig.spreads) {
+        const page = spread.verso?.pageNumber === pageNumber ? spread.verso
+          : spread.recto?.pageNumber === pageNumber ? spread.recto
+          : null;
+        if (page && page.pageState !== 'static' && page.items && page.items.length > 0) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
    * Insert a static page at the currently selected position
    * Pushes existing pages forward by 1
    */
@@ -898,15 +942,15 @@ class AppState {
     }
 
     // Helper to update a page by page number (for signatures)
-    // Also claims 'available' pages as 'static' when adding an item
+    // Items can be added to any page type - pageState is not changed automatically
     const updatePageByNumber = (page: import('../types').PageContent | null) => {
       if (!page || page.pageNumber !== pageNumber) return page;
       return {
         ...page,
         items: [...(page.items || []), item],
-        // Claim available pages as static when adding an item
-        pageState: page.pageState === 'available' ? 'static' : page.pageState,
-        isStatic: true, // Keep deprecated flag in sync
+        // Don't auto-claim - user must explicitly make page static
+        // Keep isStatic in sync with pageState for backward compatibility
+        isStatic: page.pageState === 'static',
       };
     };
 

@@ -436,6 +436,79 @@ export function renderThumbnails(
 
     thumbDiv.appendChild(labelsContainer);
 
+    // Create "Make Static?" buttons container for pages with items but not static
+    const versoNeedsPrompt = spread.verso && appState.pageNeedsStaticPrompt(spread.verso.pageNumber);
+    const rectoNeedsPrompt = spread.recto && appState.pageNeedsStaticPrompt(spread.recto.pageNumber);
+
+    if (versoNeedsPrompt || rectoNeedsPrompt) {
+      const promptContainer = document.createElement('div');
+      promptContainer.className = 'make-static-prompt-container';
+      promptContainer.style.cssText = `
+        display: flex;
+        gap: 2px;
+        margin-top: 2px;
+        width: 100%;
+      `;
+
+      if (versoNeedsPrompt && spread.verso) {
+        const versoBtn = document.createElement('button');
+        versoBtn.className = 'make-static-btn';
+        versoBtn.textContent = 'Static?';
+        versoBtn.title = `Make page ${spread.verso.pageNumber} static (removes from text flow)`;
+        versoBtn.style.cssText = `
+          flex: 1;
+          font-size: 8px;
+          padding: 1px 2px;
+          border: 1px solid #ea580c;
+          background: #fff7ed;
+          color: #ea580c;
+          border-radius: 2px;
+          cursor: pointer;
+        `;
+        const pageNum = spread.verso.pageNumber;
+        versoBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          appState.makePageStatic(pageNum);
+        });
+        promptContainer.appendChild(versoBtn);
+      } else {
+        // Spacer for alignment
+        const spacer = document.createElement('div');
+        spacer.style.flex = '1';
+        promptContainer.appendChild(spacer);
+      }
+
+      if (rectoNeedsPrompt && spread.recto) {
+        const rectoBtn = document.createElement('button');
+        rectoBtn.className = 'make-static-btn';
+        rectoBtn.textContent = 'Static?';
+        rectoBtn.title = `Make page ${spread.recto.pageNumber} static (removes from text flow)`;
+        rectoBtn.style.cssText = `
+          flex: 1;
+          font-size: 8px;
+          padding: 1px 2px;
+          border: 1px solid #ea580c;
+          background: #fff7ed;
+          color: #ea580c;
+          border-radius: 2px;
+          cursor: pointer;
+        `;
+        const pageNum = spread.recto.pageNumber;
+        rectoBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          appState.makePageStatic(pageNum);
+        });
+        promptContainer.appendChild(rectoBtn);
+      } else if (versoNeedsPrompt) {
+        // Spacer for alignment
+        const spacer = document.createElement('div');
+        spacer.style.flex = '1';
+        promptContainer.appendChild(spacer);
+      }
+
+      thumbDiv.appendChild(promptContainer);
+    }
+
     // Make spreads with static pages draggable
     if (hasStaticPage) {
       thumbDiv.setAttribute('draggable', 'true');
