@@ -890,6 +890,7 @@ body {
   bottom: 0;
   left: 0;
   right: 0;
+  z-index: 10; /* Above click overlay */
 }
 
 .spread-thumbnail-page-label {
@@ -910,6 +911,86 @@ body {
 .spread-thumbnail-page-label.selected {
   background: #22c55e;
   color: white;
+}
+
+/* Page state label colors */
+/* Available: medium gray - empty pages */
+.spread-thumbnail-page-label.page-state-available {
+  background: #6b7280;
+  color: white;
+}
+
+.spread-thumbnail-page-label.page-state-available:hover {
+  background: #4b5563;
+}
+
+/* Text: light gray - pages with markdown content */
+.spread-thumbnail-page-label.page-state-text {
+  background: #9ca3af;
+  color: white;
+}
+
+.spread-thumbnail-page-label.page-state-text:hover {
+  background: #6b7280;
+}
+
+/* Static: orange - pages with shapes, draggable */
+.spread-thumbnail-page-label.page-state-static {
+  background: #ea580c;
+  color: white;
+}
+
+.spread-thumbnail-page-label.page-state-static:hover {
+  background: #c2410c;
+}
+
+/* Selected state overrides all page states */
+.spread-thumbnail-page-label.page-state-available.selected,
+.spread-thumbnail-page-label.page-state-text.selected,
+.spread-thumbnail-page-label.page-state-static.selected {
+  background: #22c55e;
+  color: white;
+}
+
+/* Legacy class for backward compatibility */
+.spread-thumbnail-page-label.static-page-label {
+  background: #ea580c;
+  color: white;
+}
+
+/* Draggable thumbnail styling */
+.spread-thumbnail.draggable-thumbnail {
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.spread-thumbnail.draggable-thumbnail:active {
+  cursor: grabbing;
+}
+
+.spread-thumbnail.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+/* Drop target styling - orange outline */
+.spread-thumbnail.drop-target {
+  border-color: #ea580c !important;
+  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.4) !important;
+}
+
+.spread-thumbnail.drop-target canvas {
+  outline: 2px solid #ea580c;
+  outline-offset: -2px;
+}
+
+/* Individual page drop target styling */
+.spread-thumbnail-page-label.page-drop-target {
+  outline: 2px solid #3b82f6 !important;
+  outline-offset: -1px;
+  background: #3b82f6 !important;
+  color: white !important;
 }
 
 .konva-container {

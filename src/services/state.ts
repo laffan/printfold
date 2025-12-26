@@ -116,6 +116,62 @@ export const defaultEditorState: EditorState = {
 };
 
 function createEmptyProject(): BookletProject {
+  const pagesPerSig = defaultOutputOptions.pagesPerSignature;
+
+  // Create initial empty signature with proper spread layout
+  const initialPages: import('../types').PageContent[] = [];
+  for (let i = 0; i < pagesPerSig; i++) {
+    const pageNum = i + 1;
+    initialPages.push({
+      id: crypto.randomUUID(),
+      pageNumber: pageNum,
+      pageState: 'available',
+      sections: [],
+      isBlank: true,
+      isRecto: pageNum % 2 === 1,
+      isStatic: false,
+      items: [],
+    });
+  }
+
+  // Create spreads for initial signature: [null|1], [2|3], [4|null]
+  const initialSpreads: import('../types').Spread[] = [];
+
+  // First spread: [null | page 1]
+  initialSpreads.push({
+    id: crypto.randomUUID(),
+    spreadNumber: 1,
+    verso: null,
+    recto: initialPages[0],
+  });
+
+  // Middle spreads: [2|3], [4|5], etc. (all pages except first and last)
+  for (let i = 1; i < initialPages.length - 1; i += 2) {
+    initialSpreads.push({
+      id: crypto.randomUUID(),
+      spreadNumber: initialSpreads.length + 1,
+      verso: initialPages[i],
+      recto: initialPages[i + 1] || null,
+    });
+  }
+
+  // Last spread: [last page | null]
+  if (initialPages.length > 1) {
+    initialSpreads.push({
+      id: crypto.randomUUID(),
+      spreadNumber: initialSpreads.length + 1,
+      verso: initialPages[initialPages.length - 1],
+      recto: null,
+    });
+  }
+
+  const initialSignature: import('../types').Signature = {
+    id: crypto.randomUUID(),
+    signatureNumber: 1,
+    spreads: initialSpreads,
+    pageCount: pagesPerSig,
+  };
+
   return {
     id: crypto.randomUUID(),
     name: 'Untitled Booklet',
@@ -126,7 +182,7 @@ function createEmptyProject(): BookletProject {
     layoutOptions: JSON.parse(JSON.stringify(defaultLayoutOptions)),
     fontOptions: JSON.parse(JSON.stringify(defaultFontOptions)),
     headerFooter: JSON.parse(JSON.stringify(defaultHeaderFooter)),
-    signatures: [],
+    signatures: [initialSignature],
     blankPages: [],
   };
 }
@@ -345,58 +401,364 @@ class AppState {
     this.requestReflow();
   }
 
-  // Static spreads (exist independently of markdown)
-  // Add a complete signature worth of static spreads
-  addStaticSignature(): void {
+  /**
+   * Explicitly make a page static (removes it from text flow)
+   * Used when user confirms they want to claim a page for static content
+   */
+  makePageStatic(pageNumber: number): void {
     const prevState = this.project;
-    const staticSpreads = [...(this.project.staticSpreads || [])];
-    const spreadsPerSig = this.project.outputOptions.pagesPerSignature / 2;
 
-    // Add spreadsPerSig number of spreads
-    for (let i = 0; i < spreadsPerSig; i++) {
-      const newIndex = staticSpreads.length;
-      const basePageNumber = 1000 + newIndex * 2;
+    const signatures = this.project.signatures.map(sig => ({
+      ...sig,
+      spreads: sig.spreads.map(spread => ({
+        ...spread,
+        verso: spread.verso?.pageNumber === pageNumber
+          ? { ...spread.verso, pageState: 'static' as const, isStatic: true }
+          : spread.verso,
+        recto: spread.recto?.pageNumber === pageNumber
+          ? { ...spread.recto, pageState: 'static' as const, isStatic: true }
+          : spread.recto,
+      })),
+    }));
 
-      const newSpread: import('../types').StaticSpread = {
-        id: crypto.randomUUID(),
-        index: newIndex,
-        verso: {
-          id: crypto.randomUUID(),
-          pageNumber: basePageNumber,
-          sections: [],
-          isBlank: true,
-          isRecto: false,
-          isStatic: true,
-          items: [],
-        },
-        recto: {
-          id: crypto.randomUUID(),
-          pageNumber: basePageNumber + 1,
-          sections: [],
-          isBlank: true,
-          isRecto: true,
-          isStatic: true,
-          items: [],
-        },
-      };
-
-      staticSpreads.push(newSpread);
-    }
-
-    this.project = { ...this.project, staticSpreads };
+    this.project = { ...this.project, signatures };
     this.notifyProjectListeners(prevState);
 
-    // Trigger reflow to merge static spreads
+    // Trigger reflow - text will now flow around this static page
     this.requestReflow();
   }
 
-  // Add a single static spread (2 pages)
+  /**
+   * Check if a page has items but is not static (needs "make static?" prompt)
+   */
+  pageNeedsStaticPrompt(pageNumber: number): boolean {
+    for (const sig of this.project.signatures) {
+      for (const spread of sig.spreads) {
+        const page = spread.verso?.pageNumber === pageNumber ? spread.verso
+          : spread.recto?.pageNumber === pageNumber ? spread.recto
+          : null;
+        if (page && page.pageState !== 'static' && page.items && page.items.length > 0) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Insert a static page at the currently selected position
+   * Pushes existing pages forward by 1
+   * Automatically adds available pages to maintain signature boundaries
+   */
+  insertStaticPageAtSelection(): void {
+    const prevState = this.project;
+    const selectedPageNumber = this.editor.selectedPageNumber;
+
+    if (selectedPageNumber === null || selectedPageNumber === undefined) {
+      console.warn('No page selected');
+      return;
+    }
+
+    const pagesPerSig = this.project.outputOptions.pagesPerSignature;
+
+    // Collect all pages from signatures into a flat array
+    const allPages: import('../types').PageContent[] = [];
+    for (const sig of this.project.signatures) {
+      for (const spread of sig.spreads) {
+        if (spread.verso) allPages.push(spread.verso);
+        if (spread.recto) allPages.push(spread.recto);
+      }
+    }
+
+    // Sort by page number
+    allPages.sort((a, b) => a.pageNumber - b.pageNumber);
+
+    // Find insert position (insert AT the selected page, pushing it forward)
+    const insertIndex = allPages.findIndex(p => p.pageNumber >= selectedPageNumber);
+    const actualInsertIndex = insertIndex === -1 ? allPages.length : insertIndex;
+
+    // Create new static page
+    const newPage: import('../types').PageContent = {
+      id: crypto.randomUUID(),
+      pageNumber: selectedPageNumber, // Will be renumbered
+      pageState: 'static',
+      sections: [],
+      isBlank: true,
+      isRecto: selectedPageNumber % 2 === 1,
+      isStatic: true,
+      items: [],
+    };
+
+    // Insert the new page
+    allPages.splice(actualInsertIndex, 0, newPage);
+
+    // Check if we need to add available pages to maintain signature boundaries
+    const currentTotal = allPages.length;
+    const remainder = currentTotal % pagesPerSig;
+    if (remainder !== 0) {
+      // Need to add (pagesPerSig - remainder) available pages at the end
+      const pagesToAdd = pagesPerSig - remainder;
+      const maxPageNum = currentTotal; // Will be renumbered, but need unique starting point
+      for (let i = 0; i < pagesToAdd; i++) {
+        allPages.push({
+          id: crypto.randomUUID(),
+          pageNumber: maxPageNum + 1 + i, // Will be renumbered
+          pageState: 'available',
+          sections: [],
+          isBlank: true,
+          isRecto: false, // Will be recalculated
+          isStatic: false,
+          items: [],
+        });
+      }
+    }
+
+    // Renumber all pages (1-based page numbers)
+    allPages.forEach((page, index) => {
+      const pageNum = index + 1;
+      page.pageNumber = pageNum;
+      page.isRecto = pageNum % 2 === 1;
+    });
+
+    // Rebuild spreads from the page array
+    const newSpreads: import('../types').Spread[] = [];
+    for (let i = 0; i < allPages.length; i += 2) {
+      newSpreads.push({
+        id: crypto.randomUUID(),
+        spreadNumber: newSpreads.length + 1,
+        verso: allPages[i] || null,
+        recto: allPages[i + 1] || null,
+      });
+    }
+
+    // Rebuild signatures
+    const spreadsPerSig = pagesPerSig / 2;
+    const newSignatures: import('../types').Signature[] = [];
+
+    for (let i = 0; i < newSpreads.length; i += spreadsPerSig) {
+      const sigSpreads = newSpreads.slice(i, i + spreadsPerSig);
+      newSignatures.push({
+        id: crypto.randomUUID(),
+        signatureNumber: newSignatures.length + 1,
+        spreads: sigSpreads,
+        pageCount: sigSpreads.length * 2,
+      });
+    }
+
+    this.project = { ...this.project, signatures: newSignatures };
+    this.notifyProjectListeners(prevState);
+
+    // Select the new static page (its position after renumbering is actualInsertIndex + 1)
+    const newPageNum = actualInsertIndex + 1;
+    this.updateEditor({
+      selectedPageNumber: newPageNum,
+      selectedPagePosition: newPageNum % 2 === 1 ? 'recto' : 'verso',
+    });
+
+    // Trigger reflow to adjust text around new static page
+    this.requestReflow();
+  }
+
+  /**
+   * Move a static page from one position to another
+   * The page at fromPageNumber is moved to toPageNumber, shifting other pages
+   */
+  moveStaticPage(fromPageNumber: number, toPageNumber: number): void {
+    if (fromPageNumber === toPageNumber) return;
+
+    const prevState = this.project;
+
+    // Collect all pages from signatures
+    const allPages: import('../types').PageContent[] = [];
+    for (const sig of this.project.signatures) {
+      for (const spread of sig.spreads) {
+        if (spread.verso) allPages.push({ ...spread.verso });
+        if (spread.recto) allPages.push({ ...spread.recto });
+      }
+    }
+
+    // Sort by page number
+    allPages.sort((a, b) => a.pageNumber - b.pageNumber);
+
+    // Find the page to move
+    const fromIndex = allPages.findIndex(p => p.pageNumber === fromPageNumber);
+    if (fromIndex === -1) {
+      console.warn('Source page not found:', fromPageNumber);
+      return;
+    }
+
+    const pageToMove = allPages[fromIndex];
+    // Allow moving static pages or pages with items
+    const hasItems = pageToMove.items && pageToMove.items.length > 0;
+    if (pageToMove.pageState !== 'static' && !hasItems) {
+      console.warn('Can only move static pages or pages with items');
+      return;
+    }
+
+    // Remove page from current position
+    allPages.splice(fromIndex, 1);
+
+    // Find target position (after removing the source)
+    let toIndex = allPages.findIndex(p => p.pageNumber >= toPageNumber);
+    if (toIndex === -1) {
+      toIndex = allPages.length;
+    }
+
+    // If moving forward, adjust for removal
+    if (fromPageNumber < toPageNumber && toIndex > 0) {
+      toIndex = Math.min(toIndex, allPages.length);
+    }
+
+    // Insert at new position
+    allPages.splice(toIndex, 0, pageToMove);
+
+    // Renumber all pages (1-based page numbers)
+    allPages.forEach((page, index) => {
+      const pageNum = index + 1;
+      page.pageNumber = pageNum;
+      page.isRecto = pageNum % 2 === 1;
+    });
+
+    // Rebuild spreads
+    const newSpreads: import('../types').Spread[] = [];
+    for (let i = 0; i < allPages.length; i += 2) {
+      newSpreads.push({
+        id: crypto.randomUUID(),
+        spreadNumber: newSpreads.length + 1,
+        verso: allPages[i] || null,
+        recto: allPages[i + 1] || null,
+      });
+    }
+
+    // Rebuild signatures
+    const pagesPerSig = this.project.outputOptions.pagesPerSignature;
+    const spreadsPerSig = pagesPerSig / 2;
+    const newSignatures: import('../types').Signature[] = [];
+
+    for (let i = 0; i < newSpreads.length; i += spreadsPerSig) {
+      const sigSpreads = newSpreads.slice(i, i + spreadsPerSig);
+      newSignatures.push({
+        id: crypto.randomUUID(),
+        signatureNumber: newSignatures.length + 1,
+        spreads: sigSpreads,
+        pageCount: sigSpreads.length * 2,
+      });
+    }
+
+    this.project = { ...this.project, signatures: newSignatures };
+    this.notifyProjectListeners(prevState);
+
+    // Select the moved page at its new position (1-based)
+    const newPageNum = toIndex + 1;
+    this.updateEditor({
+      selectedPageNumber: newPageNum,
+      selectedPagePosition: newPageNum % 2 === 1 ? 'recto' : 'verso',
+    });
+
+    // Trigger reflow to adjust text around moved page
+    this.requestReflow();
+  }
+
+  /**
+   * Add a signature's worth of available pages at the end of the booklet
+   * Each signature has its own spread layout: [null|first], [middle pairs], [last|null]
+   */
+  addAvailableSignature(): void {
+    const prevState = this.project;
+    const pagesPerSig = this.project.outputOptions.pagesPerSignature;
+
+    // Collect all pages from existing signatures
+    const existingPages: import('../types').PageContent[] = [];
+    for (const sig of this.project.signatures) {
+      for (const spread of sig.spreads) {
+        if (spread.verso) existingPages.push({ ...spread.verso });
+        if (spread.recto) existingPages.push({ ...spread.recto });
+      }
+    }
+
+    // Find the highest page number (or start at 0 if empty)
+    const maxPageNum = existingPages.length > 0
+      ? Math.max(...existingPages.map(p => p.pageNumber))
+      : 0;
+
+    // Create new pages for the new signature
+    const newPages: import('../types').PageContent[] = [];
+    for (let i = 0; i < pagesPerSig; i++) {
+      const pageNum = maxPageNum + 1 + i;
+      newPages.push({
+        id: crypto.randomUUID(),
+        pageNumber: pageNum,
+        pageState: 'available',
+        sections: [],
+        isBlank: true,
+        isRecto: pageNum % 2 === 1,
+        isStatic: false,
+        items: [],
+      });
+    }
+
+    // Create spreads for the new signature: [null|first], [middle pairs], [last|null]
+    const newSpreads: import('../types').Spread[] = [];
+
+    // First spread: [null | first page]
+    newSpreads.push({
+      id: crypto.randomUUID(),
+      spreadNumber: 1,
+      verso: null,
+      recto: newPages[0],
+    });
+
+    // Middle spreads: pairs of pages (all except first and last)
+    for (let i = 1; i < newPages.length - 1; i += 2) {
+      newSpreads.push({
+        id: crypto.randomUUID(),
+        spreadNumber: newSpreads.length + 1,
+        verso: newPages[i],
+        recto: newPages[i + 1] || null,
+      });
+    }
+
+    // Last spread: [last page | null]
+    if (newPages.length > 1) {
+      newSpreads.push({
+        id: crypto.randomUUID(),
+        spreadNumber: newSpreads.length + 1,
+        verso: newPages[newPages.length - 1],
+        recto: null,
+      });
+    }
+
+    // Create the new signature
+    const newSignature: import('../types').Signature = {
+      id: crypto.randomUUID(),
+      signatureNumber: this.project.signatures.length + 1,
+      spreads: newSpreads,
+      pageCount: pagesPerSig,
+    };
+
+    // Add to existing signatures
+    const newSignatures = [...this.project.signatures, newSignature];
+
+    this.project = { ...this.project, signatures: newSignatures };
+    this.notifyProjectListeners(prevState);
+
+    // Don't call requestReflow() - we're adding available pages, not text content
+  }
+
+  // DEPRECATED: Old staticSpreads methods - kept for backward compatibility
+  // Add a complete signature worth of static spreads
+  addStaticSignature(): void {
+    // Redirect to new method
+    this.addAvailableSignature();
+  }
+
+  // DEPRECATED: Add a single static spread (2 pages)
   addStaticSpread(): void {
     const prevState = this.project;
     const staticSpreads = [...(this.project.staticSpreads || [])];
 
     const newIndex = staticSpreads.length;
-    const basePageNumber = 1000 + newIndex * 2; // Use high numbers to avoid conflicts
+    const basePageNumber = 1000 + newIndex * 2;
 
     const newSpread: import('../types').StaticSpread = {
       id: crypto.randomUUID(),
@@ -404,6 +766,7 @@ class AppState {
       verso: {
         id: crypto.randomUUID(),
         pageNumber: basePageNumber,
+        pageState: 'static',
         sections: [],
         isBlank: true,
         isRecto: false,
@@ -413,6 +776,7 @@ class AppState {
       recto: {
         id: crypto.randomUUID(),
         pageNumber: basePageNumber + 1,
+        pageState: 'static',
         sections: [],
         isBlank: true,
         isRecto: true,
@@ -424,62 +788,13 @@ class AppState {
     staticSpreads.push(newSpread);
     this.project = { ...this.project, staticSpreads };
     this.notifyProjectListeners(prevState);
-
-    // Trigger reflow to merge static spreads
     this.requestReflow();
   }
 
+  // DEPRECATED: Old method - redirect to new implementation
   addStaticPage(position: 'verso' | 'recto' = 'recto'): void {
-    const prevState = this.project;
-    const staticSpreads = [...(this.project.staticSpreads || [])];
-
-    // Find the last static spread or create a new one
-    let targetSpread = staticSpreads[staticSpreads.length - 1];
-    const basePageNumber = 1000 + staticSpreads.length * 2;
-
-    // If no spreads exist, or the last spread already has a page in the requested position
-    if (!targetSpread || (position === 'verso' && targetSpread.verso) || (position === 'recto' && targetSpread.recto)) {
-      // Create a new spread with just this page
-      const newSpread: import('../types').StaticSpread = {
-        id: crypto.randomUUID(),
-        index: staticSpreads.length,
-        verso: position === 'verso' ? {
-          id: crypto.randomUUID(),
-          pageNumber: basePageNumber,
-          sections: [],
-          isBlank: true,
-          isRecto: false,
-          isStatic: true,
-          items: [],
-        } : null,
-        recto: position === 'recto' ? {
-          id: crypto.randomUUID(),
-          pageNumber: basePageNumber + 1,
-          sections: [],
-          isBlank: true,
-          isRecto: true,
-          isStatic: true,
-          items: [],
-        } : null,
-      };
-      staticSpreads.push(newSpread);
-    } else {
-      // Add page to existing spread
-      const pageNumber = position === 'verso' ? basePageNumber - 2 : basePageNumber - 1;
-      targetSpread[position] = {
-        id: crypto.randomUUID(),
-        pageNumber,
-        sections: [],
-        isBlank: true,
-        isRecto: position === 'recto',
-        isStatic: true,
-        items: [],
-      };
-    }
-
-    this.project = { ...this.project, staticSpreads };
-    this.notifyProjectListeners(prevState);
-    this.requestReflow();
+    // Redirect to new method
+    this.insertStaticPageAtSelection();
   }
 
   removeStaticSpread(spreadId: string): void {
@@ -498,6 +813,165 @@ class AppState {
 
   getStaticSpreads(): import('../types').StaticSpread[] {
     return this.project.staticSpreads || [];
+  }
+
+  /**
+   * Reorder static spreads by swapping their positions
+   * Handles both staticSpreads array and signature spreads with isStatic pages
+   * @param sourceSpreadId - The ID of the spread being dragged
+   * @param targetSpreadId - The ID of the spread to swap with
+   */
+  reorderStaticPages(sourceSpreadId: string, targetSpreadId: string): void {
+    const prevState = this.project;
+    const staticSpreads = [...(this.project.staticSpreads || [])];
+
+    // First try to swap in staticSpreads array
+    const sourceStaticIndex = staticSpreads.findIndex(s => s.id === sourceSpreadId);
+    const targetStaticIndex = staticSpreads.findIndex(s => s.id === targetSpreadId);
+
+    if (sourceStaticIndex !== -1 && targetStaticIndex !== -1) {
+      // Both are in staticSpreads - swap them
+      if (sourceStaticIndex === targetStaticIndex) return;
+
+      const temp = staticSpreads[sourceStaticIndex];
+      staticSpreads[sourceStaticIndex] = staticSpreads[targetStaticIndex];
+      staticSpreads[targetStaticIndex] = temp;
+
+      staticSpreads.forEach((spread, index) => {
+        spread.index = index;
+      });
+
+      this.project = { ...this.project, staticSpreads };
+      this.notifyProjectListeners(prevState);
+      this.requestReflow();
+      return;
+    }
+
+    // If not in staticSpreads, try to swap in signatures
+    // Find the spreads in signatures
+    let sourceInfo: { sigIndex: number; spreadIndex: number } | null = null;
+    let targetInfo: { sigIndex: number; spreadIndex: number } | null = null;
+
+    for (let sigIndex = 0; sigIndex < this.project.signatures.length; sigIndex++) {
+      const sig = this.project.signatures[sigIndex];
+      for (let spreadIndex = 0; spreadIndex < sig.spreads.length; spreadIndex++) {
+        const spread = sig.spreads[spreadIndex];
+        if (spread.id === sourceSpreadId) {
+          sourceInfo = { sigIndex, spreadIndex };
+        }
+        if (spread.id === targetSpreadId) {
+          targetInfo = { sigIndex, spreadIndex };
+        }
+      }
+    }
+
+    if (!sourceInfo || !targetInfo) {
+      console.warn('Could not find source or target spread in signatures');
+      return;
+    }
+
+    // Only allow swapping within the same signature for now
+    if (sourceInfo.sigIndex !== targetInfo.sigIndex) {
+      console.warn('Cannot swap spreads across different signatures');
+      return;
+    }
+
+    // Swap the spreads in the signature
+    const signatures = this.project.signatures.map((sig, sigIndex) => {
+      if (sigIndex !== sourceInfo!.sigIndex) return sig;
+
+      const spreads = [...sig.spreads];
+      const temp = spreads[sourceInfo!.spreadIndex];
+      spreads[sourceInfo!.spreadIndex] = spreads[targetInfo!.spreadIndex];
+      spreads[targetInfo!.spreadIndex] = temp;
+
+      return { ...sig, spreads };
+    });
+
+    this.project = { ...this.project, signatures };
+    this.notifyProjectListeners(prevState);
+    // Note: Don't call requestReflow() as that would regenerate spreads from markdown
+  }
+
+  /**
+   * Reorder signatures by moving one signature to a new position
+   * Text reflows after reordering to fill available pages in the new order
+   */
+  reorderSignatures(sourceIndex: number, targetIndex: number): void {
+    if (sourceIndex === targetIndex) return;
+    if (sourceIndex < 0 || sourceIndex >= this.project.signatures.length) return;
+    if (targetIndex < 0 || targetIndex >= this.project.signatures.length) return;
+
+    const prevState = this.project;
+
+    // Collect all pages maintaining their pageState
+    const allPages: import('../types').PageContent[] = [];
+    for (const sig of this.project.signatures) {
+      for (const spread of sig.spreads) {
+        if (spread.verso) allPages.push({ ...spread.verso });
+        if (spread.recto) allPages.push({ ...spread.recto });
+      }
+    }
+
+    // Sort by page number
+    allPages.sort((a, b) => a.pageNumber - b.pageNumber);
+
+    // Get pages per signature
+    const pagesPerSig = this.project.outputOptions.pagesPerSignature;
+
+    // Split pages into signature chunks
+    const sigChunks: import('../types').PageContent[][] = [];
+    for (let i = 0; i < allPages.length; i += pagesPerSig) {
+      sigChunks.push(allPages.slice(i, i + pagesPerSig));
+    }
+
+    // Reorder the chunks
+    const [movedChunk] = sigChunks.splice(sourceIndex, 1);
+    sigChunks.splice(targetIndex, 0, movedChunk);
+
+    // Flatten and renumber pages (1-based page numbers)
+    const reorderedPages: import('../types').PageContent[] = [];
+    for (const chunk of sigChunks) {
+      for (const page of chunk) {
+        const newPageNum = reorderedPages.length + 1;
+        reorderedPages.push({
+          ...page,
+          pageNumber: newPageNum,
+          isRecto: newPageNum % 2 === 1,
+        });
+      }
+    }
+
+    // Rebuild spreads
+    const newSpreads: import('../types').Spread[] = [];
+    for (let i = 0; i < reorderedPages.length; i += 2) {
+      newSpreads.push({
+        id: crypto.randomUUID(),
+        spreadNumber: newSpreads.length + 1,
+        verso: reorderedPages[i] || null,
+        recto: reorderedPages[i + 1] || null,
+      });
+    }
+
+    // Rebuild signatures
+    const spreadsPerSig = pagesPerSig / 2;
+    const newSignatures: import('../types').Signature[] = [];
+
+    for (let i = 0; i < newSpreads.length; i += spreadsPerSig) {
+      const sigSpreads = newSpreads.slice(i, i + spreadsPerSig);
+      newSignatures.push({
+        id: crypto.randomUUID(),
+        signatureNumber: newSignatures.length + 1,
+        spreads: sigSpreads,
+        pageCount: sigSpreads.length * 2,
+      });
+    }
+
+    this.project = { ...this.project, signatures: newSignatures };
+    this.notifyProjectListeners(prevState);
+
+    // Trigger reflow to adjust text around reordered pages
+    this.requestReflow();
   }
 
   // Spanning items (items that bridge across verso and recto)
@@ -571,11 +1045,15 @@ class AppState {
     }
 
     // Helper to update a page by page number (for signatures)
+    // Items can be added to any page type - pageState is not changed automatically
     const updatePageByNumber = (page: import('../types').PageContent | null) => {
       if (!page || page.pageNumber !== pageNumber) return page;
       return {
         ...page,
         items: [...(page.items || []), item],
+        // Don't auto-claim - user must explicitly make page static
+        // Keep isStatic in sync with pageState for backward compatibility
+        isStatic: page.pageState === 'static',
       };
     };
 

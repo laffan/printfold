@@ -99,15 +99,19 @@ export interface DocumentSection {
   imageRef?: string; // Reference to uploaded image
 }
 
+// Page state for the three-state model
+export type PageState = 'available' | 'text' | 'static';
+
 // Page layout
 export interface PageContent {
   id: string;
   pageNumber: number;
+  pageState: PageState; // The page's current state
   sections: DocumentSection[];
   overflow?: DocumentSection[]; // Content that didn't fit
-  isBlank: boolean;
+  isBlank: boolean; // Deprecated: use pageState === 'available'
   isRecto: boolean; // Right-hand page
-  isStatic: boolean; // Static pages don't receive text flow
+  isStatic: boolean; // Deprecated: use pageState === 'static'
   isBackCover?: boolean; // Special back cover page (verso of first spread)
   items?: PageItem[]; // Items placed on static pages
   backgroundFill?: FillConfig; // Optional background fill for the page
