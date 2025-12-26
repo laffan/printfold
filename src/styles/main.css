@@ -861,12 +861,13 @@ body {
   border: 2px solid var(--color-border);
   border-radius: 4px;
   cursor: pointer;
-  overflow: hidden;
+  overflow: visible;
   position: relative;
   flex-shrink: 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   transition: border-color 0.15s, box-shadow 0.15s;
   margin-bottom: 6px;
+  padding-bottom: 18px; /* Space for labels below */
 }
 
 .spread-thumbnail:hover {
@@ -888,8 +889,8 @@ body {
   display: flex;
   position: absolute;
   bottom: 0;
-  left: 0;
-  right: 0;
+  left: -2px; /* Account for border */
+  right: -2px; /* Account for border */
   z-index: 10; /* Above click overlay */
 }
 
@@ -899,9 +900,17 @@ body {
   color: white;
   font-size: 9px;
   text-align: center;
-  padding: 2px 0;
+  padding: 3px 0;
   cursor: pointer;
   transition: background-color 0.15s;
+}
+
+.spread-thumbnail-page-label:first-child {
+  border-bottom-left-radius: 2px;
+}
+
+.spread-thumbnail-page-label:last-child {
+  border-bottom-right-radius: 2px;
 }
 
 .spread-thumbnail-page-label:hover {

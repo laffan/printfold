@@ -258,8 +258,11 @@ export class PDFGenerator {
     const contentWidth = width - innerMargin - outerMargin;
     const contentHeight = height - margins.top - margins.bottom - headerHeight - footerHeight;
 
-    // For blank/static pages, draw items
-    if (pageContent.isBlank || pageContent.isStatic) {
+    // For pages with items (shapes, images, text boxes), draw them
+    // This includes blank pages, static pages, and pages with items added
+    const hasItems = pageContent.items && pageContent.items.length > 0;
+    const hasBackground = !!pageContent.backgroundFill;
+    if (hasItems || hasBackground || pageContent.isBlank || pageContent.isStatic) {
       // Check if we have a pre-rendered image for this page (supports gradients, patterns, custom fonts)
       const preRenderedImage = this.renderedPageCache.get(pageContent.pageNumber);
       if (preRenderedImage) {
@@ -1053,7 +1056,10 @@ export class PDFGenerator {
       for (const spread of sig.spreads) {
         const pages = [spread.verso, spread.recto].filter(Boolean) as PageContent[];
         for (const page of pages) {
-          if (!(page.isBlank || page.isStatic)) continue;
+          // Check if this page needs rendering (has items, background, or is static/blank)
+          const hasOwnItems = page.items && page.items.length > 0;
+          const hasBackgroundFill = !!page.backgroundFill;
+          if (!(hasOwnItems || hasBackgroundFill || page.isBlank || page.isStatic)) continue;
 
           const adjacentPage = page.isRecto ? spread.verso : spread.recto;
 
