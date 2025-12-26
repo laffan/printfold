@@ -62,6 +62,7 @@ export class TextFlowEngine {
 
   /**
    * Main entry point - reflow content based on current state
+   * Static pages are preserved in place and text flows around them
    */
   reflow(markdown: string): FlowResult {
     // Refresh options from state
@@ -71,6 +72,10 @@ export class TextFlowEngine {
     this.outputOptions = project.outputOptions;
     this.headerFooter = project.headerFooter;
 
+    // Capture existing static pages from current signatures
+    // These will be preserved in their positions
+    const staticPagesByNumber = this.captureStaticPages(project.signatures);
+
     // Parse markdown into sections
     const sections = this.parseMarkdown(markdown);
 
@@ -78,56 +83,205 @@ export class TextFlowEngine {
     const pageDimensions = this.calculatePageDimensions();
 
     // Flow sections across pages
-    const pages = this.flowSections(sections, pageDimensions);
+    const textPages = this.flowSections(sections, pageDimensions);
 
-    // Insert blank pages
-    const pagesWithBlanks = this.insertBlankPages(pages, project.blankPages);
+    // Insert blank pages (user-specified)
+    const textPagesWithBlanks = this.insertBlankPages(textPages, project.blankPages);
 
-    // Create spreads and signatures from markdown content
-    let spreads = this.createSpreads(pagesWithBlanks);
+    // Merge text pages with static pages, keeping static pages in their positions
+    const allPages = this.mergeStaticPagesInPlace(textPagesWithBlanks, staticPagesByNumber);
 
-    // Merge static spreads (independent of markdown)
-    const staticSpreads = project.staticSpreads || [];
-    if (staticSpreads.length > 0) {
-      spreads = this.mergeStaticSpreads(spreads, staticSpreads);
-    }
+    // Create spreads from all pages
+    const spreads = this.createSpreadsFromPages(allPages);
 
     const signatures = this.createSignatures(spreads);
 
-    // Calculate total pages including static spreads
-    const totalPages = pagesWithBlanks.length + staticSpreads.length * 2;
-
     return {
-      pages: pagesWithBlanks,
+      pages: allPages,
       spreads,
       signatures,
-      totalPages,
+      totalPages: allPages.length,
     };
   }
 
   /**
-   * Merge static spreads with content spreads
-   * Static spreads are appended after content
+   * Capture static pages from existing signatures
+   * Returns a map of pageNumber -> PageContent for static pages
+   */
+  private captureStaticPages(signatures: import('../types').Signature[]): Map<number, PageContent> {
+    const staticPages = new Map<number, PageContent>();
+
+    for (const sig of signatures) {
+      for (const spread of sig.spreads) {
+        if (spread.verso?.pageState === 'static') {
+          staticPages.set(spread.verso.pageNumber, spread.verso);
+        }
+        if (spread.recto?.pageState === 'static') {
+          staticPages.set(spread.recto.pageNumber, spread.recto);
+        }
+      }
+    }
+
+    return staticPages;
+  }
+
+  /**
+   * Merge text pages with static pages
+   * Static pages stay in their positions, text pages fill the remaining slots
    *
-   * Page numbering:
-   * - Spread 0: [page 0 (back cover), page 1 (front cover)]
-   * - Spread N (N > 0): [page 2N, page 2N+1]
+   * Page 0 (back cover) is handled specially - it's always created if not static
+   * Text pages from flowSections have pageNumbers 1,2,3,... which are their ORDER,
+   * not their final positions. They get renumbered as they're placed.
+   */
+  private mergeStaticPagesInPlace(textPages: PageContent[], staticPages: Map<number, PageContent>): PageContent[] {
+    // Get previous back cover state
+    const project = appState.getProject();
+    const prevFirstSpread = project.signatures[0]?.spreads[0];
+
+    // If no static pages, use the original flow but ensure page 0 (back cover) exists
+    if (staticPages.size === 0) {
+      const result: PageContent[] = [];
+
+      // Create page 0 (back cover)
+      const backCoverPage = this.createEmptyPage(0, true);
+      backCoverPage.isRecto = false;
+      backCoverPage.isStatic = true;
+      backCoverPage.pageState = 'available';
+      if (prevFirstSpread?.verso?.pageNumber === 0) {
+        if (prevFirstSpread.verso.items) backCoverPage.items = prevFirstSpread.verso.items;
+        if (prevFirstSpread.verso.backgroundFill) backCoverPage.backgroundFill = prevFirstSpread.verso.backgroundFill;
+        if (prevFirstSpread.verso.pageState) backCoverPage.pageState = prevFirstSpread.verso.pageState;
+      }
+      result.push(backCoverPage);
+
+      // Add text pages with corrected page numbers (starting from 1)
+      for (let i = 0; i < textPages.length; i++) {
+        const pageNum = i + 1;
+        result.push({
+          ...textPages[i],
+          pageNumber: pageNum,
+          isRecto: pageNum % 2 === 1,
+          pageState: 'text',
+        });
+      }
+
+      return result;
+    }
+
+    // With static pages, we need to place them at their positions
+    // and flow text into the remaining slots
+
+    // Find the range of pages we need
+    const maxStaticPageNum = Math.max(...staticPages.keys());
+    // We need at least enough slots for all text + all static pages
+    // But also at least up to the max static page number
+    const minPagesNeeded = Math.max(textPages.length + staticPages.size, maxStaticPageNum + 1);
+
+    const result: PageContent[] = [];
+    let textPageIndex = 0;
+
+    // First, handle page 0 (back cover) specially
+    if (staticPages.has(0)) {
+      const staticPage = staticPages.get(0)!;
+      result.push({
+        ...staticPage,
+        pageNumber: 0,
+        isRecto: false,
+      });
+    } else {
+      // Create back cover as available
+      const backCoverPage = this.createEmptyPage(0, true);
+      backCoverPage.isRecto = false;
+      backCoverPage.isStatic = true;
+      backCoverPage.pageState = 'available';
+      if (prevFirstSpread?.verso?.pageNumber === 0) {
+        if (prevFirstSpread.verso.items) backCoverPage.items = prevFirstSpread.verso.items;
+        if (prevFirstSpread.verso.backgroundFill) backCoverPage.backgroundFill = prevFirstSpread.verso.backgroundFill;
+        if (prevFirstSpread.verso.pageState) backCoverPage.pageState = prevFirstSpread.verso.pageState;
+      }
+      result.push(backCoverPage);
+    }
+
+    // Now handle pages 1 through minPagesNeeded
+    for (let pageNum = 1; pageNum < minPagesNeeded; pageNum++) {
+      if (staticPages.has(pageNum)) {
+        // This position has a static page - use it
+        const staticPage = staticPages.get(pageNum)!;
+        result.push({
+          ...staticPage,
+          pageNumber: pageNum,
+          isRecto: pageNum % 2 === 1,
+        });
+      } else if (textPageIndex < textPages.length) {
+        // Fill with text content
+        result.push({
+          ...textPages[textPageIndex],
+          pageNumber: pageNum,
+          isRecto: pageNum % 2 === 1,
+          pageState: 'text',
+        });
+        textPageIndex++;
+      } else {
+        // No more text, create available page
+        result.push(this.createEmptyPage(pageNum, true));
+      }
+    }
+
+    // If there are remaining text pages, append them at the end
+    while (textPageIndex < textPages.length) {
+      const pageNum = result.length;
+      result.push({
+        ...textPages[textPageIndex],
+        pageNumber: pageNum,
+        isRecto: pageNum % 2 === 1,
+        pageState: 'text',
+      });
+      textPageIndex++;
+    }
+
+    return result;
+  }
+
+  /**
+   * Create spreads from a linear array of pages
+   */
+  private createSpreadsFromPages(pages: PageContent[]): Spread[] {
+    const spreads: Spread[] = [];
+
+    // Page 0 is back cover (verso of first spread)
+    // Page 1 is front cover (recto of first spread)
+    // Then pages 2,3 are spread 2, pages 4,5 are spread 3, etc.
+
+    for (let i = 0; i < pages.length; i += 2) {
+      const verso = pages[i] || null;
+      const recto = pages[i + 1] || null;
+
+      spreads.push({
+        id: crypto.randomUUID(),
+        spreadNumber: spreads.length + 1,
+        verso,
+        recto,
+      });
+    }
+
+    return spreads;
+  }
+
+  /**
+   * DEPRECATED: Merge static spreads with content spreads
+   * This method is kept for backward compatibility but is no longer used
    */
   private mergeStaticSpreads(contentSpreads: Spread[], staticSpreads: StaticSpread[]): Spread[] {
     const merged = [...contentSpreads];
 
-    // Calculate base spread number for static spreads
     const baseSpreadNumber = merged.length > 0
       ? Math.max(...merged.map(s => s.spreadNumber)) + 1
       : 1;
 
-    // Convert static spreads to regular spreads
-    // Page numbering continues from content: after N content spreads, next page is 2N
     staticSpreads.forEach((staticSpread, index) => {
       const spreadNumber = baseSpreadNumber + index;
       const basePageNumber = contentSpreads.length * 2 + index * 2;
 
-      // Update page numbers in static spread
       const verso = staticSpread.verso ? {
         ...staticSpread.verso,
         pageNumber: basePageNumber,
