@@ -622,9 +622,10 @@ export function updateEditSelectedSection(): void {
     return;
   }
 
-  // Show panel and section
+  // Show panel and section, and ensure we're on the Selected tab
   if (panel) panel.style.display = 'block';
   section.style.display = 'block';
+  switchToSelectedTab();
 
   // Helper to safely set input values
   const setInputValue = (id: string, value: string) => {

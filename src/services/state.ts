@@ -582,22 +582,23 @@ class AppState {
     const prevState = this.project;
     const pagesPerSig = this.project.outputOptions.pagesPerSignature;
 
-    // Collect all pages from signatures
+    // Collect all pages from signatures, preserving their data
     const allPages: import('../types').PageContent[] = [];
     for (const sig of this.project.signatures) {
       for (const spread of sig.spreads) {
-        if (spread.verso) allPages.push(spread.verso);
-        if (spread.recto) allPages.push(spread.recto);
+        if (spread.verso) allPages.push({ ...spread.verso });
+        if (spread.recto) allPages.push({ ...spread.recto });
       }
     }
 
-    // Sort by page number
-    allPages.sort((a, b) => a.pageNumber - b.pageNumber);
+    // Find the highest page number (or start at 0 if empty)
+    const maxPageNum = allPages.length > 0
+      ? Math.max(...allPages.map(p => p.pageNumber))
+      : 0;
 
     // Add new available pages at the end
-    const startPageNum = allPages.length;
     for (let i = 0; i < pagesPerSig; i++) {
-      const pageNum = startPageNum + i;
+      const pageNum = maxPageNum + 1 + i;
       allPages.push({
         id: crypto.randomUUID(),
         pageNumber: pageNum,
@@ -610,29 +611,70 @@ class AppState {
       });
     }
 
-    // Rebuild spreads
+    // Sort by page number
+    allPages.sort((a, b) => a.pageNumber - b.pageNumber);
+
+    // Rebuild spreads using NEW layout:
+    // First spread: [null | page 1]
+    // Middle spreads: [2|3], [4|5], etc.
+    // Last spread of each signature: [lastPage | null]
     const newSpreads: import('../types').Spread[] = [];
-    for (let i = 0; i < allPages.length; i += 2) {
+
+    // Find page 1
+    const page1 = allPages.find(p => p.pageNumber === 1);
+    if (page1) {
       newSpreads.push({
         id: crypto.randomUUID(),
-        spreadNumber: newSpreads.length + 1,
-        verso: allPages[i] || null,
-        recto: allPages[i + 1] || null,
+        spreadNumber: 1,
+        verso: null, // Ghost placeholder
+        recto: page1,
       });
     }
 
-    // Rebuild signatures
-    const spreadsPerSig = pagesPerSig / 2;
+    // Get remaining pages (excluding page 1 and the last page which goes in final spread)
+    const remainingPages = allPages.filter(p => p.pageNumber !== 1);
+    const lastPage = remainingPages.length > 0 ? remainingPages[remainingPages.length - 1] : null;
+    const middlePages = lastPage ? remainingPages.slice(0, -1) : [];
+
+    // Create middle spreads
+    for (let i = 0; i < middlePages.length; i += 2) {
+      newSpreads.push({
+        id: crypto.randomUUID(),
+        spreadNumber: newSpreads.length + 1,
+        verso: middlePages[i] || null,
+        recto: middlePages[i + 1] || null,
+      });
+    }
+
+    // Last spread with back cover on left
+    if (lastPage) {
+      newSpreads.push({
+        id: crypto.randomUUID(),
+        spreadNumber: newSpreads.length + 1,
+        verso: lastPage,
+        recto: null,
+      });
+    }
+
+    // Rebuild signatures - need to account for new spread layout
+    // Each signature has: 1 first spread + middle spreads + 1 last spread
+    // But for simplicity, we'll use spreadsPerSig as before
+    const spreadsPerSig = Math.ceil(pagesPerSig / 2) + 1; // +1 for the first/last spread asymmetry
     const newSignatures: import('../types').Signature[] = [];
 
-    for (let i = 0; i < newSpreads.length; i += spreadsPerSig) {
-      const sigSpreads = newSpreads.slice(i, i + spreadsPerSig);
-      newSignatures.push({
-        id: crypto.randomUUID(),
-        signatureNumber: newSignatures.length + 1,
-        spreads: sigSpreads,
-        pageCount: sigSpreads.length * 2,
-      });
+    // For now, keep simple splitting
+    const actualSpreadsPerSig = Math.ceil(newSpreads.length / Math.ceil(allPages.length / pagesPerSig));
+
+    for (let i = 0; i < newSpreads.length; i += actualSpreadsPerSig) {
+      const sigSpreads = newSpreads.slice(i, i + actualSpreadsPerSig);
+      if (sigSpreads.length > 0) {
+        newSignatures.push({
+          id: crypto.randomUUID(),
+          signatureNumber: newSignatures.length + 1,
+          spreads: sigSpreads,
+          pageCount: pagesPerSig,
+        });
+      }
     }
 
     this.project = { ...this.project, signatures: newSignatures };
