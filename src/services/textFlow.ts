@@ -88,6 +88,29 @@ export class TextFlowEngine {
     // Insert blank pages (user-specified)
     const textPagesWithBlanks = this.insertBlankPages(textPages, project.blankPages);
 
+    // If there's no content and no static pages, preserve the existing signature structure
+    // This ensures the initial empty signature is not wiped out on startup
+    if (textPagesWithBlanks.length === 0 && staticPagesByNumber.size === 0) {
+      // Return existing signatures if available, otherwise create a default one
+      if (project.signatures.length > 0) {
+        const allPages: PageContent[] = [];
+        for (const sig of project.signatures) {
+          for (const spread of sig.spreads) {
+            if (spread.verso) allPages.push(spread.verso);
+            if (spread.recto) allPages.push(spread.recto);
+          }
+        }
+        return {
+          pages: allPages,
+          spreads: project.signatures.flatMap(s => s.spreads),
+          signatures: project.signatures,
+          totalPages: allPages.length,
+        };
+      }
+      // Create default empty signature
+      return this.createDefaultSignature();
+    }
+
     // Merge text pages with static pages, keeping static pages in their positions
     const allPages = this.mergeStaticPagesInPlace(textPagesWithBlanks, staticPagesByNumber);
 
@@ -101,6 +124,39 @@ export class TextFlowEngine {
       spreads,
       signatures,
       totalPages: allPages.length,
+    };
+  }
+
+  /**
+   * Create a default empty signature with available pages
+   * Used when there's no content at startup
+   */
+  private createDefaultSignature(): FlowResult {
+    const pagesPerSig = this.outputOptions.pagesPerSignature;
+    const pages: PageContent[] = [];
+
+    for (let i = 0; i < pagesPerSig; i++) {
+      const pageNum = i + 1;
+      pages.push({
+        id: crypto.randomUUID(),
+        pageNumber: pageNum,
+        pageState: 'available',
+        sections: [],
+        isBlank: true,
+        isRecto: pageNum % 2 === 1,
+        isStatic: false,
+        items: [],
+      });
+    }
+
+    const spreads = this.createSpreadsFromPages(pages);
+    const signatures = this.createSignatures(spreads);
+
+    return {
+      pages,
+      spreads,
+      signatures,
+      totalPages: pages.length,
     };
   }
 
@@ -901,23 +957,37 @@ export class TextFlowEngine {
 
   /**
    * Create signatures from spreads
+   * Ensures signatures are always complete (never partial)
    */
   private createSignatures(spreads: Spread[]): Signature[] {
     const pagesPerSig = this.outputOptions.pagesPerSignature;
     const spreadsPerSig = pagesPerSig / 2;
     const signatures: Signature[] = [];
 
+    if (spreads.length === 0) {
+      return signatures;
+    }
+
+    // Find the highest existing page number to continue numbering
+    let maxPageNum = 0;
+    for (const spread of spreads) {
+      if (spread.verso) maxPageNum = Math.max(maxPageNum, spread.verso.pageNumber);
+      if (spread.recto) maxPageNum = Math.max(maxPageNum, spread.recto.pageNumber);
+    }
+
     // Pad spreads to fill complete signatures
-    // Page numbering: spread 0 has [backCover(0) | page1], spread 1 has [page2 | page3], etc.
-    // So spread at index N has pages (N*2) and (N*2 + 1) for N > 0
-    // For padding spreads, continue this pattern
     const paddedSpreads = [...spreads];
     while (paddedSpreads.length % spreadsPerSig !== 0) {
+      maxPageNum += 1;
+      const versoPage = this.createEmptyPage(maxPageNum, true);
+      maxPageNum += 1;
+      const rectoPage = this.createEmptyPage(maxPageNum, true);
+
       const emptySpread: Spread = {
         id: crypto.randomUUID(),
         spreadNumber: paddedSpreads.length + 1,
-        verso: this.createEmptyPage(paddedSpreads.length * 2, true),
-        recto: this.createEmptyPage(paddedSpreads.length * 2 + 1, true),
+        verso: versoPage,
+        recto: rectoPage,
       };
       paddedSpreads.push(emptySpread);
     }
