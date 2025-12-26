@@ -1,0 +1,260 @@
+/* Input Column */
+.column-input {
+  min-width: 280px;
+}
+
+.panel-files {
+  flex: 1;
+  min-height: 200px;
+  overflow: hidden;
+}
+
+.panel-files.expanded {
+  flex: 1;
+}
+
+.panel-preview {
+  flex: 0 0 auto;
+  min-height: 100px;
+  max-height: 200px;
+}
+
+.panel-preview.collapsed {
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+.panel-preview.collapsed .file-preview {
+  display: none;
+}
+
+.file-list {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0;
+  border: 2px dashed transparent;
+  transition: all 0.2s ease;
+}
+
+.file-list.dragover {
+  border-color: var(--color-primary);
+  background: rgba(74, 158, 255, 0.05);
+}
+
+.file-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.file-tab {
+  flex: 1;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.file-tab:hover {
+  color: var(--color-text);
+  background: var(--color-bg-hover);
+}
+
+.file-tab.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.file-items-container {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.file-list-empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  margin-bottom: 4px;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.file-item:hover {
+  background: var(--color-bg-hover);
+}
+
+.file-item.selected {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.file-item.main-document::before {
+  content: '★';
+  color: var(--color-warning);
+  font-size: 10px;
+}
+
+.file-item.selected.main-document::before {
+  color: #fff;
+}
+
+.file-item.dragging {
+  opacity: 0.5;
+}
+
+.file-item.drag-over {
+  border-top: 2px solid var(--color-primary);
+  margin-top: -2px;
+}
+
+/* Text file items: clean flat list style */
+.file-item-text {
+  margin-bottom: 0;
+  border-radius: 0;
+  background: transparent;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.file-item-text:hover {
+  background: var(--color-bg-hover);
+}
+
+.file-item-text.selected {
+  background: var(--color-primary);
+}
+
+/* Image file items with thumbnails */
+.file-items-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-content: flex-start;
+}
+
+.file-item-image {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 6px;
+  width: 100px;
+  position: relative;
+}
+
+.file-thumbnail {
+  width: 100%;
+  aspect-ratio: 1;
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.file-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.file-item-image .file-name {
+  font-size: 10px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-item-image .file-actions {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  opacity: 0;
+}
+
+.file-item-image:hover .file-actions {
+  opacity: 1;
+}
+
+.drag-handle {
+  cursor: grab;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  padding: 2px 4px;
+  letter-spacing: -2px;
+  user-select: none;
+}
+
+.drag-handle:hover {
+  color: var(--color-text);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.file-icon {
+  font-size: 16px;
+}
+
+.file-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.file-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.file-item:hover .file-actions {
+  opacity: 1;
+}
+
+.file-preview {
+  flex: 1;
+  overflow: hidden;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-sm);
+}
+
+.preview-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.filename {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+

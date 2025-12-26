@@ -1,0 +1,153 @@
+/* Main Layout */
+.app-main {
+  display: flex;
+  flex: 1;
+  padding: var(--panel-gap);
+  gap: 0;
+  overflow: hidden;
+}
+
+/* Column Resizers */
+.column-resizer {
+  width: 8px;
+  cursor: col-resize;
+  background: transparent;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.column-resizer::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-border);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.column-resizer:hover::after,
+.column-resizer.dragging::after {
+  opacity: 1;
+  background: var(--color-primary);
+}
+
+/* Panel Resizers (horizontal) */
+.panel-resizer {
+  height: 8px;
+  cursor: row-resize;
+  background: transparent;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.panel-resizer::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--color-border);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.panel-resizer:hover::after,
+.panel-resizer.dragging::after {
+  opacity: 1;
+  background: var(--color-primary);
+}
+
+/* Columns */
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--panel-gap);
+  min-width: var(--column-min-width);
+  overflow: hidden;
+}
+
+.column-input {
+  flex: 0 0 280px;
+}
+
+.column-editor {
+  flex: 1;
+  min-width: 400px;
+}
+
+.column-options {
+  flex: 0 0 300px;
+}
+
+.column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+}
+
+.column-header h2 {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary);
+}
+
+/* Panels */
+.panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.panel-header h3 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.panel-header.collapsible {
+  cursor: pointer;
+  user-select: none;
+}
+
+.panel-header.collapsible:hover {
+  background: var(--color-bg-hover);
+}
+
+.collapse-icon {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  transition: transform 0.2s ease;
+}
+
+.panel.collapsed .collapse-icon {
+  transform: rotate(-90deg);
+}
+
+.panel.collapsed .panel-content {
+  display: none;
+}
+
+.panel-content {
+  padding: 12px;
+  overflow-y: auto;
+}
+

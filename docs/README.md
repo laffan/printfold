@@ -390,17 +390,97 @@ src/
 │   ├── FontDropdown.ts
 │   ├── PDFPreview.ts
 │   ├── FillPicker/
+│   │   ├── index.ts          # Re-exports
+│   │   ├── FillPicker.ts     # Main component class
+│   │   ├── colorUtils.ts     # Color conversion utilities
+│   │   ├── colorTab.ts       # Solid color picker tab
+│   │   ├── gradientTab.ts    # Gradient editor tab
+│   │   └── patternTab.ts     # Pattern fill tab
 │   ├── OptionsPanel/
+│   │   ├── component.ts      # Main panel class
+│   │   ├── helpers.ts        # Input binding utilities
+│   │   ├── editPage/         # Modular edit page functionality
+│   │   │   ├── index.ts
+│   │   │   ├── shared.ts     # Shared state and helpers
+│   │   │   ├── multiSelect.ts
+│   │   │   ├── itemCreation.ts
+│   │   │   ├── arrayInstances.ts
+│   │   │   ├── pageBackground.ts
+│   │   │   ├── propertyInputs.ts
+│   │   │   ├── panelUpdate.ts
+│   │   │   └── setupPanel.ts
+│   │   └── ...               # Other option modules
 │   └── SpreadEditor/
+│       ├── component.ts      # Main editor class
+│       ├── component/        # Component utilities
+│       │   ├── index.ts
+│       │   ├── types.ts      # Local types
+│       │   ├── navigation.ts # Page navigation
+│       │   └── rendering.ts  # Render helpers
+│       ├── items/            # Page item handling
+│       │   ├── index.ts
+│       │   ├── fill.ts       # Fill application
+│       │   ├── textEditing.ts
+│       │   ├── nodeCreation.ts
+│       │   ├── arrayItems.ts
+│       │   └── rendering.ts
+│       ├── selection.ts
+│       ├── content.ts
+│       ├── margins.ts
+│       └── thumbnails.ts
 ├── services/
-│   ├── state.ts
-│   ├── textFlow.ts
-│   ├── pdfGenerator.ts
+│   ├── state.ts              # Re-exports from state/
+│   ├── state/                # Modular state management
+│   │   ├── index.ts
+│   │   ├── AppStateCore.ts   # Base class
+│   │   ├── defaults.ts       # Default values
+│   │   ├── fileManagement.ts
+│   │   ├── optionsManagement.ts
+│   │   ├── pageOperations.ts
+│   │   ├── signatureOperations.ts
+│   │   ├── itemOperations.ts
+│   │   └── multiSelect.ts
+│   ├── textFlow.ts           # Re-exports from textFlow/
+│   ├── textFlow/             # Modular text flow engine
+│   │   ├── index.ts
+│   │   ├── TextFlowEngine.ts # Main engine class
+│   │   ├── types.ts
+│   │   ├── cache.ts
+│   │   ├── parsing.ts        # Markdown parsing
+│   │   ├── measurement.ts    # Text measurement
+│   │   ├── pagination.ts     # Page break logic
+│   │   ├── signatures.ts     # Signature creation
+│   │   ├── dimensions.ts     # Size calculations
+│   │   └── imposition.ts     # Print imposition
+│   ├── pdfGenerator.ts       # Re-exports from pdfGenerator/
+│   ├── pdfGenerator/         # Modular PDF generation
+│   │   ├── index.ts
+│   │   ├── PDFGenerator.ts   # Main generator class
+│   │   ├── types.ts
+│   │   ├── textUtils.ts
+│   │   ├── colors.ts
+│   │   ├── fonts.ts
+│   │   ├── images.ts
+│   │   ├── printMarks.ts
+│   │   └── itemDrawing.ts
 │   ├── googleFonts.ts
 │   ├── zipHandler.ts
 │   └── environment.ts
 ├── styles/
-│   └── main.css
+│   ├── main.css              # Imports all modules
+│   └── modules/              # Modular CSS
+│       ├── base.css          # Variables, reset, app layout
+│       ├── header.css        # Header styles
+│       ├── buttons.css       # Button components
+│       ├── panels.css        # Panel styles
+│       ├── layout.css        # Main layout, resizers
+│       ├── input-panel.css   # Input column, file lists
+│       ├── editor.css        # Spread editor, thumbnails
+│       ├── options-panel.css # Options tabs, forms
+│       ├── modal.css         # Modal dialogs
+│       ├── font-dropdown.css # Font picker
+│       ├── fill-picker.css   # Fill picker tabs
+│       └── utilities.css     # Responsive, context menu
 ├── types/
 │   └── index.ts
 ├── index.html
@@ -452,21 +532,22 @@ npm run build       # Production build
 
 | Feature | Files |
 |---------|-------|
-| Text Layout | `textFlow.ts`, `types/index.ts` |
-| PDF Export | `pdfGenerator.ts` |
-| Canvas Editor | `SpreadEditor/` |
-| State Management | `state.ts` |
-| Page Items | `SpreadEditor/items.ts`, `editPage.ts` |
-| Fills/Gradients | `FillPicker/`, `types/index.ts` |
-| Fonts | `googleFonts.ts`, `fontOptions.ts` |
+| Text Layout | `textFlow/` (parsing, measurement, pagination, imposition) |
+| PDF Export | `pdfGenerator/` (fonts, images, printMarks, itemDrawing) |
+| Canvas Editor | `SpreadEditor/component.ts`, `SpreadEditor/items/` |
+| State Management | `state/` (AppStateCore + method extensions) |
+| Page Items | `SpreadEditor/items/`, `OptionsPanel/editPage/` |
+| Fills/Gradients | `FillPicker/` (colorTab, gradientTab, patternTab) |
+| Fonts | `googleFonts.ts`, `OptionsPanel/fontOptions.ts` |
 | Project I/O | `zipHandler.ts` |
 | Settings UI | `OptionsPanel/` |
+| Styles | `styles/modules/` (12 modular CSS files) |
 
 ### Important Constants
 
 | Constant | Value | Location |
 |----------|-------|----------|
 | Points per inch | 72 | Used throughout |
-| Default margins | 54pt (0.75") | `state.ts` |
-| Reflow debounce | 0ms + RAF | `state.ts` |
-| Input debounce | 150ms | `helpers.ts` |
+| Default margins | 54pt (0.75") | `state/defaults.ts` |
+| Reflow debounce | 0ms + RAF | `state/AppStateCore.ts` |
+| Input debounce | 150ms | `OptionsPanel/helpers.ts` |
