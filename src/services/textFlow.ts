@@ -114,17 +114,162 @@ export class TextFlowEngine {
     // Merge text pages with static pages, keeping static pages in their positions
     const allPages = this.mergeStaticPagesInPlace(textPagesWithBlanks, staticPagesByNumber);
 
-    // Create spreads from all pages
-    const spreads = this.createSpreadsFromPages(allPages);
+    // Pad pages to complete signatures BEFORE creating spreads
+    // This ensures we never have partial signatures
+    const paddedPages = this.padPagesToCompleteSignature(allPages);
 
-    const signatures = this.createSignatures(spreads);
+    // Create signatures directly from pages, then spreads for each signature
+    const signatures = this.createSignaturesFromPages(paddedPages);
+
+    // Collect all spreads from signatures for the return value
+    const spreads = signatures.flatMap(sig => sig.spreads);
 
     return {
-      pages: allPages,
+      pages: paddedPages,
       spreads,
       signatures,
-      totalPages: allPages.length,
+      totalPages: paddedPages.length,
     };
+  }
+
+  /**
+   * Create signatures directly from pages
+   * Each signature contains pagesPerSig pages with appropriate visual spreads
+   */
+  private createSignaturesFromPages(pages: PageContent[]): Signature[] {
+    const pagesPerSig = this.outputOptions.pagesPerSignature;
+    const signatures: Signature[] = [];
+
+    if (pages.length === 0) {
+      return signatures;
+    }
+
+    // Group pages into signatures
+    for (let sigStart = 0; sigStart < pages.length; sigStart += pagesPerSig) {
+      const sigPages = pages.slice(sigStart, sigStart + pagesPerSig);
+      const signatureNumber = Math.floor(sigStart / pagesPerSig) + 1;
+
+      // Create visual spreads for this signature
+      const spreads = this.createSpreadsForSignature(sigPages, signatureNumber);
+
+      signatures.push({
+        id: crypto.randomUUID(),
+        signatureNumber,
+        spreads,
+        pageCount: sigPages.length,
+      });
+    }
+
+    return signatures;
+  }
+
+  /**
+   * Create visual spreads for a single signature's pages
+   * Layout: [ghost/null | first], [middle pairs], [last | null]
+   */
+  private createSpreadsForSignature(pages: PageContent[], signatureNumber: number): Spread[] {
+    const spreads: Spread[] = [];
+
+    if (pages.length === 0) return spreads;
+
+    // Get previous signatures to preserve items on existing pages (for first signature)
+    const project = appState.getProject();
+    const prevFirstSpread = signatureNumber === 1 ? project.signatures[0]?.spreads[0] : null;
+
+    // First page (front cover of this signature)
+    const page1 = pages[0];
+
+    // For the first signature, preserve items and state from previous page 1
+    if (signatureNumber === 1 && prevFirstSpread?.recto?.pageNumber === page1.pageNumber) {
+      if (prevFirstSpread.recto.items && !page1.items?.length) {
+        page1.items = prevFirstSpread.recto.items;
+      }
+      if (prevFirstSpread.recto.backgroundFill && !page1.backgroundFill) {
+        page1.backgroundFill = prevFirstSpread.recto.backgroundFill;
+      }
+    }
+
+    // First spread: null verso (ghost placeholder for back cover), page 1 on recto
+    const spreadId = (signatureNumber === 1 && prevFirstSpread?.id) || crypto.randomUUID();
+    spreads.push({
+      id: spreadId,
+      spreadNumber: 1,
+      verso: null, // Ghost placeholder - UI renders back cover ghost here
+      recto: page1,
+    });
+
+    // Middle pages: create spreads [2|3], [4|5], etc., but save last page for final spread
+    const remainingPages = pages.slice(1);
+    const lastPage = remainingPages.length > 0 ? remainingPages[remainingPages.length - 1] : null;
+    const middlePages = lastPage ? remainingPages.slice(0, -1) : [];
+
+    for (let i = 0; i < middlePages.length; i += 2) {
+      const verso = middlePages[i] || null;
+      const recto = middlePages[i + 1] || null;
+
+      if (verso || recto) {
+        spreads.push({
+          id: crypto.randomUUID(),
+          spreadNumber: spreads.length + 1,
+          verso,
+          recto,
+        });
+      }
+    }
+
+    // Last spread: back cover on left, null on right
+    if (lastPage && lastPage.pageNumber !== page1.pageNumber) {
+      spreads.push({
+        id: crypto.randomUUID(),
+        spreadNumber: spreads.length + 1,
+        verso: lastPage,
+        recto: null, // Empty - back cover is on left
+      });
+    }
+
+    return spreads;
+  }
+
+  /**
+   * Pad pages to fill complete signatures
+   * Ensures we never have partial signatures
+   */
+  private padPagesToCompleteSignature(pages: PageContent[]): PageContent[] {
+    const pagesPerSig = this.outputOptions.pagesPerSignature;
+
+    // If no pages, return empty (createDefaultSignature handles the startup case)
+    if (pages.length === 0) {
+      return pages;
+    }
+
+    // Calculate how many pages we need to add
+    const remainder = pages.length % pagesPerSig;
+    if (remainder === 0) {
+      return pages; // Already complete
+    }
+
+    const pagesToAdd = pagesPerSig - remainder;
+    const result = [...pages];
+
+    // Find max page number
+    let maxPageNum = Math.max(...pages.map(p => p.pageNumber));
+
+    // Add available pages to complete the signature
+    for (let i = 0; i < pagesToAdd; i++) {
+      maxPageNum += 1;
+      result.push({
+        id: crypto.randomUUID(),
+        pageNumber: maxPageNum,
+        pageState: 'available',
+        sections: [],
+        isBlank: true,
+        isRecto: maxPageNum % 2 === 1,
+        isStatic: false,
+        items: [],
+      });
+    }
+
+    return result;
   }
 
   /**
@@ -149,8 +294,9 @@ export class TextFlowEngine {
       });
     }
 
-    const spreads = this.createSpreadsFromPages(pages);
-    const signatures = this.createSignatures(spreads);
+    // Use the same signature creation as reflow
+    const signatures = this.createSignaturesFromPages(pages);
+    const spreads = signatures.flatMap(sig => sig.spreads);
 
     return {
       pages,
@@ -267,98 +413,6 @@ export class TextFlowEngine {
     return result;
   }
 
-  /**
-   * Create spreads from a linear array of pages
-   * NEW LAYOUT: First page on right, last page on left
-   * - First spread: [null | page 1] - ghost placeholder for back cover
-   * - Middle spreads: [2|3], [4|5], etc.
-   * - Last spread: [lastPage | null] - back cover on left
-   */
-  private createSpreadsFromPages(pages: PageContent[]): Spread[] {
-    const spreads: Spread[] = [];
-
-    if (pages.length === 0) return spreads;
-
-    // Sort pages by page number
-    const sortedPages = [...pages].sort((a, b) => a.pageNumber - b.pageNumber);
-
-    // First spread: null verso (ghost placeholder), page 1 on recto
-    const page1 = sortedPages.find(p => p.pageNumber === 1) || sortedPages[0];
-    spreads.push({
-      id: crypto.randomUUID(),
-      spreadNumber: 1,
-      verso: null, // Ghost placeholder - UI renders back cover ghost here
-      recto: page1,
-    });
-
-    // Middle spreads: pair remaining pages
-    // Skip page 1, pair pages 2-3, 4-5, etc., but save last page for final spread
-    const remainingPages = sortedPages.filter(p => p.pageNumber !== 1);
-    const lastPage = remainingPages.length > 0 ? remainingPages[remainingPages.length - 1] : null;
-    const middlePages = lastPage ? remainingPages.slice(0, -1) : [];
-
-    for (let i = 0; i < middlePages.length; i += 2) {
-      const verso = middlePages[i] || null;
-      const recto = middlePages[i + 1] || null;
-
-      if (verso || recto) {
-        spreads.push({
-          id: crypto.randomUUID(),
-          spreadNumber: spreads.length + 1,
-          verso,
-          recto,
-        });
-      }
-    }
-
-    // Last spread: back cover on left, null on right
-    if (lastPage && lastPage.pageNumber !== 1) {
-      spreads.push({
-        id: crypto.randomUUID(),
-        spreadNumber: spreads.length + 1,
-        verso: lastPage,
-        recto: null, // Empty - back cover is on left
-      });
-    }
-
-    return spreads;
-  }
-
-  /**
-   * DEPRECATED: Merge static spreads with content spreads
-   * This method is kept for backward compatibility but is no longer used
-   */
-  private mergeStaticSpreads(contentSpreads: Spread[], staticSpreads: StaticSpread[]): Spread[] {
-    const merged = [...contentSpreads];
-
-    const baseSpreadNumber = merged.length > 0
-      ? Math.max(...merged.map(s => s.spreadNumber)) + 1
-      : 1;
-
-    staticSpreads.forEach((staticSpread, index) => {
-      const spreadNumber = baseSpreadNumber + index;
-      const basePageNumber = contentSpreads.length * 2 + index * 2;
-
-      const verso = staticSpread.verso ? {
-        ...staticSpread.verso,
-        pageNumber: basePageNumber,
-      } : null;
-
-      const recto = staticSpread.recto ? {
-        ...staticSpread.recto,
-        pageNumber: basePageNumber + 1,
-      } : null;
-
-      merged.push({
-        id: staticSpread.id,
-        spreadNumber,
-        verso,
-        recto,
-      });
-    });
-
-    return merged;
-  }
 
   /**
    * Parse markdown into structured sections
@@ -953,56 +1007,6 @@ export class TextFlowEngine {
     }
 
     return spreads;
-  }
-
-  /**
-   * Create signatures from spreads
-   * Ensures signatures are always complete (never partial)
-   */
-  private createSignatures(spreads: Spread[]): Signature[] {
-    const pagesPerSig = this.outputOptions.pagesPerSignature;
-    const spreadsPerSig = pagesPerSig / 2;
-    const signatures: Signature[] = [];
-
-    if (spreads.length === 0) {
-      return signatures;
-    }
-
-    // Find the highest existing page number to continue numbering
-    let maxPageNum = 0;
-    for (const spread of spreads) {
-      if (spread.verso) maxPageNum = Math.max(maxPageNum, spread.verso.pageNumber);
-      if (spread.recto) maxPageNum = Math.max(maxPageNum, spread.recto.pageNumber);
-    }
-
-    // Pad spreads to fill complete signatures
-    const paddedSpreads = [...spreads];
-    while (paddedSpreads.length % spreadsPerSig !== 0) {
-      maxPageNum += 1;
-      const versoPage = this.createEmptyPage(maxPageNum, true);
-      maxPageNum += 1;
-      const rectoPage = this.createEmptyPage(maxPageNum, true);
-
-      const emptySpread: Spread = {
-        id: crypto.randomUUID(),
-        spreadNumber: paddedSpreads.length + 1,
-        verso: versoPage,
-        recto: rectoPage,
-      };
-      paddedSpreads.push(emptySpread);
-    }
-
-    for (let i = 0; i < paddedSpreads.length; i += spreadsPerSig) {
-      const sigSpreads = paddedSpreads.slice(i, i + spreadsPerSig);
-      signatures.push({
-        id: crypto.randomUUID(),
-        signatureNumber: Math.floor(i / spreadsPerSig) + 1,
-        spreads: sigSpreads,
-        pageCount: sigSpreads.length * 2,
-      });
-    }
-
-    return signatures;
   }
 
   /**
