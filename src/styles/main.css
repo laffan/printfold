@@ -985,11 +985,18 @@ body {
   outline-offset: -2px;
 }
 
-/* Individual page drop target styling */
+/* Individual page drop target styling - click areas */
+.page-drop-target {
+  outline: 2px dashed #f97316 !important;
+  outline-offset: -2px;
+  background: rgba(249, 115, 22, 0.15) !important;
+}
+
+/* Individual page drop target styling - labels */
 .spread-thumbnail-page-label.page-drop-target {
-  outline: 2px solid #3b82f6 !important;
+  outline: 2px dashed #f97316 !important;
   outline-offset: -1px;
-  background: #3b82f6 !important;
+  background: #f97316 !important;
   color: white !important;
 }
 
