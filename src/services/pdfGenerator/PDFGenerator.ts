@@ -219,11 +219,15 @@ export class PDFGenerator {
 
     const hasItems = pageContent.items && pageContent.items.length > 0;
     const hasBackground = !!pageContent.backgroundFill;
-    const isTextPage = pageContent.pageState === 'text' ||
-                       (!pageContent.isBlank && !pageContent.isStatic && pageContent.sections.length > 0);
+    // A page is a text page if its pageState is 'text' - these pages need text content rendered
+    const isTextPage = pageContent.pageState === 'text';
+    // Check for static/available pages using pageState (prefer) or deprecated flags (fallback)
+    const isStaticOrAvailable = pageContent.pageState === 'static' ||
+                                 pageContent.pageState === 'available' ||
+                                 pageContent.isBlank || pageContent.isStatic;
 
     // For static/blank pages with items or background, use pre-rendered image if available
-    if (!isTextPage && (hasItems || hasBackground || pageContent.isBlank || pageContent.isStatic)) {
+    if (!isTextPage && (hasItems || hasBackground || isStaticOrAvailable)) {
       const preRenderedImage = this.renderedPageCache.get(pageContent.pageNumber);
       if (preRenderedImage) {
         pdfPage.drawImage(preRenderedImage, { x, y, width, height });

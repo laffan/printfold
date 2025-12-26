@@ -120,14 +120,15 @@ export async function preRenderStaticPages(
       const pages = [spread.verso, spread.recto].filter(Boolean) as import('../../types').PageContent[];
       for (const page of pages) {
         // Skip text pages - they are rendered via the normal text flow
-        // Text pages are identified by having sections AND not being blank/static
-        const isTextPage = page.pageState === 'text' ||
-                           (!page.isBlank && !page.isStatic && page.sections && page.sections.length > 0);
+        const isTextPage = page.pageState === 'text';
         if (isTextPage) continue;
 
         const hasOwnItems = page.items && page.items.length > 0;
         const hasBackgroundFill = !!page.backgroundFill;
-        if (!(hasOwnItems || hasBackgroundFill || page.isBlank || page.isStatic)) continue;
+        const isStaticOrAvailable = page.pageState === 'static' ||
+                                     page.pageState === 'available' ||
+                                     page.isBlank || page.isStatic;
+        if (!(hasOwnItems || hasBackgroundFill || isStaticOrAvailable)) continue;
 
         const adjacentPage = page.isRecto ? spread.verso : spread.recto;
         const hasOwnContent = page.items?.length || page.backgroundFill;
