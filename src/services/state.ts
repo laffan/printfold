@@ -489,10 +489,11 @@ class AppState {
     // Insert the new page
     allPages.splice(actualInsertIndex, 0, newPage);
 
-    // Renumber all pages
+    // Renumber all pages (1-based page numbers)
     allPages.forEach((page, index) => {
-      page.pageNumber = index;
-      page.isRecto = index % 2 === 1;
+      const pageNum = index + 1;
+      page.pageNumber = pageNum;
+      page.isRecto = pageNum % 2 === 1;
     });
 
     // Rebuild spreads from the page array
@@ -524,10 +525,11 @@ class AppState {
     this.project = { ...this.project, signatures: newSignatures };
     this.notifyProjectListeners(prevState);
 
-    // Select the new static page
+    // Select the new static page (its position after renumbering is actualInsertIndex + 1)
+    const newPageNum = actualInsertIndex + 1;
     this.updateEditor({
-      selectedPageNumber: selectedPageNumber,
-      selectedPagePosition: selectedPageNumber % 2 === 1 ? 'recto' : 'verso',
+      selectedPageNumber: newPageNum,
+      selectedPagePosition: newPageNum % 2 === 1 ? 'recto' : 'verso',
     });
 
     // Trigger reflow to adjust text around new static page
@@ -585,10 +587,11 @@ class AppState {
     // Insert at new position
     allPages.splice(toIndex, 0, pageToMove);
 
-    // Renumber all pages
+    // Renumber all pages (1-based page numbers)
     allPages.forEach((page, index) => {
-      page.pageNumber = index;
-      page.isRecto = index % 2 === 1;
+      const pageNum = index + 1;
+      page.pageNumber = pageNum;
+      page.isRecto = pageNum % 2 === 1;
     });
 
     // Rebuild spreads
@@ -620,8 +623,8 @@ class AppState {
     this.project = { ...this.project, signatures: newSignatures };
     this.notifyProjectListeners(prevState);
 
-    // Select the moved page at its new position
-    const newPageNum = toIndex;
+    // Select the moved page at its new position (1-based)
+    const newPageNum = toIndex + 1;
     this.updateEditor({
       selectedPageNumber: newPageNum,
       selectedPagePosition: newPageNum % 2 === 1 ? 'recto' : 'verso',
@@ -901,11 +904,11 @@ class AppState {
     const [movedChunk] = sigChunks.splice(sourceIndex, 1);
     sigChunks.splice(targetIndex, 0, movedChunk);
 
-    // Flatten and renumber pages
+    // Flatten and renumber pages (1-based page numbers)
     const reorderedPages: import('../types').PageContent[] = [];
     for (const chunk of sigChunks) {
       for (const page of chunk) {
-        const newPageNum = reorderedPages.length;
+        const newPageNum = reorderedPages.length + 1;
         reorderedPages.push({
           ...page,
           pageNumber: newPageNum,
