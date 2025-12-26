@@ -116,6 +116,62 @@ export const defaultEditorState: EditorState = {
 };
 
 function createEmptyProject(): BookletProject {
+  const pagesPerSig = defaultOutputOptions.pagesPerSignature;
+
+  // Create initial empty signature with proper spread layout
+  const initialPages: import('../types').PageContent[] = [];
+  for (let i = 0; i < pagesPerSig; i++) {
+    const pageNum = i + 1;
+    initialPages.push({
+      id: crypto.randomUUID(),
+      pageNumber: pageNum,
+      pageState: 'available',
+      sections: [],
+      isBlank: true,
+      isRecto: pageNum % 2 === 1,
+      isStatic: false,
+      items: [],
+    });
+  }
+
+  // Create spreads for initial signature: [null|1], [2|3], [4|null]
+  const initialSpreads: import('../types').Spread[] = [];
+
+  // First spread: [null | page 1]
+  initialSpreads.push({
+    id: crypto.randomUUID(),
+    spreadNumber: 1,
+    verso: null,
+    recto: initialPages[0],
+  });
+
+  // Middle spreads: [2|3], [4|5], etc. (all pages except first and last)
+  for (let i = 1; i < initialPages.length - 1; i += 2) {
+    initialSpreads.push({
+      id: crypto.randomUUID(),
+      spreadNumber: initialSpreads.length + 1,
+      verso: initialPages[i],
+      recto: initialPages[i + 1] || null,
+    });
+  }
+
+  // Last spread: [last page | null]
+  if (initialPages.length > 1) {
+    initialSpreads.push({
+      id: crypto.randomUUID(),
+      spreadNumber: initialSpreads.length + 1,
+      verso: initialPages[initialPages.length - 1],
+      recto: null,
+    });
+  }
+
+  const initialSignature: import('../types').Signature = {
+    id: crypto.randomUUID(),
+    signatureNumber: 1,
+    spreads: initialSpreads,
+    pageCount: pagesPerSig,
+  };
+
   return {
     id: crypto.randomUUID(),
     name: 'Untitled Booklet',
@@ -126,7 +182,7 @@ function createEmptyProject(): BookletProject {
     layoutOptions: JSON.parse(JSON.stringify(defaultLayoutOptions)),
     fontOptions: JSON.parse(JSON.stringify(defaultFontOptions)),
     headerFooter: JSON.parse(JSON.stringify(defaultHeaderFooter)),
-    signatures: [],
+    signatures: [initialSignature],
     blankPages: [],
   };
 }
@@ -577,29 +633,31 @@ class AppState {
 
   /**
    * Add a signature's worth of available pages at the end of the booklet
+   * Each signature has its own spread layout: [null|first], [middle pairs], [last|null]
    */
   addAvailableSignature(): void {
     const prevState = this.project;
     const pagesPerSig = this.project.outputOptions.pagesPerSignature;
 
-    // Collect all pages from signatures, preserving their data
-    const allPages: import('../types').PageContent[] = [];
+    // Collect all pages from existing signatures
+    const existingPages: import('../types').PageContent[] = [];
     for (const sig of this.project.signatures) {
       for (const spread of sig.spreads) {
-        if (spread.verso) allPages.push({ ...spread.verso });
-        if (spread.recto) allPages.push({ ...spread.recto });
+        if (spread.verso) existingPages.push({ ...spread.verso });
+        if (spread.recto) existingPages.push({ ...spread.recto });
       }
     }
 
     // Find the highest page number (or start at 0 if empty)
-    const maxPageNum = allPages.length > 0
-      ? Math.max(...allPages.map(p => p.pageNumber))
+    const maxPageNum = existingPages.length > 0
+      ? Math.max(...existingPages.map(p => p.pageNumber))
       : 0;
 
-    // Add new available pages at the end
+    // Create new pages for the new signature
+    const newPages: import('../types').PageContent[] = [];
     for (let i = 0; i < pagesPerSig; i++) {
       const pageNum = maxPageNum + 1 + i;
-      allPages.push({
+      newPages.push({
         id: crypto.randomUUID(),
         pageNumber: pageNum,
         pageState: 'available',
@@ -611,77 +669,52 @@ class AppState {
       });
     }
 
-    // Sort by page number
-    allPages.sort((a, b) => a.pageNumber - b.pageNumber);
-
-    // Rebuild spreads using NEW layout:
-    // First spread: [null | page 1]
-    // Middle spreads: [2|3], [4|5], etc.
-    // Last spread of each signature: [lastPage | null]
+    // Create spreads for the new signature: [null|first], [middle pairs], [last|null]
     const newSpreads: import('../types').Spread[] = [];
 
-    // Find page 1
-    const page1 = allPages.find(p => p.pageNumber === 1);
-    if (page1) {
-      newSpreads.push({
-        id: crypto.randomUUID(),
-        spreadNumber: 1,
-        verso: null, // Ghost placeholder
-        recto: page1,
-      });
-    }
+    // First spread: [null | first page]
+    newSpreads.push({
+      id: crypto.randomUUID(),
+      spreadNumber: 1,
+      verso: null,
+      recto: newPages[0],
+    });
 
-    // Get remaining pages (excluding page 1 and the last page which goes in final spread)
-    const remainingPages = allPages.filter(p => p.pageNumber !== 1);
-    const lastPage = remainingPages.length > 0 ? remainingPages[remainingPages.length - 1] : null;
-    const middlePages = lastPage ? remainingPages.slice(0, -1) : [];
-
-    // Create middle spreads
-    for (let i = 0; i < middlePages.length; i += 2) {
+    // Middle spreads: pairs of pages (all except first and last)
+    for (let i = 1; i < newPages.length - 1; i += 2) {
       newSpreads.push({
         id: crypto.randomUUID(),
         spreadNumber: newSpreads.length + 1,
-        verso: middlePages[i] || null,
-        recto: middlePages[i + 1] || null,
+        verso: newPages[i],
+        recto: newPages[i + 1] || null,
       });
     }
 
-    // Last spread with back cover on left
-    if (lastPage) {
+    // Last spread: [last page | null]
+    if (newPages.length > 1) {
       newSpreads.push({
         id: crypto.randomUUID(),
         spreadNumber: newSpreads.length + 1,
-        verso: lastPage,
+        verso: newPages[newPages.length - 1],
         recto: null,
       });
     }
 
-    // Rebuild signatures - need to account for new spread layout
-    // Each signature has: 1 first spread + middle spreads + 1 last spread
-    // But for simplicity, we'll use spreadsPerSig as before
-    const spreadsPerSig = Math.ceil(pagesPerSig / 2) + 1; // +1 for the first/last spread asymmetry
-    const newSignatures: import('../types').Signature[] = [];
+    // Create the new signature
+    const newSignature: import('../types').Signature = {
+      id: crypto.randomUUID(),
+      signatureNumber: this.project.signatures.length + 1,
+      spreads: newSpreads,
+      pageCount: pagesPerSig,
+    };
 
-    // For now, keep simple splitting
-    const actualSpreadsPerSig = Math.ceil(newSpreads.length / Math.ceil(allPages.length / pagesPerSig));
-
-    for (let i = 0; i < newSpreads.length; i += actualSpreadsPerSig) {
-      const sigSpreads = newSpreads.slice(i, i + actualSpreadsPerSig);
-      if (sigSpreads.length > 0) {
-        newSignatures.push({
-          id: crypto.randomUUID(),
-          signatureNumber: newSignatures.length + 1,
-          spreads: sigSpreads,
-          pageCount: pagesPerSig,
-        });
-      }
-    }
+    // Add to existing signatures
+    const newSignatures = [...this.project.signatures, newSignature];
 
     this.project = { ...this.project, signatures: newSignatures };
     this.notifyProjectListeners(prevState);
 
     // Don't call requestReflow() - we're adding available pages, not text content
-    // Text will flow into available pages when the user adds markdown content
   }
 
   // DEPRECATED: Old staticSpreads methods - kept for backward compatibility
