@@ -179,18 +179,16 @@ export function renderThumbnails(
     const isRectoSelected = editorState.selectedPagePosition === 'recto' &&
       spread.recto?.pageNumber === editorState.selectedPageNumber;
 
-    // Check if this spread is a user-created static spread (from staticSpreads array)
-    // This is different from isStatic on pages, which includes back cover and padding pages
+    // Check if this spread has static pages (either from staticSpreads array or isStatic flag)
+    // Exclude spread 0 (back cover + front cover) as it's structural
     const staticSpreads = project.staticSpreads || [];
-    const isUserStaticSpread = staticSpreads.some(ss => ss.id === spread.id);
+    const isInStaticSpreadsArray = staticSpreads.some(ss => ss.id === spread.id);
+    const hasStaticPages = spread.verso?.isStatic || spread.recto?.isStatic;
+    const isBackCoverSpread = spreadIndex === 0; // First spread contains back cover
+    const isUserStaticSpread = isInStaticSpreadsArray || (hasStaticPages && !isBackCoverSpread);
 
     // DEBUG: Log static spread detection
-    if (spreadIndex === 0) {
-      console.log('[DEBUG] staticSpreads array:', staticSpreads.map(s => s.id));
-    }
-    if (spread.verso?.isStatic || spread.recto?.isStatic) {
-      console.log(`[DEBUG] Spread ${spreadIndex} has static page(s). spread.id=${spread.id}, isUserStaticSpread=${isUserStaticSpread}`);
-    }
+    console.log(`[DEBUG] Spread ${spreadIndex}: hasStaticPages=${hasStaticPages}, isBackCoverSpread=${isBackCoverSpread}, inArray=${isInStaticSpreadsArray}, isUserStatic=${isUserStaticSpread}`);
 
     // Individual page static checks (for display purposes)
     const isVersoStatic = spread.verso?.isStatic ?? false;

@@ -502,6 +502,7 @@ class AppState {
 
   /**
    * Reorder static spreads by swapping their positions
+   * Handles both staticSpreads array and signature spreads with isStatic pages
    * @param sourceSpreadId - The ID of the spread being dragged
    * @param targetSpreadId - The ID of the spread to swap with
    */
@@ -509,34 +510,72 @@ class AppState {
     const prevState = this.project;
     const staticSpreads = [...(this.project.staticSpreads || [])];
 
-    if (staticSpreads.length < 2) return;
+    // First try to swap in staticSpreads array
+    const sourceStaticIndex = staticSpreads.findIndex(s => s.id === sourceSpreadId);
+    const targetStaticIndex = staticSpreads.findIndex(s => s.id === targetSpreadId);
 
-    // Find source and target indices in staticSpreads array
-    const sourceIndex = staticSpreads.findIndex(s => s.id === sourceSpreadId);
-    const targetIndex = staticSpreads.findIndex(s => s.id === targetSpreadId);
+    if (sourceStaticIndex !== -1 && targetStaticIndex !== -1) {
+      // Both are in staticSpreads - swap them
+      if (sourceStaticIndex === targetStaticIndex) return;
 
-    if (sourceIndex === -1 || targetIndex === -1) {
-      console.warn('Could not find source or target spread in staticSpreads');
+      const temp = staticSpreads[sourceStaticIndex];
+      staticSpreads[sourceStaticIndex] = staticSpreads[targetStaticIndex];
+      staticSpreads[targetStaticIndex] = temp;
+
+      staticSpreads.forEach((spread, index) => {
+        spread.index = index;
+      });
+
+      this.project = { ...this.project, staticSpreads };
+      this.notifyProjectListeners(prevState);
+      this.requestReflow();
       return;
     }
 
-    if (sourceIndex === targetIndex) return;
+    // If not in staticSpreads, try to swap in signatures
+    // Find the spreads in signatures
+    let sourceInfo: { sigIndex: number; spreadIndex: number } | null = null;
+    let targetInfo: { sigIndex: number; spreadIndex: number } | null = null;
 
-    // Swap the spreads
-    const temp = staticSpreads[sourceIndex];
-    staticSpreads[sourceIndex] = staticSpreads[targetIndex];
-    staticSpreads[targetIndex] = temp;
+    for (let sigIndex = 0; sigIndex < this.project.signatures.length; sigIndex++) {
+      const sig = this.project.signatures[sigIndex];
+      for (let spreadIndex = 0; spreadIndex < sig.spreads.length; spreadIndex++) {
+        const spread = sig.spreads[spreadIndex];
+        if (spread.id === sourceSpreadId) {
+          sourceInfo = { sigIndex, spreadIndex };
+        }
+        if (spread.id === targetSpreadId) {
+          targetInfo = { sigIndex, spreadIndex };
+        }
+      }
+    }
 
-    // Reindex all spreads
-    staticSpreads.forEach((spread, index) => {
-      spread.index = index;
+    if (!sourceInfo || !targetInfo) {
+      console.warn('Could not find source or target spread in signatures');
+      return;
+    }
+
+    // Only allow swapping within the same signature for now
+    if (sourceInfo.sigIndex !== targetInfo.sigIndex) {
+      console.warn('Cannot swap spreads across different signatures');
+      return;
+    }
+
+    // Swap the spreads in the signature
+    const signatures = this.project.signatures.map((sig, sigIndex) => {
+      if (sigIndex !== sourceInfo!.sigIndex) return sig;
+
+      const spreads = [...sig.spreads];
+      const temp = spreads[sourceInfo!.spreadIndex];
+      spreads[sourceInfo!.spreadIndex] = spreads[targetInfo!.spreadIndex];
+      spreads[targetInfo!.spreadIndex] = temp;
+
+      return { ...sig, spreads };
     });
 
-    this.project = { ...this.project, staticSpreads };
+    this.project = { ...this.project, signatures };
     this.notifyProjectListeners(prevState);
-
-    // Trigger reflow to update page numbers
-    this.requestReflow();
+    // Note: Don't call requestReflow() as that would regenerate spreads from markdown
   }
 
   // Spanning items (items that bridge across verso and recto)
