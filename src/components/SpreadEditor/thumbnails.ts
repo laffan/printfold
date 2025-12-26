@@ -6,9 +6,15 @@
 import { appState } from '../../services/state';
 import type { Spread } from '../../types';
 
-// Track drag state
+// Track drag state for spreads
 let draggedSpreadId: string | null = null;
 let dragSourceSpreadIndex: number = -1;
+
+// Track drag state for signatures
+let draggedSignatureIndex: number = -1;
+
+// Track drag state for individual pages
+let draggedPageNumber: number = -1;
 
 /**
  * Render all spread thumbnails
@@ -67,6 +73,83 @@ export function renderThumbnails(
     `;
     sigLabel.textContent = `Sig ${sigIndex + 1}`;
     sigContainer.appendChild(sigLabel);
+
+    // Make signatures draggable when there's more than one
+    if (project.signatures.length > 1) {
+      sigContainer.setAttribute('draggable', 'true');
+      sigContainer.style.cursor = 'grab';
+
+      // Signature drag start
+      sigContainer.addEventListener('dragstart', (e) => {
+        // Don't start signature drag if we're dragging a spread inside
+        if (draggedSpreadId !== null) {
+          e.preventDefault();
+          return;
+        }
+
+        draggedSignatureIndex = sigIndex;
+        e.dataTransfer!.effectAllowed = 'move';
+        e.dataTransfer!.setData('application/x-printfold-signature', JSON.stringify({
+          signatureIndex: sigIndex
+        }));
+
+        sigContainer.classList.add('dragging-signature');
+        sigContainer.style.opacity = '0.5';
+      });
+
+      // Signature drag end
+      sigContainer.addEventListener('dragend', () => {
+        sigContainer.classList.remove('dragging-signature');
+        sigContainer.style.opacity = '1';
+        draggedSignatureIndex = -1;
+
+        // Remove all signature drop indicators
+        thumbnailContainer.querySelectorAll('.signature-drop-target').forEach(el => {
+          el.classList.remove('signature-drop-target');
+          (el as HTMLElement).style.borderColor = '#9ca3af';
+        });
+      });
+
+      // Signature dragover (for receiving other signatures)
+      sigContainer.addEventListener('dragover', (e) => {
+        // Only handle signature drags, not spread drags
+        if (draggedSignatureIndex === -1) return;
+        if (draggedSignatureIndex === sigIndex) return;
+
+        e.preventDefault();
+        e.dataTransfer!.dropEffect = 'move';
+
+        sigContainer.classList.add('signature-drop-target');
+        sigContainer.style.borderColor = '#3b82f6';
+      });
+
+      // Signature dragleave
+      sigContainer.addEventListener('dragleave', (e) => {
+        // Check if we're leaving to a child element
+        if (sigContainer.contains(e.relatedTarget as Node)) return;
+
+        sigContainer.classList.remove('signature-drop-target');
+        sigContainer.style.borderColor = '#9ca3af';
+      });
+
+      // Signature drop
+      sigContainer.addEventListener('drop', (e) => {
+        e.preventDefault();
+        sigContainer.classList.remove('signature-drop-target');
+        sigContainer.style.borderColor = '#9ca3af';
+
+        const dataStr = e.dataTransfer?.getData('application/x-printfold-signature');
+        if (!dataStr) return;
+
+        const data = JSON.parse(dataStr);
+        const sourceIndex: number = data.signatureIndex;
+
+        if (sourceIndex === sigIndex) return;
+
+        // Reorder signatures
+        appState.reorderSignatures(sourceIndex, sigIndex);
+      });
+    }
 
     // Render spreads within this signature
     signature.spreads.forEach((spread) => {
@@ -213,6 +296,66 @@ export function renderThumbnails(
       }
       updateSpreadIndicatorFn();
     });
+
+    // Make static verso page draggable
+    if (versoPageState === 'static' && spread.verso) {
+      versoLabel.setAttribute('draggable', 'true');
+      versoLabel.style.cursor = 'grab';
+
+      versoLabel.addEventListener('dragstart', (e) => {
+        e.stopPropagation();
+        draggedPageNumber = spread.verso!.pageNumber;
+        e.dataTransfer!.effectAllowed = 'move';
+        e.dataTransfer!.setData('application/x-printfold-page', JSON.stringify({
+          pageNumber: spread.verso!.pageNumber
+        }));
+        versoLabel.classList.add('dragging-page');
+        versoLabel.style.opacity = '0.5';
+      });
+
+      versoLabel.addEventListener('dragend', () => {
+        versoLabel.classList.remove('dragging-page');
+        versoLabel.style.opacity = '1';
+        draggedPageNumber = -1;
+        thumbnailContainer.querySelectorAll('.page-drop-target').forEach(el => {
+          el.classList.remove('page-drop-target');
+        });
+      });
+    }
+
+    // All pages can receive dragged static pages
+    if (spread.verso) {
+      versoLabel.addEventListener('dragover', (e) => {
+        if (draggedPageNumber === -1) return;
+        if (draggedPageNumber === spread.verso!.pageNumber) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer!.dropEffect = 'move';
+        versoLabel.classList.add('page-drop-target');
+      });
+
+      versoLabel.addEventListener('dragleave', () => {
+        versoLabel.classList.remove('page-drop-target');
+      });
+
+      versoLabel.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        versoLabel.classList.remove('page-drop-target');
+
+        const dataStr = e.dataTransfer?.getData('application/x-printfold-page');
+        if (!dataStr) return;
+
+        const data = JSON.parse(dataStr);
+        const sourcePageNumber: number = data.pageNumber;
+        const targetPageNumber = spread.verso!.pageNumber;
+
+        if (sourcePageNumber !== targetPageNumber) {
+          appState.moveStaticPage(sourcePageNumber, targetPageNumber);
+        }
+      });
+    }
+
     labelsContainer.appendChild(versoLabel);
 
     // Recto label
@@ -229,6 +372,66 @@ export function renderThumbnails(
       }
       updateSpreadIndicatorFn();
     });
+
+    // Make static recto page draggable
+    if (rectoPageState === 'static' && spread.recto) {
+      rectoLabel.setAttribute('draggable', 'true');
+      rectoLabel.style.cursor = 'grab';
+
+      rectoLabel.addEventListener('dragstart', (e) => {
+        e.stopPropagation();
+        draggedPageNumber = spread.recto!.pageNumber;
+        e.dataTransfer!.effectAllowed = 'move';
+        e.dataTransfer!.setData('application/x-printfold-page', JSON.stringify({
+          pageNumber: spread.recto!.pageNumber
+        }));
+        rectoLabel.classList.add('dragging-page');
+        rectoLabel.style.opacity = '0.5';
+      });
+
+      rectoLabel.addEventListener('dragend', () => {
+        rectoLabel.classList.remove('dragging-page');
+        rectoLabel.style.opacity = '1';
+        draggedPageNumber = -1;
+        thumbnailContainer.querySelectorAll('.page-drop-target').forEach(el => {
+          el.classList.remove('page-drop-target');
+        });
+      });
+    }
+
+    // All pages can receive dragged static pages
+    if (spread.recto) {
+      rectoLabel.addEventListener('dragover', (e) => {
+        if (draggedPageNumber === -1) return;
+        if (draggedPageNumber === spread.recto!.pageNumber) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer!.dropEffect = 'move';
+        rectoLabel.classList.add('page-drop-target');
+      });
+
+      rectoLabel.addEventListener('dragleave', () => {
+        rectoLabel.classList.remove('page-drop-target');
+      });
+
+      rectoLabel.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        rectoLabel.classList.remove('page-drop-target');
+
+        const dataStr = e.dataTransfer?.getData('application/x-printfold-page');
+        if (!dataStr) return;
+
+        const data = JSON.parse(dataStr);
+        const sourcePageNumber: number = data.pageNumber;
+        const targetPageNumber = spread.recto!.pageNumber;
+
+        if (sourcePageNumber !== targetPageNumber) {
+          appState.moveStaticPage(sourcePageNumber, targetPageNumber);
+        }
+      });
+    }
+
     labelsContainer.appendChild(rectoLabel);
 
     thumbDiv.appendChild(labelsContainer);

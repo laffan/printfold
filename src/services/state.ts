@@ -435,6 +435,103 @@ class AppState {
   }
 
   /**
+   * Move a static page from one position to another
+   * The page at fromPageNumber is moved to toPageNumber, shifting other pages
+   */
+  moveStaticPage(fromPageNumber: number, toPageNumber: number): void {
+    if (fromPageNumber === toPageNumber) return;
+
+    const prevState = this.project;
+
+    // Collect all pages from signatures
+    const allPages: import('../types').PageContent[] = [];
+    for (const sig of this.project.signatures) {
+      for (const spread of sig.spreads) {
+        if (spread.verso) allPages.push({ ...spread.verso });
+        if (spread.recto) allPages.push({ ...spread.recto });
+      }
+    }
+
+    // Sort by page number
+    allPages.sort((a, b) => a.pageNumber - b.pageNumber);
+
+    // Find the page to move
+    const fromIndex = allPages.findIndex(p => p.pageNumber === fromPageNumber);
+    if (fromIndex === -1) {
+      console.warn('Source page not found:', fromPageNumber);
+      return;
+    }
+
+    const pageToMove = allPages[fromIndex];
+    if (pageToMove.pageState !== 'static') {
+      console.warn('Can only move static pages');
+      return;
+    }
+
+    // Remove page from current position
+    allPages.splice(fromIndex, 1);
+
+    // Find target position (after removing the source)
+    let toIndex = allPages.findIndex(p => p.pageNumber >= toPageNumber);
+    if (toIndex === -1) {
+      toIndex = allPages.length;
+    }
+
+    // If moving forward, adjust for removal
+    if (fromPageNumber < toPageNumber && toIndex > 0) {
+      toIndex = Math.min(toIndex, allPages.length);
+    }
+
+    // Insert at new position
+    allPages.splice(toIndex, 0, pageToMove);
+
+    // Renumber all pages
+    allPages.forEach((page, index) => {
+      page.pageNumber = index;
+      page.isRecto = index % 2 === 1;
+    });
+
+    // Rebuild spreads
+    const newSpreads: import('../types').Spread[] = [];
+    for (let i = 0; i < allPages.length; i += 2) {
+      newSpreads.push({
+        id: crypto.randomUUID(),
+        spreadNumber: newSpreads.length + 1,
+        verso: allPages[i] || null,
+        recto: allPages[i + 1] || null,
+      });
+    }
+
+    // Rebuild signatures
+    const pagesPerSig = this.project.outputOptions.pagesPerSignature;
+    const spreadsPerSig = pagesPerSig / 2;
+    const newSignatures: import('../types').Signature[] = [];
+
+    for (let i = 0; i < newSpreads.length; i += spreadsPerSig) {
+      const sigSpreads = newSpreads.slice(i, i + spreadsPerSig);
+      newSignatures.push({
+        id: crypto.randomUUID(),
+        signatureNumber: newSignatures.length + 1,
+        spreads: sigSpreads,
+        pageCount: sigSpreads.length * 2,
+      });
+    }
+
+    this.project = { ...this.project, signatures: newSignatures };
+    this.notifyProjectListeners(prevState);
+
+    // Select the moved page at its new position
+    const newPageNum = toIndex;
+    this.updateEditor({
+      selectedPageNumber: newPageNum,
+      selectedPagePosition: newPageNum % 2 === 1 ? 'recto' : 'verso',
+    });
+
+    // Trigger reflow to adjust text around moved page
+    this.requestReflow();
+  }
+
+  /**
    * Add a signature's worth of available pages at the end of the booklet
    */
   addAvailableSignature(): void {
@@ -647,6 +744,87 @@ class AppState {
     this.project = { ...this.project, signatures };
     this.notifyProjectListeners(prevState);
     // Note: Don't call requestReflow() as that would regenerate spreads from markdown
+  }
+
+  /**
+   * Reorder signatures by moving one signature to a new position
+   * Text reflows after reordering to fill available pages in the new order
+   */
+  reorderSignatures(sourceIndex: number, targetIndex: number): void {
+    if (sourceIndex === targetIndex) return;
+    if (sourceIndex < 0 || sourceIndex >= this.project.signatures.length) return;
+    if (targetIndex < 0 || targetIndex >= this.project.signatures.length) return;
+
+    const prevState = this.project;
+
+    // Collect all pages maintaining their pageState
+    const allPages: import('../types').PageContent[] = [];
+    for (const sig of this.project.signatures) {
+      for (const spread of sig.spreads) {
+        if (spread.verso) allPages.push({ ...spread.verso });
+        if (spread.recto) allPages.push({ ...spread.recto });
+      }
+    }
+
+    // Sort by page number
+    allPages.sort((a, b) => a.pageNumber - b.pageNumber);
+
+    // Get pages per signature
+    const pagesPerSig = this.project.outputOptions.pagesPerSignature;
+
+    // Split pages into signature chunks
+    const sigChunks: import('../types').PageContent[][] = [];
+    for (let i = 0; i < allPages.length; i += pagesPerSig) {
+      sigChunks.push(allPages.slice(i, i + pagesPerSig));
+    }
+
+    // Reorder the chunks
+    const [movedChunk] = sigChunks.splice(sourceIndex, 1);
+    sigChunks.splice(targetIndex, 0, movedChunk);
+
+    // Flatten and renumber pages
+    const reorderedPages: import('../types').PageContent[] = [];
+    for (const chunk of sigChunks) {
+      for (const page of chunk) {
+        const newPageNum = reorderedPages.length;
+        reorderedPages.push({
+          ...page,
+          pageNumber: newPageNum,
+          isRecto: newPageNum % 2 === 1,
+        });
+      }
+    }
+
+    // Rebuild spreads
+    const newSpreads: import('../types').Spread[] = [];
+    for (let i = 0; i < reorderedPages.length; i += 2) {
+      newSpreads.push({
+        id: crypto.randomUUID(),
+        spreadNumber: newSpreads.length + 1,
+        verso: reorderedPages[i] || null,
+        recto: reorderedPages[i + 1] || null,
+      });
+    }
+
+    // Rebuild signatures
+    const spreadsPerSig = pagesPerSig / 2;
+    const newSignatures: import('../types').Signature[] = [];
+
+    for (let i = 0; i < newSpreads.length; i += spreadsPerSig) {
+      const sigSpreads = newSpreads.slice(i, i + spreadsPerSig);
+      newSignatures.push({
+        id: crypto.randomUUID(),
+        signatureNumber: newSignatures.length + 1,
+        spreads: sigSpreads,
+        pageCount: sigSpreads.length * 2,
+      });
+    }
+
+    this.project = { ...this.project, signatures: newSignatures };
+    this.notifyProjectListeners(prevState);
+
+    // Trigger reflow to adjust text around reordered pages
+    this.requestReflow();
   }
 
   // Spanning items (items that bridge across verso and recto)

@@ -984,6 +984,14 @@ body {
   outline-offset: -2px;
 }
 
+/* Individual page drop target styling */
+.spread-thumbnail-page-label.page-drop-target {
+  outline: 2px solid #3b82f6 !important;
+  outline-offset: -1px;
+  background: #3b82f6 !important;
+  color: white !important;
+}
+
 .konva-container {
   flex: 1;
   height: 100%;
