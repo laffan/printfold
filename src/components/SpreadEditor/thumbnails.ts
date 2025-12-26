@@ -169,17 +169,17 @@ export function renderThumbnails(
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Draw content indicators
+    // Draw page content (items and text sections)
     const contentMargin = 3;
 
     // Verso content
     if (vSpread.verso) {
-      drawPageContent(ctx, vSpread.verso, 0, thumbWidth / 2, thumbHeight, contentMargin);
+      drawPageContent(ctx, vSpread.verso, 0, thumbWidth / 2, thumbHeight, contentMargin, pageDimensions);
     }
 
     // Recto content
     if (vSpread.recto) {
-      drawPageContent(ctx, vSpread.recto, thumbWidth / 2, thumbWidth / 2, thumbHeight, contentMargin);
+      drawPageContent(ctx, vSpread.recto, thumbWidth / 2, thumbWidth / 2, thumbHeight, contentMargin, pageDimensions);
     }
 
     thumbDiv.appendChild(canvas);
@@ -285,7 +285,7 @@ export function renderThumbnails(
 }
 
 /**
- * Draw page content indicators on canvas
+ * Draw page content on canvas - includes text sections and items
  */
 function drawPageContent(
   ctx: CanvasRenderingContext2D,
@@ -293,14 +293,81 @@ function drawPageContent(
   xOffset: number,
   width: number,
   height: number,
-  margin: number
+  margin: number,
+  pageDimensions: { width: number; height: number }
 ): void {
-  if (page.isBlank || page.isStatic || page.pageState === 'available') {
-    // Don't draw anything for blank/available pages - they're transparent
-    return;
+  // Scale factor from page dimensions to thumbnail dimensions
+  const scaleX = width / pageDimensions.width;
+  const scaleY = height / pageDimensions.height;
+
+  // Draw items on static/available pages
+  if (page.items && page.items.length > 0) {
+    for (const item of page.items) {
+      const itemX = xOffset + item.x * scaleX;
+      const itemY = item.y * scaleY;
+      const itemW = item.width * scaleX;
+      const itemH = item.height * scaleY;
+
+      if (item.type === 'shape') {
+        const shapeItem = item as import('../../types').ShapePageItem;
+        const fillColor = shapeItem.fillColor || '#cccccc';
+        const strokeColor = shapeItem.strokeColor || '#666666';
+
+        ctx.fillStyle = fillColor;
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = Math.max(0.5, (shapeItem.strokeWidth || 1) * scaleX);
+
+        if (shapeItem.shapeType === 'rectangle') {
+          if (shapeItem.hasFill !== false) {
+            ctx.fillRect(itemX, itemY, itemW, itemH);
+          }
+          if (shapeItem.hasStroke !== false) {
+            ctx.strokeRect(itemX, itemY, itemW, itemH);
+          }
+        } else if (shapeItem.shapeType === 'ellipse' || shapeItem.shapeType === 'circle') {
+          ctx.beginPath();
+          ctx.ellipse(
+            itemX + itemW / 2,
+            itemY + itemH / 2,
+            itemW / 2,
+            itemH / 2,
+            0, 0, Math.PI * 2
+          );
+          if (shapeItem.hasFill !== false) {
+            ctx.fill();
+          }
+          if (shapeItem.hasStroke !== false) {
+            ctx.stroke();
+          }
+        } else if (shapeItem.shapeType === 'line' || shapeItem.shapeType === 'arrow') {
+          ctx.beginPath();
+          ctx.moveTo(itemX, itemY);
+          ctx.lineTo(itemX + itemW, itemY + itemH);
+          ctx.stroke();
+        }
+      } else if (item.type === 'text') {
+        const textItem = item as import('../../types').TextPageItem;
+        ctx.fillStyle = textItem.color || '#333333';
+        // Draw text as a small rectangle representation
+        ctx.fillRect(itemX, itemY, itemW, Math.min(itemH, 2));
+      } else if (item.type === 'image') {
+        // Draw image placeholder as a light gray box with an X
+        ctx.fillStyle = '#e0e0e0';
+        ctx.fillRect(itemX, itemY, itemW, itemH);
+        ctx.strokeStyle = '#999999';
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(itemX, itemY);
+        ctx.lineTo(itemX + itemW, itemY + itemH);
+        ctx.moveTo(itemX + itemW, itemY);
+        ctx.lineTo(itemX, itemY + itemH);
+        ctx.stroke();
+      }
+    }
   }
 
-  if (page.sections && page.sections.length > 0) {
+  // Draw text sections (for text pages)
+  if (page.sections && page.sections.length > 0 && page.pageState === 'text') {
     ctx.fillStyle = '#d0d0d0';
     let yPos = margin;
     for (const section of page.sections) {
