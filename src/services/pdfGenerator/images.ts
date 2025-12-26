@@ -108,6 +108,8 @@ export async function preRenderStaticPages(
   }
 
   // Collect static/blank pages that need rendering
+  // Note: Text pages (pages with sections/text content) are NOT pre-rendered
+  // because the PDF generator handles text content differently (using pdf-lib text rendering)
   const pagesToRender: Array<{
     page: import('../../types').PageContent;
     adjacentPage: import('../../types').PageContent | null;
@@ -117,6 +119,12 @@ export async function preRenderStaticPages(
     for (const spread of sig.spreads) {
       const pages = [spread.verso, spread.recto].filter(Boolean) as import('../../types').PageContent[];
       for (const page of pages) {
+        // Skip text pages - they are rendered via the normal text flow
+        // Text pages are identified by having sections AND not being blank/static
+        const isTextPage = page.pageState === 'text' ||
+                           (!page.isBlank && !page.isStatic && page.sections && page.sections.length > 0);
+        if (isTextPage) continue;
+
         const hasOwnItems = page.items && page.items.length > 0;
         const hasBackgroundFill = !!page.backgroundFill;
         if (!(hasOwnItems || hasBackgroundFill || page.isBlank || page.isStatic)) continue;

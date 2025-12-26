@@ -219,46 +219,26 @@ export class PDFGenerator {
 
     const hasItems = pageContent.items && pageContent.items.length > 0;
     const hasBackground = !!pageContent.backgroundFill;
+    const isTextPage = pageContent.pageState === 'text' ||
+                       (!pageContent.isBlank && !pageContent.isStatic && pageContent.sections.length > 0);
 
-    if (hasItems || hasBackground || pageContent.isBlank || pageContent.isStatic) {
+    // For static/blank pages with items or background, use pre-rendered image if available
+    if (!isTextPage && (hasItems || hasBackground || pageContent.isBlank || pageContent.isStatic)) {
       const preRenderedImage = this.renderedPageCache.get(pageContent.pageNumber);
       if (preRenderedImage) {
         pdfPage.drawImage(preRenderedImage, { x, y, width, height });
+        // Still render crossing items from adjacent pages after the pre-rendered image
+        this.drawCrossingItems(pdfPage, adjacentPage, x, y, width, height, isRecto);
+        this.drawSpanningItems(pdfPage, spreadSpanningItems, x, y, width, height, isRecto);
         return;
       }
 
+      // Fallback: draw items directly for static/blank pages
       if (pageContent.items && pageContent.items.length > 0) {
         drawPageItemsClipped(pdfPage, pageContent.items, x, y, width, height, 0, width, this.fontCache, this.imageCache);
       }
-
-      if (adjacentPage?.items && adjacentPage.items.length > 0) {
-        const crossingItems = adjacentPage.items.filter(item => {
-          if (isRecto) {
-            return item.x + item.width > width;
-          } else {
-            return item.x < 0;
-          }
-        });
-
-        if (crossingItems.length > 0) {
-          const offsetX = isRecto ? -width : width;
-          drawPageItemsClipped(pdfPage, crossingItems, x, y, width, height, offsetX, width, this.fontCache, this.imageCache);
-        }
-      }
-
-      if (spreadSpanningItems && spreadSpanningItems.length > 0) {
-        const spanningPageItems = spreadSpanningItems.map(item => spanningItemToPageItem(item)).filter(Boolean) as PageItem[];
-        const offsetX = isRecto ? -width : 0;
-        const visibleItems = spanningPageItems.filter(item => {
-          const itemLeft = item.x + offsetX;
-          const itemRight = itemLeft + item.width;
-          return itemRight > 0 && itemLeft < width;
-        });
-        if (visibleItems.length > 0) {
-          drawPageItemsClipped(pdfPage, visibleItems, x, y, width, height, offsetX, width, this.fontCache, this.imageCache);
-        }
-      }
-
+      this.drawCrossingItems(pdfPage, adjacentPage, x, y, width, height, isRecto);
+      this.drawSpanningItems(pdfPage, spreadSpanningItems, x, y, width, height, isRecto);
       return;
     }
 
@@ -370,6 +350,74 @@ export class PDFGenerator {
         const textWidth = headerFont.widthOfTextAtSize(text, headerSize);
         pdfPage.drawText(text, { x: x + width - outerMargin - textWidth, y: headerY, size: headerSize, font: headerFont, color: rgb(0, 0, 0) });
       }
+    }
+
+    // Draw items on top of text content (for text pages with items)
+    if (hasItems) {
+      drawPageItemsClipped(pdfPage, pageContent.items!, x, y, width, height, 0, width, this.fontCache, this.imageCache);
+    }
+
+    // Draw crossing items from adjacent pages
+    this.drawCrossingItems(pdfPage, adjacentPage, x, y, width, height, isRecto);
+
+    // Draw spanning items
+    this.drawSpanningItems(pdfPage, spreadSpanningItems, x, y, width, height, isRecto);
+  }
+
+  /**
+   * Draw items from adjacent page that cross into this page
+   */
+  private drawCrossingItems(
+    pdfPage: PDFPage,
+    adjacentPage: PageContent | null | undefined,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    isRecto: boolean
+  ): void {
+    if (!adjacentPage?.items || adjacentPage.items.length === 0 || !this.fontCache) return;
+
+    const crossingItems = adjacentPage.items.filter(item => {
+      if (isRecto) {
+        // This is recto, adjacent is verso - items extending right past verso boundary
+        return item.x + item.width > width;
+      } else {
+        // This is verso, adjacent is recto - items with negative x extending left
+        return item.x < 0;
+      }
+    });
+
+    if (crossingItems.length > 0) {
+      const offsetX = isRecto ? -width : width;
+      drawPageItemsClipped(pdfPage, crossingItems, x, y, width, height, offsetX, width, this.fontCache, this.imageCache);
+    }
+  }
+
+  /**
+   * Draw spanning items that bridge across the spread
+   */
+  private drawSpanningItems(
+    pdfPage: PDFPage,
+    spreadSpanningItems: SpanningItem[] | undefined,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    isRecto: boolean
+  ): void {
+    if (!spreadSpanningItems || spreadSpanningItems.length === 0 || !this.fontCache) return;
+
+    const spanningPageItems = spreadSpanningItems.map(item => spanningItemToPageItem(item)).filter(Boolean) as PageItem[];
+    const offsetX = isRecto ? -width : 0;
+    const visibleItems = spanningPageItems.filter(item => {
+      const itemLeft = item.x + offsetX;
+      const itemRight = itemLeft + item.width;
+      return itemRight > 0 && itemLeft < width;
+    });
+
+    if (visibleItems.length > 0) {
+      drawPageItemsClipped(pdfPage, visibleItems, x, y, width, height, offsetX, width, this.fontCache, this.imageCache);
     }
   }
 }
