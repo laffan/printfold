@@ -984,11 +984,89 @@ export class SpreadEditor {
       );
     }
 
-    // Note: Spanning items (items that span both pages of a spread) are not currently
-    // supported with visual spreads since they're tied to signature-based spread IDs.
-    // In the future, spanning items could be refactored to use page number pairs instead.
+    // Render crossing items from adjacent pages
+    // These are items that extend past the page boundary into the adjacent page
+    this.renderCrossingItems(spread, pageDimensions);
 
     this.itemsLayer.draw();
+  }
+
+  /**
+   * Render items from adjacent pages that cross into the current page
+   * This ensures items spanning page boundaries are fully visible
+   */
+  private renderCrossingItems(
+    spread: VisualSpread,
+    pageDimensions: { width: number; height: number }
+  ): void {
+    const pageWidth = pageDimensions.width;
+
+    // Render verso items that extend into recto (x + width > pageWidth)
+    // These items are already rendered at xOffset=0, but we need to ensure
+    // the crossing portion is visible above the recto page background
+    if (spread.verso?.items && spread.recto) {
+      const crossingToRecto = spread.verso.items.filter(item =>
+        item.x + item.width > pageWidth
+      );
+
+      for (const item of crossingToRecto) {
+        // Create a clipped version of the item for the recto side only
+        // This renders at xOffset=0 but represents the portion from pageWidth onwards
+        const crossingNode = createItemNode(
+          item,
+          0, // Same xOffset as original - positioned relative to verso
+          spread.verso.pageNumber,
+          this.zoomLevel,
+          this.stage,
+          this.itemsLayer,
+          this.transformer,
+          () => this.updateTransformer()
+        );
+
+        if (crossingNode) {
+          // Mark as crossing item so it's not registered for selection/interaction
+          crossingNode.setAttr('isCrossingItem', true);
+          crossingNode.setAttr('originalItemId', item.id);
+          // Disable interaction - the original item handles it
+          crossingNode.draggable(false);
+          crossingNode.listening(false);
+          // Move to top so it's visible above the recto page background
+          crossingNode.moveToTop();
+          this.itemsLayer.add(crossingNode);
+        }
+      }
+    }
+
+    // Render recto items that extend into verso (x < 0)
+    // These items are rendered at xOffset=pageWidth, so items with negative x
+    // extend into verso territory
+    if (spread.recto?.items && spread.verso) {
+      const crossingToVerso = spread.recto.items.filter(item => item.x < 0);
+
+      for (const item of crossingToVerso) {
+        // Create a version of the item for the verso side
+        const crossingNode = createItemNode(
+          item,
+          pageWidth, // Same xOffset as original - positioned relative to recto
+          spread.recto.pageNumber,
+          this.zoomLevel,
+          this.stage,
+          this.itemsLayer,
+          this.transformer,
+          () => this.updateTransformer()
+        );
+
+        if (crossingNode) {
+          // Mark as crossing item
+          crossingNode.setAttr('isCrossingItem', true);
+          crossingNode.setAttr('originalItemId', item.id);
+          crossingNode.draggable(false);
+          crossingNode.listening(false);
+          crossingNode.moveToTop();
+          this.itemsLayer.add(crossingNode);
+        }
+      }
+    }
   }
 
   /**
