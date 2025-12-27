@@ -39,20 +39,23 @@ function createDimensionElement(index: number, dim: ArrayDimension): HTMLElement
     <div class="array-dimension-controls">
       <div class="input-row">
         <label>Count</label>
-        <input type="number" class="dim-count" data-index="${index}" value="${dim.count}" min="2" max="50" />
+        <div class="input-with-cap">
+          <input type="number" class="dim-count" data-index="${index}" value="${dim.count}" min="2" max="50" />
+          <span class="input-cap">Copies</span>
+        </div>
       </div>
       <div class="input-row">
         <label>X Offset</label>
         <div class="input-with-cap">
           <input type="number" class="dim-offset-x" data-index="${index}" value="${dim.offsetX}" />
-          <span class="input-cap" data-input="dim-offset-x-${index}">pt</span>
+          <span class="input-cap">pt</span>
         </div>
       </div>
       <div class="input-row">
         <label>Y Offset</label>
         <div class="input-with-cap">
           <input type="number" class="dim-offset-y" data-index="${index}" value="${dim.offsetY}" />
-          <span class="input-cap" data-input="dim-offset-y-${index}">pt</span>
+          <span class="input-cap">pt</span>
         </div>
       </div>
     </div>

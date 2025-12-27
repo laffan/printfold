@@ -5,12 +5,27 @@
 
 import Konva from 'konva';
 import { appState } from './state';
+import { calculateArrayPositions, getTotalArrayInstances } from '../components/SpreadEditor/items/arrayItems';
 import type { PageContent, PageItem, TextPageItem, ShapePageItem, ImagePageItem, FillConfig } from '../types';
 
 // Target DPI for print-quality rendering
 const PRINT_DPI = 300;
 const SCREEN_DPI = 72;
 const SCALE_FACTOR = PRINT_DPI / SCREEN_DPI;
+
+/**
+ * Apply shadow properties to a Konva node
+ */
+function applyItemShadow(node: Konva.Shape | Konva.Text | Konva.Image, item: PageItem, scale: number): void {
+  if (item.hasShadow) {
+    node.shadowEnabled(true);
+    node.shadowColor(item.shadowColor || '#000000');
+    node.shadowBlur((item.shadowBlur ?? 5) * scale);
+    node.shadowOffsetX((item.shadowOffsetX ?? 3) * scale);
+    node.shadowOffsetY((item.shadowOffsetY ?? 3) * scale);
+    node.shadowOpacity(item.shadowOpacity ?? 0.5);
+  }
+}
 
 /**
  * Apply fill config to a Konva shape (mirrors SpreadEditor/items.ts logic)
@@ -301,26 +316,43 @@ export async function renderPageToImage(
       layer.add(bgRect);
     }
 
-    // Render page items
+    // Render page items (including array instances)
     if (page.items) {
       for (const item of page.items) {
-        const node = createRenderNode(item, 0, SCALE_FACTOR, imageLoadPromises);
-        if (node) {
-          // Apply shadow if enabled
-          if (item.hasShadow) {
-            node.shadowEnabled(true);
-            node.shadowColor(item.shadowColor || '#000000');
-            node.shadowBlur((item.shadowBlur ?? 5) * SCALE_FACTOR);
-            node.shadowOffsetX((item.shadowOffsetX ?? 3) * SCALE_FACTOR);
-            node.shadowOffsetY((item.shadowOffsetY ?? 3) * SCALE_FACTOR);
-            node.shadowOpacity(item.shadowOpacity ?? 0.5);
+        const dimensions = item.arrayDimensions || [];
+        const totalInstances = getTotalArrayInstances(dimensions);
+
+        if (totalInstances <= 1) {
+          // No array - render single item
+          const node = createRenderNode(item, 0, SCALE_FACTOR, imageLoadPromises);
+          if (node) {
+            applyItemShadow(node, item, SCALE_FACTOR);
+            layer.add(node);
           }
-          layer.add(node);
+        } else {
+          // Array - render all instances in reverse order (first on top)
+          const positions = calculateArrayPositions(dimensions);
+          for (let i = positions.length - 1; i >= 0; i--) {
+            const pos = positions[i];
+            // Create a modified item for this instance position
+            const instanceItem: PageItem = {
+              ...item,
+              x: item.x + pos.x,
+              y: item.y + pos.y,
+              arrayDimensions: undefined, // Don't recurse
+            } as PageItem;
+
+            const node = createRenderNode(instanceItem, 0, SCALE_FACTOR, imageLoadPromises);
+            if (node) {
+              applyItemShadow(node, item, SCALE_FACTOR);
+              layer.add(node);
+            }
+          }
         }
       }
     }
 
-    // Render crossing items from adjacent page
+    // Render crossing items from adjacent page (including array instances)
     // Konva's canvas automatically clips at boundaries, so circles etc. will be properly clipped
     if (adjacentPage?.items) {
       const crossingItems = adjacentPage.items.filter(item => {
@@ -336,18 +368,34 @@ export async function renderPageToImage(
       for (const item of crossingItems) {
         // Adjust x position for the crossing item
         const offsetX = page.isRecto ? -pageWidth : pageWidth;
-        const node = createRenderNode(item, offsetX, SCALE_FACTOR, imageLoadPromises);
-        if (node) {
-          // Apply shadow if enabled
-          if (item.hasShadow) {
-            node.shadowEnabled(true);
-            node.shadowColor(item.shadowColor || '#000000');
-            node.shadowBlur((item.shadowBlur ?? 5) * SCALE_FACTOR);
-            node.shadowOffsetX((item.shadowOffsetX ?? 3) * SCALE_FACTOR);
-            node.shadowOffsetY((item.shadowOffsetY ?? 3) * SCALE_FACTOR);
-            node.shadowOpacity(item.shadowOpacity ?? 0.5);
+        const dimensions = item.arrayDimensions || [];
+        const totalInstances = getTotalArrayInstances(dimensions);
+
+        if (totalInstances <= 1) {
+          // No array - render single item
+          const node = createRenderNode(item, offsetX, SCALE_FACTOR, imageLoadPromises);
+          if (node) {
+            applyItemShadow(node, item, SCALE_FACTOR);
+            layer.add(node);
           }
-          layer.add(node);
+        } else {
+          // Array - render all instances in reverse order (first on top)
+          const positions = calculateArrayPositions(dimensions);
+          for (let i = positions.length - 1; i >= 0; i--) {
+            const pos = positions[i];
+            const instanceItem: PageItem = {
+              ...item,
+              x: item.x + pos.x,
+              y: item.y + pos.y,
+              arrayDimensions: undefined,
+            } as PageItem;
+
+            const node = createRenderNode(instanceItem, offsetX, SCALE_FACTOR, imageLoadPromises);
+            if (node) {
+              applyItemShadow(node, item, SCALE_FACTOR);
+              layer.add(node);
+            }
+          }
         }
       }
     }
@@ -374,7 +422,7 @@ export async function renderPageToImage(
 }
 
 /**
- * Check if a page needs raster rendering (has complex fills, custom fonts, etc.)
+ * Check if a page needs raster rendering (has complex fills, custom fonts, arrays, etc.)
  */
 export function pageNeedsRasterRendering(page: PageContent): boolean {
   if (!page.items || page.items.length === 0) {
@@ -386,6 +434,11 @@ export function pageNeedsRasterRendering(page: PageContent): boolean {
   }
 
   for (const item of page.items) {
+    // Arrays always need raster rendering
+    if (item.arrayDimensions && item.arrayDimensions.length > 0) {
+      return true;
+    }
+
     if (item.type === 'shape') {
       const shapeItem = item as ShapePageItem;
       if (shapeItem.fill && shapeItem.fill.type !== 'color') {
