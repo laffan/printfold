@@ -109,7 +109,15 @@ export function drawPageItemsClipped(
           opacity,
         });
       } else if (shapeItem.shapeType === 'ellipse' || shapeItem.shapeType === 'circle') {
-        const centerX = pageX + adjustedX + item.width / 2;
+        // For circles/ellipses, only draw if the CENTER is within the visible region
+        // Since pdf-lib doesn't support clipping paths, circles cannot be split across pages
+        // They will appear on whichever page contains their center
+        const centerLocalX = adjustedX + item.width / 2;
+
+        // Skip if center is outside the clip region - the circle belongs to the other page
+        if (centerLocalX < 0 || centerLocalX > clipWidth) continue;
+
+        const centerX = pageX + centerLocalX;
         const centerY = itemPdfY + item.height / 2;
 
         if (shapeItem.shapeType === 'circle') {
