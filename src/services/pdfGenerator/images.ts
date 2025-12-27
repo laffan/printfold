@@ -130,27 +130,19 @@ export async function preRenderStaticPages(
                                      page.isBlank || page.isStatic;
         if (!(hasOwnItems || hasBackgroundFill || isStaticOrAvailable)) continue;
 
-        const adjacentPage = page.isRecto ? spread.verso : spread.recto;
+        // Pre-render pages that have their own content (items or background)
+        // Crossing items are NOT included in pre-render - they're added during PDF generation
+        // based on physical sheet adjacency which may differ from spread adjacency
         const hasOwnContent = page.items?.length || page.backgroundFill;
-        const hasCrossingItems = adjacentPage?.items?.some(item => {
-          if (page.isRecto) {
-            return item.x + item.width > pageWidth;
-          } else {
-            return item.x < 0;
-          }
-        });
 
-        if (hasOwnContent || hasCrossingItems) {
+        if (hasOwnContent) {
           console.log('[PRERENDER DEBUG] Adding page to render:', {
             pageNum: page.pageNumber,
             pageState: page.pageState,
             isRecto: page.isRecto,
             hasOwnContent,
-            hasCrossingItems,
-            adjacentPageNum: adjacentPage?.pageNumber,
-            adjacentPageState: adjacentPage?.pageState,
           });
-          pagesToRender.push({ page, adjacentPage: adjacentPage || null });
+          pagesToRender.push({ page, adjacentPage: null });
         }
       }
     }

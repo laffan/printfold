@@ -241,23 +241,18 @@ function createRenderNode(
 /**
  * Render a page's items to a high-resolution image
  * Returns a data URL of the rendered image
+ *
+ * NOTE: This only renders the page's OWN items. Crossing items from adjacent pages
+ * are handled during PDF generation based on physical sheet adjacency.
  */
 export async function renderPageToImage(
   page: PageContent,
   pageWidth: number,
   pageHeight: number,
-  adjacentPage?: PageContent | null
+  _adjacentPage?: PageContent | null // Kept for API compatibility but not used
 ): Promise<string | null> {
-  // Check if page has items worth rendering
-  const hasItems = (page.items && page.items.length > 0) ||
-                   (adjacentPage?.items && adjacentPage.items.some(item => {
-                     // Check for crossing items
-                     if (page.isRecto) {
-                       return item.x + item.width > pageWidth;
-                     } else {
-                       return item.x < 0;
-                     }
-                   }));
+  // Check if page has items worth rendering (only the page's own content)
+  const hasItems = page.items && page.items.length > 0;
 
   if (!hasItems && !page.backgroundFill) {
     return null;
@@ -317,51 +312,9 @@ export async function renderPageToImage(
       }
     }
 
-    // Render crossing items from adjacent page
-    if (adjacentPage?.items) {
-      const crossingItems = adjacentPage.items.filter(item => {
-        if (page.isRecto) {
-          // This is recto, adjacent is verso - items extending right past verso boundary
-          return item.x + item.width > pageWidth;
-        } else {
-          // This is verso, adjacent is recto - items with negative x extending left
-          return item.x < 0;
-        }
-      });
-
-      if (crossingItems.length > 0) {
-        console.log('[PRERENDER DEBUG] Rendering crossing items for page', page.pageNumber, {
-          isRecto: page.isRecto,
-          adjacentPageNum: adjacentPage.pageNumber,
-          crossingItemsCount: crossingItems.length,
-          crossingItems: crossingItems.map(item => ({
-            id: item.id,
-            x: item.x,
-            width: item.width,
-            xPlusWidth: item.x + item.width,
-            pageWidth,
-          })),
-        });
-      }
-
-      for (const item of crossingItems) {
-        // Adjust x position for the crossing item
-        const offsetX = page.isRecto ? -pageWidth : pageWidth;
-        const node = createRenderNode(item, offsetX, SCALE_FACTOR, imageLoadPromises);
-        if (node) {
-          // Apply shadow if enabled
-          if (item.hasShadow) {
-            node.shadowEnabled(true);
-            node.shadowColor(item.shadowColor || '#000000');
-            node.shadowBlur((item.shadowBlur ?? 5) * SCALE_FACTOR);
-            node.shadowOffsetX((item.shadowOffsetX ?? 3) * SCALE_FACTOR);
-            node.shadowOffsetY((item.shadowOffsetY ?? 3) * SCALE_FACTOR);
-            node.shadowOpacity(item.shadowOpacity ?? 0.5);
-          }
-          layer.add(node);
-        }
-      }
-    }
+    // NOTE: Crossing items from adjacent pages are NOT rendered during pre-rendering.
+    // They are rendered during PDF generation based on physical sheet adjacency,
+    // which may differ from spread adjacency (especially for edge pages in signatures).
 
     // Wait for all images to load
     await Promise.all(imageLoadPromises);
