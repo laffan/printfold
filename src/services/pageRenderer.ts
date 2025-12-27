@@ -28,6 +28,30 @@ function applyItemShadow(node: Konva.Shape | Konva.Text | Konva.Image, item: Pag
 }
 
 /**
+ * Clear all fill-related properties from a shape
+ * This ensures switching between fill types doesn't leave stale gradient/pattern data
+ */
+function clearFillProperties(shape: Konva.Shape): void {
+  // Clear solid fill
+  shape.fill('');
+
+  // Clear linear gradient properties
+  shape.fillLinearGradientStartPoint({ x: 0, y: 0 });
+  shape.fillLinearGradientEndPoint({ x: 0, y: 0 });
+  shape.fillLinearGradientColorStops([]);
+
+  // Clear radial gradient properties
+  shape.fillRadialGradientStartPoint({ x: 0, y: 0 });
+  shape.fillRadialGradientEndPoint({ x: 0, y: 0 });
+  shape.fillRadialGradientStartRadius(0);
+  shape.fillRadialGradientEndRadius(0);
+  shape.fillRadialGradientColorStops([]);
+
+  // Clear pattern properties
+  shape.fillPatternImage(undefined as unknown as HTMLImageElement);
+}
+
+/**
  * Apply fill config to a Konva shape (mirrors SpreadEditor/items.ts logic)
  */
 function applyFillToShape(
@@ -38,6 +62,9 @@ function applyFillToShape(
   height: number,
   imageLoadPromises: Promise<void>[]
 ): void {
+  // Clear any previous fill properties first
+  clearFillProperties(shape);
+
   if (!fill) {
     shape.fill(fallbackColor || 'transparent');
     return;
@@ -209,9 +236,11 @@ function createRenderNode(
       opacity,
     });
 
-    // Apply fill if enabled
+    // Apply fill if enabled, otherwise make transparent
     if (hasFill) {
       applyFillToShape(textNode, textItem.fill, textItem.color, width, height, imageLoadPromises);
+    } else {
+      textNode.fill('transparent');
     }
 
     // Apply stroke if enabled
@@ -446,6 +475,10 @@ export function pageNeedsRasterRendering(page: PageContent): boolean {
       }
     } else if (item.type === 'text') {
       const textItem = item as TextPageItem;
+      // Check for gradient/pattern fills on text
+      if (textItem.fill && textItem.fill.type !== 'color') {
+        return true;
+      }
       // Check for custom fonts (not standard PDF fonts)
       const standardFonts = ['Times New Roman', 'TimesRoman', 'Helvetica', 'Arial', 'Courier', 'Courier New'];
       if (!standardFonts.some(f => textItem.fontFamily.toLowerCase().includes(f.toLowerCase()))) {
