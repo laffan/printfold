@@ -26,19 +26,6 @@ export class PDFGenerator {
    */
   async generate(): Promise<Uint8Array> {
     const project = appState.getProject();
-
-    // DEBUG: Log all pages with items at start of generation
-    const pagesWithItems = project.signatures
-      .flatMap(s => s.spreads)
-      .flatMap(sp => [sp.verso, sp.recto])
-      .filter(p => p?.items && p.items.length > 0);
-    console.log('[PDF DEBUG] Starting PDF generation. Pages with items:', pagesWithItems.map(p => ({
-      pageNumber: p?.pageNumber,
-      pageState: p?.pageState,
-      isStatic: p?.isStatic,
-      itemCount: p?.items?.length,
-    })));
-
     const pdfDoc = await PDFDocument.create();
 
     // Embed fonts
@@ -108,55 +95,28 @@ export class PDFGenerator {
     const imposition = textFlowEngine.calculateImposition(signature);
     const staticSpreads = project.staticSpreads || [];
 
-    // Get all pages from spreads with their spread info
-    const pages: (PageContent | null)[] = [];
+    // Build maps for looking up pages and spread info by page number
+    const pageByNumber: Map<number, PageContent> = new Map();
     const spreadForPage: Map<number, { spread: Spread; staticSpread?: import('../../types').StaticSpread }> = new Map();
 
     for (const spread of signature.spreads) {
       const staticSpread = staticSpreads.find(s => s.id === spread.id);
 
       if (spread.verso) {
+        pageByNumber.set(spread.verso.pageNumber, spread.verso);
         spreadForPage.set(spread.verso.pageNumber, { spread, staticSpread });
       }
       if (spread.recto) {
+        pageByNumber.set(spread.recto.pageNumber, spread.recto);
         spreadForPage.set(spread.recto.pageNumber, { spread, staticSpread });
       }
-      pages.push(spread.verso);
-      pages.push(spread.recto);
     }
-
-    // DEBUG: Log pages array with items
-    console.log('[PDF DEBUG] Pages array:', pages.map((p, idx) => ({
-      index: idx,
-      pageNumber: p?.pageNumber,
-      hasItems: p?.items && p.items.length > 0,
-      itemCount: p?.items?.length || 0,
-    })));
 
     const rowsPerSheet = calculateSpreadRowsPerSheet(
       sheetSize,
       pageHeight,
       project.outputOptions.fillAvailableSpace
     );
-
-    const basePageOffset = (signature.signatureNumber - 1) * signature.pageCount;
-    const pageNumberToIndex = (impositionPageNum: number): number => {
-      const localPageNum = impositionPageNum - basePageOffset;
-      if (localPageNum === signature.pageCount) {
-        return 0;
-      }
-      return localPageNum;
-    };
-
-    // DEBUG: Log imposition info
-    console.log('[PDF DEBUG] Imposition for signature', signature.signatureNumber, ':', {
-      basePageOffset,
-      signaturePageCount: signature.pageCount,
-      impositionSheets: imposition.map(s => ({
-        front: s.front,
-        back: s.back,
-      })),
-    });
 
     // Group imposition sheets for multi-row layout
     for (let i = 0; i < imposition.length; i += rowsPerSheet) {
@@ -168,24 +128,9 @@ export class PDFGenerator {
       sheetsInGroup.forEach((sheet, rowIndex) => {
         const rowY = sheetSize.height - (rowIndex + 1) * pageHeight;
 
-        const leftPageIndex = pageNumberToIndex(sheet.front.left);
-        const rightPageIndex = pageNumberToIndex(sheet.front.right);
-
-        const leftPage = leftPageIndex >= 0 && leftPageIndex < pages.length ? pages[leftPageIndex] : null;
-        const rightPage = rightPageIndex >= 0 && rightPageIndex < pages.length ? pages[rightPageIndex] : null;
-
-        // DEBUG: Log ALL page lookups to trace what's happening
-        console.log('[PDF DEBUG] Front lookup:', {
-          impositionLeft: sheet.front.left,
-          impositionRight: sheet.front.right,
-          leftPageIndex,
-          rightPageIndex,
-          pagesArrayLength: pages.length,
-          leftPageNum: leftPage?.pageNumber,
-          rightPageNum: rightPage?.pageNumber,
-          leftHasItems: leftPage?.items?.length || 0,
-          rightHasItems: rightPage?.items?.length || 0,
-        });
+        // Look up pages by their page number directly
+        const leftPage = pageByNumber.get(sheet.front.left) || null;
+        const rightPage = pageByNumber.get(sheet.front.right) || null;
 
         if (leftPage) {
           const info = spreadForPage.get(leftPage.pageNumber);
@@ -208,24 +153,9 @@ export class PDFGenerator {
       sheetsInGroup.forEach((sheet, rowIndex) => {
         const rowY = sheetSize.height - (rowIndex + 1) * pageHeight;
 
-        const backLeftIndex = pageNumberToIndex(sheet.back.left);
-        const backRightIndex = pageNumberToIndex(sheet.back.right);
-
-        const leftPage = backLeftIndex >= 0 && backLeftIndex < pages.length ? pages[backLeftIndex] : null;
-        const rightPage = backRightIndex >= 0 && backRightIndex < pages.length ? pages[backRightIndex] : null;
-
-        // DEBUG: Log ALL back page lookups
-        console.log('[PDF DEBUG] Back lookup:', {
-          impositionLeft: sheet.back.left,
-          impositionRight: sheet.back.right,
-          backLeftIndex,
-          backRightIndex,
-          pagesArrayLength: pages.length,
-          leftPageNum: leftPage?.pageNumber,
-          rightPageNum: rightPage?.pageNumber,
-          leftHasItems: leftPage?.items?.length || 0,
-          rightHasItems: rightPage?.items?.length || 0,
-        });
+        // Look up pages by their page number directly
+        const leftPage = pageByNumber.get(sheet.back.left) || null;
+        const rightPage = pageByNumber.get(sheet.back.right) || null;
 
         if (leftPage) {
           const info = spreadForPage.get(leftPage.pageNumber);
@@ -282,22 +212,6 @@ export class PDFGenerator {
     const isStaticOrAvailable = pageContent.pageState === 'static' ||
                                  pageContent.pageState === 'available' ||
                                  pageContent.isBlank || pageContent.isStatic;
-
-    // DEBUG: Log page state info for pages with items
-    if (hasItems) {
-      console.log(`[PDF DEBUG] Page ${pageContent.pageNumber}:`, {
-        pageState: pageContent.pageState,
-        isBlank: pageContent.isBlank,
-        isStatic: pageContent.isStatic,
-        hasItems,
-        itemCount: pageContent.items?.length,
-        isTextPage,
-        isStaticOrAvailable,
-        sectionsCount: pageContent.sections?.length,
-        willEnterStaticPath: !isTextPage && (hasItems || hasBackground || isStaticOrAvailable),
-        hasPreRenderedImage: this.renderedPageCache.has(pageContent.pageNumber),
-      });
-    }
 
     // For static/blank pages with items or background, use pre-rendered image if available
     if (!isTextPage && (hasItems || hasBackground || isStaticOrAvailable)) {
