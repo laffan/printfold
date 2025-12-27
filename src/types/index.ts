@@ -219,6 +219,7 @@ export interface OutputOptions {
   pagesPerSignature: 4 | 8 | 12 | 16 | 20 | 24;
   orientation: 'portrait' | 'landscape';
   fillAvailableSpace: boolean; // Print multiple rows of spreads per sheet when possible
+  showFoldMarks: boolean; // Show fold marks on printed PDF (light gray)
   // Creep compensation - narrows inner pages to prevent outer edges from extending
   creepEnabled?: boolean;
   creepPerSheet?: number; // Amount to reduce each successive sheet (in points), default 0.0625 * 72 for bond paper

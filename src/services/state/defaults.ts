@@ -39,6 +39,7 @@ export const defaultOutputOptions: OutputOptions = {
   pagesPerSignature: 4,
   orientation: 'portrait',
   fillAvailableSpace: true,
+  showFoldMarks: false,
   creepEnabled: false,
   creepPerSheet: 0.0625 * 72,
 };

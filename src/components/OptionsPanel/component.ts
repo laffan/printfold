@@ -135,6 +135,9 @@ export class OptionsPanel {
     setCheckboxValue('opt-fill-space', project.outputOptions.fillAvailableSpace);
     updateFillSpaceVisibility();
 
+    // Show fold marks
+    setCheckboxValue('opt-fold-marks', project.outputOptions.showFoldMarks);
+
     // Creep compensation
     setCheckboxValue('opt-creep-enabled', project.outputOptions.creepEnabled ?? false);
     const creepSettings = document.getElementById('creep-settings');

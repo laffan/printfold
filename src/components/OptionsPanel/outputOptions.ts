@@ -71,6 +71,11 @@ export function setupOutputOptions(debounce: (fn: DebounceCallback) => void): vo
     appState.updateOutputOptions({ fillAvailableSpace: checked });
   });
 
+  // Show fold marks
+  bindCheckbox('opt-fold-marks', (checked) => {
+    appState.updateOutputOptions({ showFoldMarks: checked });
+  });
+
   // Pages per signature
   bindSelect('opt-pages-per-sig', (value) => {
     appState.updateOutputOptions({ pagesPerSignature: parseInt(value) as OutputOptions['pagesPerSignature'] });

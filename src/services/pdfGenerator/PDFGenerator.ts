@@ -128,9 +128,9 @@ export class PDFGenerator {
     // Generate PDF pages by grouping sheets across signatures
     await this.generateCombinedSheets(pdfDoc, allSheets, sheetSize, pageWidth, pageHeight, rowsPerSheet, globalPageMap);
 
-    // Add cut marks and fold indicators if there are pages
+    // Add cut marks and optional fold indicators if there are pages
     if (project.signatures.length > 0) {
-      addPrintMarks(pdfDoc, sheetSize, pageHeight, rowsPerSheet);
+      addPrintMarks(pdfDoc, sheetSize, pageHeight, rowsPerSheet, project.outputOptions.showFoldMarks);
     }
 
     return pdfDoc.save();
