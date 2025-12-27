@@ -647,6 +647,13 @@ export class SpreadEditor {
       };
     }
 
+    if (project.outputOptions.bookletSize.startsWith('sixth-')) {
+      return {
+        width: sheetSize.width / 2,
+        height: sheetSize.height / 3,
+      };
+    }
+
     if (project.outputOptions.bookletSize.startsWith('quarter-')) {
       return {
         width: sheetSize.width / 2,

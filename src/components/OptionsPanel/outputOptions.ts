@@ -118,6 +118,8 @@ export function getPageHeight(): number {
     return project.outputOptions.customHeight || sheetSize.height;
   } else if (project.outputOptions.bookletSize.startsWith('eighth-')) {
     return sheetSize.height / 4;
+  } else if (project.outputOptions.bookletSize.startsWith('sixth-')) {
+    return sheetSize.height / 3;
   } else if (project.outputOptions.bookletSize.startsWith('quarter-')) {
     return sheetSize.height / 2;
   } else {

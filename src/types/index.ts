@@ -213,7 +213,7 @@ export interface PageMarginOverride {
 
 export interface OutputOptions {
   sheetSize: 'letter' | 'a4' | 'legal' | 'tabloid' | 'a3';
-  bookletSize: 'half-letter' | 'quarter-letter' | 'eighth-letter' | 'half-a4' | 'quarter-a4' | 'eighth-a4' | 'custom';
+  bookletSize: 'half-letter' | 'quarter-letter' | 'sixth-letter' | 'eighth-letter' | 'half-a4' | 'quarter-a4' | 'sixth-a4' | 'eighth-a4' | 'custom';
   customWidth?: number;
   customHeight?: number;
   pagesPerSignature: 4 | 8 | 12 | 16 | 20 | 24;

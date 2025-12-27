@@ -29,6 +29,9 @@ export function calculatePageDimensions(
   } else if (outputOptions.bookletSize.startsWith('eighth-')) {
     pageWidth = sheetSize.width / 2;
     pageHeight = sheetSize.height / 4;
+  } else if (outputOptions.bookletSize.startsWith('sixth-')) {
+    pageWidth = sheetSize.width / 2;
+    pageHeight = sheetSize.height / 3;
   } else {
     // quarter-letter, quarter-a4, etc.
     pageWidth = sheetSize.width / 2;

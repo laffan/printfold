@@ -102,6 +102,9 @@ export async function preRenderStaticPages(
   } else if (project.outputOptions.bookletSize.startsWith('eighth-')) {
     pageWidth = sheetSize.width / 2;
     pageHeight = sheetSize.height / 4;
+  } else if (project.outputOptions.bookletSize.startsWith('sixth-')) {
+    pageWidth = sheetSize.width / 2;
+    pageHeight = sheetSize.height / 3;
   } else if (project.outputOptions.bookletSize.startsWith('quarter-')) {
     pageWidth = sheetSize.width / 2;
     pageHeight = sheetSize.height / 2;
