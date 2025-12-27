@@ -364,18 +364,30 @@ Items can be placed on any page type (static, available, or text pages):
 **Common Properties:** Position (x, y), size, rotation, opacity
 
 **Effects (available for all items):**
+- **Fill** - Solid color, linear gradient, radial gradient, or pattern
 - **Stroke** - Border with customizable color and width
 - **Shadow** - Drop shadow with color, blur, offset, and opacity
-- **Array** - Create multiple instances with offset and per-instance fill customization
+- **Array** - Create multiple copies with multi-dimensional offset support
 
 ### Fill System
 
-Shapes and page backgrounds support multiple fill types:
+Text, shapes, and page backgrounds support multiple fill types:
 
 1. **Solid Color**: Single hex color
 2. **Linear Gradient**: Angle-based with color stops
 3. **Radial Gradient**: Center, radius, color stops
 4. **Pattern**: Image-based repeating pattern
+
+All fill types render correctly in both the canvas editor and PDF export (using Konva pre-rendering for complex fills).
+
+### Array Feature
+
+The Array effect creates multiple copies of an item with configurable offsets:
+
+- **Multi-dimensional**: Each dimension creates copies with its own count and offset
+- **Stacking**: Copies appear below the original item (first copy on top)
+- **Multiplicative**: Dimensions multiply (e.g., 3×2 = 6 total copies in a grid)
+- **Example**: Dimension 1 (count=3, x=30) + Dimension 2 (count=2, y=40) creates a 3×2 grid
 
 ### Imposition
 

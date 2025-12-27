@@ -31,8 +31,8 @@ OptionsPanel/
 ### Selected Tab
 
 Contains:
-- **Edit Selected Section** - Properties for selected items
-- **Effects Section** - Stroke, shadow, and array effects
+- **Edit Selected Section** - Properties for selected items (position, size, type-specific options)
+- **Effects Section** - Fill, stroke, shadow, and array effects
 - **Page Background Section** - Background fill for static pages
 
 ### Styles Tab
@@ -333,17 +333,20 @@ When an item is selected:
 - Font family dropdown
 - Font size
 - Font weight/style toggles
-- Fill (solid color, gradient, or pattern)
 - Text alignment
 
 ### Shape Item Properties
 
-- Fill type and configuration (solid, gradient, pattern)
-- Has Fill toggle
+(Shape-specific properties appear here when shapes are selected)
 
 ### Effects Section
 
 Toggle-based effects available for all items:
+
+#### Fill Effect
+- Enable/disable toggle
+- Fill type (solid color, linear gradient, radial gradient, or pattern)
+- Type-specific configuration (color picker, gradient editor, pattern settings)
 
 #### Stroke Effect
 - Enable/disable toggle
@@ -358,14 +361,17 @@ Toggle-based effects available for all items:
 - Opacity
 
 #### Array Effect
-Creates multiple copies of an item in a grid pattern:
+Creates multiple copies of an item with multi-dimensional offset support:
 - Enable/disable toggle
-- Instance count (2-50)
-- X offset between instances
-- Y offset between instances
-- Per-instance fill customization
+- Dimension list (each dimension can be added/removed)
+- Per-dimension controls:
+  - Copy count (2-50)
+  - X offset between copies
+  - Y offset between copies
+- Draggable "Copies" and "pt" caps for easy value adjustment
+- Total copy count displayed in header
 
-The array uses Konva.Group to group all instances together for unified selection and dragging.
+Dimensions are multiplicative (e.g., 3×2 = 6 total copies). The array uses Konva.Group to group all instances together for unified selection and dragging. Copies stack with the first copy on top.
 
 ### Z-Order Controls
 
