@@ -7,5 +7,5 @@
 export { applyFillToShape } from './fill';
 export { startTextEditing } from './textEditing';
 export { createItemNode } from './nodeCreation';
-export { createArrayInstanceNode } from './arrayItems';
+export { createArrayInstanceNodes, calculateArrayPositions, getTotalArrayInstances } from './arrayItems';
 export { renderPageItems, renderSpanningItems } from './rendering';

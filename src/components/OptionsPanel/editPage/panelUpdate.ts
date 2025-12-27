@@ -13,8 +13,9 @@ import {
   setTextFillPicker
 } from './shared';
 import { updateMultiSelectControls } from './multiSelect';
-import { updateArrayInstancesList } from './arrayInstances';
+import { updateArrayDimensionsList, setupAddDimensionButton } from './arrayInstances';
 import { setupPageBackgroundPicker } from './pageBackground';
+import { getTotalArrayInstances } from '../../SpreadEditor/items/arrayItems';
 import type { TextPageItem, ShapePageItem, FillConfig } from '../../../types';
 
 /**
@@ -186,19 +187,24 @@ export function updateEditSelectedSection(): void {
   setInputValue('item-shadow-offset-y', (item.shadowOffsetY ?? 3).toString());
   setInputValue('item-shadow-opacity', (item.shadowOpacity ?? 0.5).toString());
 
-  // Update array toggle and properties
-  const arrayCount = item.arrayCount || 1;
-  const hasArray = arrayCount > 1;
+  // Update array toggle and properties (multi-dimensional)
+  const dimensions = item.arrayDimensions || [];
+  const hasArray = dimensions.length > 0;
+  const totalInstances = getTotalArrayInstances(dimensions);
   const itemHasArray = document.getElementById('item-has-array') as HTMLInputElement;
   const itemArraySection = document.getElementById('item-array-section');
   if (itemHasArray) itemHasArray.checked = hasArray;
   if (itemArraySection) itemArraySection.style.display = hasArray ? 'block' : 'none';
-  setInputValue('item-array-count', arrayCount.toString());
-  setInputValue('item-array-offset-x', (item.arrayOffsetX || 20).toString());
-  setInputValue('item-array-offset-y', (item.arrayOffsetY || 20).toString());
 
-  // Update array instances list
-  updateArrayInstancesList(item);
+  // Update total instances count display
+  const totalCountDisplay = document.getElementById('array-total-count');
+  if (totalCountDisplay) {
+    totalCountDisplay.textContent = totalInstances > 1 ? `(${totalInstances} total copies)` : '';
+  }
+
+  // Update array dimensions list and set up add button
+  updateArrayDimensionsList(item);
+  setupAddDimensionButton();
 
   // Show/hide type-specific properties
   if (item.type === 'shape') {

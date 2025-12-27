@@ -5,8 +5,8 @@
 import { appState } from '../../../services/state';
 import { createFontDropdown } from '../../FontDropdown';
 import { setItemFontDropdown } from './shared';
-import { updateArrayInstancesList } from './arrayInstances';
-import type { TextPageItem } from '../../../types';
+import { addArrayDimension } from './arrayInstances';
+import type { TextPageItem, ArrayDimension } from '../../../types';
 
 /**
  * Set up property input handlers for the Edit Selected section
@@ -166,31 +166,31 @@ export function setupEditPropertyInputs(updateEditSelectedSectionFn: () => void)
   setupPropInput('item-shadow-offset-y', 'shadowOffsetY');
   setupPropInput('item-shadow-opacity', 'shadowOpacity');
 
-  // Array toggle
+  // Array toggle - when checked, add first dimension; when unchecked, clear all dimensions
   const itemHasArray = document.getElementById('item-has-array') as HTMLInputElement;
   const itemArraySection = document.getElementById('item-array-section');
   itemHasArray?.addEventListener('change', () => {
     const editorState = appState.getEditor();
     if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
-    // Set arrayCount to 2 when enabled, 1 when disabled
-    const newArrayCount = itemHasArray.checked ? 2 : 1;
-    appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { arrayCount: newArrayCount });
+
+    if (itemHasArray.checked) {
+      // Add first dimension with default values
+      const firstDimension: ArrayDimension = {
+        id: crypto.randomUUID(),
+        count: 3,
+        offsetX: 30,
+        offsetY: 0,
+      };
+      appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, {
+        arrayDimensions: [firstDimension],
+      });
+    } else {
+      // Clear all dimensions
+      appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, {
+        arrayDimensions: undefined,
+      });
+    }
+
     if (itemArraySection) itemArraySection.style.display = itemHasArray.checked ? 'block' : 'none';
   });
-
-  // Array duplication inputs
-  const arrayCountInput = document.getElementById('item-array-count') as HTMLInputElement;
-  arrayCountInput?.addEventListener('input', () => {
-    const editorState = appState.getEditor();
-    if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
-    const value = parseInt(arrayCountInput.value, 10);
-    if (!isNaN(value) && value >= 1 && value <= 50) {
-      appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { arrayCount: value });
-      // Refresh the instances list
-      const item = appState.getItemFromPage(editorState.selectedPageNumber, editorState.selectedItemId);
-      if (item) updateArrayInstancesList(item);
-    }
-  });
-  setupPropInput('item-array-offset-x', 'arrayOffsetX');
-  setupPropInput('item-array-offset-y', 'arrayOffsetY');
 }

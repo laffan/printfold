@@ -10,7 +10,6 @@ export let itemFontDropdown: FontDropdown | null = null;
 export let itemFillPicker: FillPicker | null = null;
 export let textFillPicker: FillPicker | null = null;
 export let pageBackgroundPicker: FillPicker | null = null;
-export const instanceFillPickers: Map<number, FillPicker> = new Map();
 
 // Setters for module-level state (needed because TypeScript doesn't allow direct assignment to exported variables)
 export function setItemFontDropdown(dropdown: FontDropdown | null): void {

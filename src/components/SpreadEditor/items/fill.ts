@@ -7,7 +7,31 @@ import { appState } from '../../../services/state';
 import type { FillConfig } from '../../../types';
 
 /**
- * Apply fill config to a Konva shape
+ * Clear all fill-related properties from a shape
+ * This ensures switching between fill types doesn't leave stale gradient/pattern data
+ */
+function clearFillProperties(shape: Konva.Shape): void {
+  // Clear solid fill
+  shape.fill('');
+
+  // Clear linear gradient properties
+  shape.fillLinearGradientStartPoint({ x: 0, y: 0 });
+  shape.fillLinearGradientEndPoint({ x: 0, y: 0 });
+  shape.fillLinearGradientColorStops([]);
+
+  // Clear radial gradient properties
+  shape.fillRadialGradientStartPoint({ x: 0, y: 0 });
+  shape.fillRadialGradientEndPoint({ x: 0, y: 0 });
+  shape.fillRadialGradientStartRadius(0);
+  shape.fillRadialGradientEndRadius(0);
+  shape.fillRadialGradientColorStops([]);
+
+  // Clear pattern properties
+  shape.fillPatternImage(undefined as unknown as HTMLImageElement);
+}
+
+/**
+ * Apply fill config to a Konva shape (works for shapes and text)
  */
 export function applyFillToShape(
   shape: Konva.Shape,
@@ -16,6 +40,9 @@ export function applyFillToShape(
   width: number,
   height: number
 ): void {
+  // Clear any previous fill properties first
+  clearFillProperties(shape);
+
   // Use fallback if no fill config
   if (!fill) {
     shape.fill(fallbackColor || 'transparent');

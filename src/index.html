@@ -381,36 +381,18 @@
                     </div>
                   </div>
                 </div>
-                <!-- Array Effect -->
+                <!-- Array Effect (Multi-dimensional) -->
                 <div class="form-group toggle-section">
                   <label class="checkbox-label">
                     <input type="checkbox" id="item-has-array">
                     <span>Array</span>
+                    <span id="array-total-count" class="array-count-badge"></span>
                   </label>
                   <div id="item-array-section" style="display: none;">
-                    <div class="inline-sizes three-col">
-                      <label>
-                        <span>Count</span>
-                        <input type="number" id="item-array-count" step="1" min="2" max="50" value="2">
-                      </label>
-                      <label>
-                        <span>X Offset</span>
-                        <div class="input-with-cap">
-                          <input type="number" id="item-array-offset-x" step="1" value="20">
-                          <span class="input-cap">pt</span>
-                        </div>
-                      </label>
-                      <label>
-                        <span>Y Offset</span>
-                        <div class="input-with-cap">
-                          <input type="number" id="item-array-offset-y" step="1" value="20">
-                          <span class="input-cap">pt</span>
-                        </div>
-                      </label>
+                    <div id="array-dimensions-list" class="array-dimensions-list">
+                      <!-- Dimension items will be dynamically added here -->
                     </div>
-                    <div id="array-instances-list" class="array-instances-list">
-                      <!-- Instance items will be dynamically added here -->
-                    </div>
+                    <button id="add-array-dimension" class="btn btn-small btn-add-dimension">+ Add Dimension</button>
                   </div>
                 </div>
               </div>
