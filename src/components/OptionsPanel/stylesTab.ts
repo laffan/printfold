@@ -166,9 +166,22 @@ function createHeadingsSection(styles: DetectedStyles): HTMLElement {
     <div class="form-group inline-sizes">
       ${sizeInputs.join('')}
     </div>
-    <div class="form-group">
-      <label>Color</label>
-      <input type="color" id="dyn-color-headings">
+    <div class="form-group inline-sizes">
+      <label>
+        <span>Line Height</span>
+        <div class="input-with-cap">
+          <input type="number" id="dyn-line-height-headings" min="0.8" max="3" step="0.05">
+          <span class="input-cap" data-for="dyn-line-height-headings">×</span>
+        </div>
+      </label>
+      <label>
+        <span>Color</span>
+        <input type="color" id="dyn-color-headings">
+      </label>
+      <label class="checkbox-label" style="align-self: end; padding-bottom: 6px;">
+        <input type="checkbox" id="dyn-headings-bold">
+        <span>Bold</span>
+      </label>
     </div>
   `;
   return section;
@@ -206,12 +219,12 @@ function createBlockquoteSection(): HTMLElement {
         <input type="color" id="dyn-color-blockquote">
       </label>
     </div>
-    <div class="form-group inline-sizes">
-      <label>
+    <div class="form-group" style="display: flex; gap: 16px;">
+      <label class="checkbox-label">
         <input type="checkbox" id="dyn-blockquote-italic">
         <span>Italic</span>
       </label>
-      <label>
+      <label class="checkbox-label">
         <input type="checkbox" id="dyn-blockquote-bold">
         <span>Bold</span>
       </label>
@@ -228,7 +241,7 @@ function createHighlightSection(): HTMLElement {
   section.className = 'options-section';
   section.innerHTML = `
     <h4 class="section-header">Highlight</h4>
-    <div class="form-group inline-sizes">
+    <div class="form-group inline-sizes" style="grid-template-columns: 1fr 1fr;">
       <label>
         <span>Text Color</span>
         <input type="color" id="dyn-highlight-text-color">
@@ -250,7 +263,7 @@ function createStrikethroughSection(): HTMLElement {
   section.className = 'options-section';
   section.innerHTML = `
     <h4 class="section-header">Strikethrough</h4>
-    <div class="form-group inline-sizes">
+    <div class="form-group inline-sizes" style="grid-template-columns: 1fr 1fr;">
       <label>
         <span>Text Color</span>
         <input type="color" id="dyn-strikethrough-text-color">
@@ -286,19 +299,10 @@ function createHeaderFooterSection(type: 'header' | 'footer'): HTMLElement {
         </div>
       </label>
       <label>
-        <span>Line Height</span>
-        <div class="input-with-cap">
-          <input type="number" id="dyn-${type}-line-height" min="0.8" max="3" step="0.05">
-          <span class="input-cap" data-for="dyn-${type}-line-height">×</span>
-        </div>
-      </label>
-      <label>
         <span>Color</span>
         <input type="color" id="dyn-${type}-color">
       </label>
-    </div>
-    <div class="form-group inline-sizes">
-      <label>
+      <label class="checkbox-label" style="align-self: end; padding-bottom: 6px;">
         <input type="checkbox" id="dyn-${type}-bold">
         <span>Bold</span>
       </label>
@@ -382,7 +386,6 @@ function setupDynamicDraggableCaps(): void {
  */
 function setupInputHandlers(): void {
   const fontOptions = appState.getProject().fontOptions;
-  const headerFooter = appState.getProject().headerFooter;
 
   // Body text handlers
   const bodySizeInput = document.getElementById('dyn-font-size-body') as HTMLInputElement;
@@ -418,6 +421,31 @@ function setupInputHandlers(): void {
     });
   }
 
+  // Heading handlers
+  setupHeadingHandlers();
+
+  // Blockquote handlers
+  setupBlockquoteHandlers();
+
+  // Highlight handlers
+  setupHighlightHandlers();
+
+  // Strikethrough handlers
+  setupStrikethroughHandlers();
+
+  // Header handlers
+  setupHeaderFooterHandlers('header');
+
+  // Footer handlers
+  setupHeaderFooterHandlers('footer');
+}
+
+/**
+ * Set up heading input handlers
+ */
+function setupHeadingHandlers(): void {
+  const fontOptions = appState.getProject().fontOptions;
+
   // Heading size handlers
   const headingLevels = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const;
   for (const level of headingLevels) {
@@ -433,6 +461,27 @@ function setupInputHandlers(): void {
         }
       });
     }
+  }
+
+  // Heading line height handler (shared across all heading levels)
+  const lineHeightInput = document.getElementById('dyn-line-height-headings') as HTMLInputElement;
+  if (lineHeightInput) {
+    // Use H1's line height as the representative value, fall back to layout default
+    lineHeightInput.value = (fontOptions.h1.lineHeight || appState.getProject().layoutOptions.lineHeight || 1.5).toString();
+    lineHeightInput.addEventListener('input', () => {
+      const value = parseFloat(lineHeightInput.value);
+      if (!isNaN(value)) {
+        const fonts = appState.getProject().fontOptions;
+        appState.updateFontOptions({
+          h1: { ...fonts.h1, lineHeight: value },
+          h2: { ...fonts.h2, lineHeight: value },
+          h3: { ...fonts.h3, lineHeight: value },
+          h4: { ...fonts.h4, lineHeight: value },
+          h5: { ...fonts.h5, lineHeight: value },
+          h6: { ...fonts.h6, lineHeight: value },
+        });
+      }
+    });
   }
 
   // Heading color handler
@@ -453,20 +502,23 @@ function setupInputHandlers(): void {
     });
   }
 
-  // Blockquote handlers
-  setupBlockquoteHandlers();
-
-  // Highlight handlers
-  setupHighlightHandlers();
-
-  // Strikethrough handlers
-  setupStrikethroughHandlers();
-
-  // Header handlers
-  setupHeaderFooterHandlers('header');
-
-  // Footer handlers
-  setupHeaderFooterHandlers('footer');
+  // Heading bold handler
+  const boldCheckbox = document.getElementById('dyn-headings-bold') as HTMLInputElement;
+  if (boldCheckbox) {
+    boldCheckbox.checked = fontOptions.h1.fontWeight === 'bold';
+    boldCheckbox.addEventListener('change', () => {
+      const fonts = appState.getProject().fontOptions;
+      const fontWeight = boldCheckbox.checked ? 'bold' : 'normal';
+      appState.updateFontOptions({
+        h1: { ...fonts.h1, fontWeight },
+        h2: { ...fonts.h2, fontWeight },
+        h3: { ...fonts.h3, fontWeight },
+        h4: { ...fonts.h4, fontWeight },
+        h5: { ...fonts.h5, fontWeight },
+        h6: { ...fonts.h6, fontWeight },
+      });
+    });
+  }
 }
 
 /**
@@ -602,7 +654,6 @@ function setupHeaderFooterHandlers(type: 'header' | 'footer'): void {
   const config = headerFooter[type];
 
   const sizeInput = document.getElementById(`dyn-${type}-font-size`) as HTMLInputElement;
-  const lineHeightInput = document.getElementById(`dyn-${type}-line-height`) as HTMLInputElement;
   const colorInput = document.getElementById(`dyn-${type}-color`) as HTMLInputElement;
   const boldCheckbox = document.getElementById(`dyn-${type}-bold`) as HTMLInputElement;
 
@@ -614,19 +665,6 @@ function setupHeaderFooterHandlers(type: 'header' | 'footer'): void {
         const hf = appState.getProject().headerFooter;
         appState.updateHeaderFooter({
           [type]: { ...hf[type], font: { ...hf[type].font, fontSize: value } }
-        });
-      }
-    });
-  }
-
-  if (lineHeightInput) {
-    lineHeightInput.value = (config.font.lineHeight || 1.2).toString();
-    lineHeightInput.addEventListener('input', () => {
-      const value = parseFloat(lineHeightInput.value);
-      if (!isNaN(value)) {
-        const hf = appState.getProject().headerFooter;
-        appState.updateHeaderFooter({
-          [type]: { ...hf[type], font: { ...hf[type].font, lineHeight: value } }
         });
       }
     });
