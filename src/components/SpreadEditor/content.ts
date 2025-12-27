@@ -160,6 +160,7 @@ export function drawPageContent(
         wrap: textAlign === 'justify' ? 'word' : 'none',
         align: textAlign,
         ellipsis: textAlign !== 'justify',
+        textDecoration: fontStyle.textDecoration || '',
       });
 
       // Draw inline background color (highlight) if set

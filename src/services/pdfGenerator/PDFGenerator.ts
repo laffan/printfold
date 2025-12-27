@@ -351,6 +351,29 @@ export class PDFGenerator {
           color: parseColor(fontStyle.color),
         });
 
+        // Draw underline if set
+        const textDeco = fontStyle.textDecoration || 'none';
+        if (textDeco.includes('underline')) {
+          const underlineY = currentY - fontStyle.fontSize - 1;
+          pdfPage.drawLine({
+            start: { x: lineX, y: underlineY },
+            end: { x: lineX + textWidth, y: underlineY },
+            thickness: fontStyle.fontSize / 15,
+            color: parseColor(fontStyle.color),
+          });
+        }
+
+        // Draw strikethrough if set
+        if (textDeco.includes('line-through')) {
+          const strikeY = currentY - fontStyle.fontSize * 0.6;
+          pdfPage.drawLine({
+            start: { x: lineX, y: strikeY },
+            end: { x: lineX + textWidth, y: strikeY },
+            thickness: fontStyle.fontSize / 15,
+            color: parseColor(fontStyle.color),
+          });
+        }
+
         currentY -= lineHeight;
       }
 
