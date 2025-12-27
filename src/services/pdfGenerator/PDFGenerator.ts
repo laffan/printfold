@@ -148,6 +148,16 @@ export class PDFGenerator {
       return localPageNum;
     };
 
+    // DEBUG: Log imposition info
+    console.log('[PDF DEBUG] Imposition for signature', signature.signatureNumber, ':', {
+      basePageOffset,
+      signaturePageCount: signature.pageCount,
+      impositionSheets: imposition.map(s => ({
+        front: s.front,
+        back: s.back,
+      })),
+    });
+
     // Group imposition sheets for multi-row layout
     for (let i = 0; i < imposition.length; i += rowsPerSheet) {
       const sheetsInGroup = imposition.slice(i, i + rowsPerSheet);
@@ -164,19 +174,18 @@ export class PDFGenerator {
         const leftPage = leftPageIndex >= 0 && leftPageIndex < pages.length ? pages[leftPageIndex] : null;
         const rightPage = rightPageIndex >= 0 && rightPageIndex < pages.length ? pages[rightPageIndex] : null;
 
-        // DEBUG: Log page lookup for pages with items
-        if (leftPage?.items?.length || rightPage?.items?.length) {
-          console.log('[PDF DEBUG] Front sheet page lookup:', {
-            impositionLeft: sheet.front.left,
-            impositionRight: sheet.front.right,
-            leftPageIndex,
-            rightPageIndex,
-            leftPageNum: leftPage?.pageNumber,
-            rightPageNum: rightPage?.pageNumber,
-            leftHasItems: leftPage?.items?.length || 0,
-            rightHasItems: rightPage?.items?.length || 0,
-          });
-        }
+        // DEBUG: Log ALL page lookups to trace what's happening
+        console.log('[PDF DEBUG] Front lookup:', {
+          impositionLeft: sheet.front.left,
+          impositionRight: sheet.front.right,
+          leftPageIndex,
+          rightPageIndex,
+          pagesArrayLength: pages.length,
+          leftPageNum: leftPage?.pageNumber,
+          rightPageNum: rightPage?.pageNumber,
+          leftHasItems: leftPage?.items?.length || 0,
+          rightHasItems: rightPage?.items?.length || 0,
+        });
 
         if (leftPage) {
           const info = spreadForPage.get(leftPage.pageNumber);
@@ -204,6 +213,19 @@ export class PDFGenerator {
 
         const leftPage = backLeftIndex >= 0 && backLeftIndex < pages.length ? pages[backLeftIndex] : null;
         const rightPage = backRightIndex >= 0 && backRightIndex < pages.length ? pages[backRightIndex] : null;
+
+        // DEBUG: Log ALL back page lookups
+        console.log('[PDF DEBUG] Back lookup:', {
+          impositionLeft: sheet.back.left,
+          impositionRight: sheet.back.right,
+          backLeftIndex,
+          backRightIndex,
+          pagesArrayLength: pages.length,
+          leftPageNum: leftPage?.pageNumber,
+          rightPageNum: rightPage?.pageNumber,
+          leftHasItems: leftPage?.items?.length || 0,
+          rightHasItems: rightPage?.items?.length || 0,
+        });
 
         if (leftPage) {
           const info = spreadForPage.get(leftPage.pageNumber);
