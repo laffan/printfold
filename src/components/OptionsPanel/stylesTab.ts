@@ -402,7 +402,7 @@ function setupDynamicDraggableCaps(): void {
  */
 function setupTextFormatHandlers(
   prefix: string,
-  getStyle: () => { fontSize: number; lineHeight?: number; letterSpacing?: number; color: string; fontWeight: string; fontStyle: string; textAlign?: string; backgroundColor?: string },
+  getStyle: () => { fontSize: number; lineHeight?: number; letterSpacing?: number; color: string; fontWeight: string; fontStyle: string; textAlign?: string; backgroundColor?: string; textDecoration?: string },
   updateStyle: (updates: Partial<ReturnType<typeof getStyle>>) => void
 ): void {
   // Size
