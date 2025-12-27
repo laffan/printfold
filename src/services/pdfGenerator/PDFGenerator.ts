@@ -3,7 +3,7 @@
  * Generates print-ready PDFs using pdf-lib with booklet imposition
  */
 
-import { PDFDocument, PDFPage, PDFImage, rgb, StandardFonts } from 'pdf-lib';
+import { PDFDocument, PDFPage, PDFImage, rgb, StandardFonts, pushGraphicsState, popGraphicsState, moveTo, lineTo, closePath, clip, endPath } from 'pdf-lib';
 import { appState } from '../state';
 import { textFlowEngine } from '../textFlow';
 import type { Signature, Spread, PageContent, PageItem, SpanningItem } from '../../types';
@@ -281,11 +281,31 @@ export class PDFGenerator {
       }
 
       // Fallback: draw items directly for static/blank pages (when pre-render failed or wasn't done)
-      if (pageContent.items && pageContent.items.length > 0) {
-        drawPageItemsClipped(pdfPage, pageContent.items, x, y, width, height, 0, width, this.fontCache, this.imageCache);
+      // Use clipping to prevent items from extending past page boundaries
+      const hasItemsToClip = (pageContent.items && pageContent.items.length > 0) ||
+                              (adjacentPage?.items && adjacentPage.items.length > 0);
+      if (hasItemsToClip) {
+        // Set up clipping rectangle for the page bounds
+        pdfPage.pushOperators(
+          pushGraphicsState(),
+          moveTo(x, y),
+          lineTo(x + width, y),
+          lineTo(x + width, y + height),
+          lineTo(x, y + height),
+          closePath(),
+          clip(),
+          endPath()
+        );
+
+        if (pageContent.items && pageContent.items.length > 0) {
+          drawPageItemsClipped(pdfPage, pageContent.items, x, y, width, height, 0, width, this.fontCache, this.imageCache);
+        }
+        // Use reading-order position (pageContent.isRecto) not physical sheet position for crossing items
+        this.drawCrossingItems(pdfPage, adjacentPage, x, y, width, height, pageContent.isRecto);
+
+        // Restore graphics state to remove clipping
+        pdfPage.pushOperators(popGraphicsState());
       }
-      // Use reading-order position (pageContent.isRecto) not physical sheet position for crossing items
-      this.drawCrossingItems(pdfPage, adjacentPage, x, y, width, height, pageContent.isRecto);
       this.drawSpanningItems(pdfPage, spreadSpanningItems, x, y, width, height, isRecto);
       return;
     }
@@ -401,24 +421,42 @@ export class PDFGenerator {
     }
 
     // Draw items on top of text content (for text pages with items)
-    if (hasItems) {
-      console.log('[TEXT PAGE DEBUG] Drawing items on text page', pageContent.pageNumber, {
-        itemCount: pageContent.items!.length,
-        items: pageContent.items!.map(item => ({
-          id: item.id,
-          type: item.type,
-          x: item.x,
-          y: item.y,
-          width: item.width,
-          height: item.height,
-        })),
-      });
-      drawPageItemsClipped(pdfPage, pageContent.items!, x, y, width, height, 0, width, this.fontCache, this.imageCache);
-    }
+    // Use clipping to prevent items from extending past page boundaries
+    if (hasItems || (adjacentPage?.items && adjacentPage.items.length > 0)) {
+      // Set up clipping rectangle for the page bounds
+      pdfPage.pushOperators(
+        pushGraphicsState(),
+        moveTo(x, y),
+        lineTo(x + width, y),
+        lineTo(x + width, y + height),
+        lineTo(x, y + height),
+        closePath(),
+        clip(),
+        endPath()
+      );
 
-    // Draw crossing items from adjacent pages
-    // Use reading-order position (pageContent.isRecto) not physical sheet position
-    this.drawCrossingItems(pdfPage, adjacentPage, x, y, width, height, pageContent.isRecto);
+      if (hasItems) {
+        console.log('[TEXT PAGE DEBUG] Drawing items on text page', pageContent.pageNumber, {
+          itemCount: pageContent.items!.length,
+          items: pageContent.items!.map(item => ({
+            id: item.id,
+            type: item.type,
+            x: item.x,
+            y: item.y,
+            width: item.width,
+            height: item.height,
+          })),
+        });
+        drawPageItemsClipped(pdfPage, pageContent.items!, x, y, width, height, 0, width, this.fontCache, this.imageCache);
+      }
+
+      // Draw crossing items from adjacent pages (within the clipping region)
+      // Use reading-order position (pageContent.isRecto) not physical sheet position
+      this.drawCrossingItems(pdfPage, adjacentPage, x, y, width, height, pageContent.isRecto);
+
+      // Restore graphics state to remove clipping
+      pdfPage.pushOperators(popGraphicsState());
+    }
 
     // Draw spanning items
     this.drawSpanningItems(pdfPage, spreadSpanningItems, x, y, width, height, isRecto);
