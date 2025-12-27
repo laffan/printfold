@@ -195,14 +195,15 @@ export function drawMarginGuides(
     const headerHeight = project.headerFooter.header.height;
     const headerY = y + margins.top;
     const headerLineY = headerY + headerHeight;
+    const headerFontSize = project.headerFooter.header.font.fontSize;
 
-    // Draw header content
+    // Draw header content - text sits on the orange line (baseline at line position)
     drawHeaderFooterContent(
       project.headerFooter.header,
       pageContent.isRecto,
       pageContent.pageNumber,
       contentX,
-      headerY + headerHeight / 2 - 5,
+      headerLineY - headerFontSize - 2, // Position text so baseline sits on line
       contentWidth,
       layer
     );
@@ -223,15 +224,15 @@ export function drawMarginGuides(
   if (project.headerFooter.footer.enabled) {
     const footerHeight = project.headerFooter.footer.height;
     const footerLineY = y + dimensions.height - margins.bottom - footerHeight;
-    const footerContentY = footerLineY + footerHeight / 2 - 5;
+    const footerFontSize = project.headerFooter.footer.font.fontSize;
 
-    // Draw footer content
+    // Draw footer content - text sits on the orange line (just below the line)
     drawHeaderFooterContent(
       project.headerFooter.footer,
       pageContent.isRecto,
       pageContent.pageNumber,
       contentX,
-      footerContentY,
+      footerLineY + 2, // Position text just below the line
       contentWidth,
       layer
     );
@@ -473,16 +474,16 @@ function addMarginDragHandler(
         currentMarginValue = Math.max(0, startMargins.bottom - dy);
         line.points([startPoints[0], startPoints[1] + dy, startPoints[2], startPoints[3] + dy]);
       } else if (type === 'inner') {
-        // Inner margin: dragging the line toward the spine shrinks margin, away from spine expands it
-        // For recto: inner line is on LEFT. Drag LEFT (toward spine) = shrink, drag RIGHT = expand
-        // For verso: inner line is on RIGHT. Drag RIGHT (toward spine) = shrink, drag LEFT = expand
-        currentMarginValue = Math.max(0, startMargins.inner + (isRecto ? -dx : dx));
+        // Inner margin: dragging the line toward content shrinks margin, away from content expands it
+        // For recto: inner line is on LEFT. Drag LEFT = shrink margin, drag RIGHT = expand
+        // For verso: inner line is on RIGHT. Drag RIGHT = shrink margin, drag LEFT = expand
+        currentMarginValue = Math.max(0, startMargins.inner + (isRecto ? dx : -dx));
         line.points([startPoints[0] + dx, startPoints[1], startPoints[2] + dx, startPoints[3]]);
       } else if (type === 'outer') {
-        // Outer margin: dragging toward the outer edge shrinks margin, toward content expands it
-        // For recto: outer line is on RIGHT. Drag RIGHT (toward edge) = shrink, drag LEFT = expand
-        // For verso: outer line is on LEFT. Drag LEFT (toward edge) = shrink, drag RIGHT = expand
-        currentMarginValue = Math.max(0, startMargins.outer + (isRecto ? dx : -dx));
+        // Outer margin: dragging the line toward content shrinks margin, away from content expands it
+        // For recto: outer line is on RIGHT. Drag RIGHT = shrink margin, drag LEFT = expand
+        // For verso: outer line is on LEFT. Drag LEFT = shrink margin, drag RIGHT = expand
+        currentMarginValue = Math.max(0, startMargins.outer + (isRecto ? -dx : dx));
         line.points([startPoints[0] + dx, startPoints[1], startPoints[2] + dx, startPoints[3]]);
       }
 

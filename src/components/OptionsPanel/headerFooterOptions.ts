@@ -4,7 +4,7 @@
  */
 
 import { appState } from '../../services/state';
-import { bindTextInput, bindCheckbox, bindNumberInput, bindColorInput, type DebounceCallback } from './helpers';
+import { bindTextInput, bindCheckbox, type DebounceCallback } from './helpers';
 
 /**
  * Set up header/footer options event handlers
@@ -106,33 +106,5 @@ export function setupHeaderFooterOptions(debounce: (fn: DebounceCallback) => voi
     });
   }, debounce);
 
-  // Header font options (font family handled by custom dropdown)
-  bindNumberInput('opt-header-font-size', (value) => {
-    const header = appState.getProject().headerFooter.header;
-    appState.updateHeaderFooter({
-      header: { ...header, font: { ...header.font, fontSize: value } },
-    });
-  }, debounce);
-
-  bindColorInput('opt-header-color', (value) => {
-    const header = appState.getProject().headerFooter.header;
-    appState.updateHeaderFooter({
-      header: { ...header, font: { ...header.font, color: value } },
-    });
-  }, debounce);
-
-  // Footer font options (font family handled by custom dropdown)
-  bindNumberInput('opt-footer-font-size', (value) => {
-    const footer = appState.getProject().headerFooter.footer;
-    appState.updateHeaderFooter({
-      footer: { ...footer, font: { ...footer.font, fontSize: value } },
-    });
-  }, debounce);
-
-  bindColorInput('opt-footer-color', (value) => {
-    const footer = appState.getProject().headerFooter.footer;
-    appState.updateHeaderFooter({
-      footer: { ...footer, font: { ...footer.font, color: value } },
-    });
-  }, debounce);
+  // Header/footer font options are now handled in the Styles tab (stylesTab.ts)
 }

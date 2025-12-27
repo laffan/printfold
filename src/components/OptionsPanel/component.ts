@@ -183,13 +183,7 @@ export class OptionsPanel {
     setInputValue('opt-font-size-h3', project.fontOptions.h3.fontSize.toString());
     setColorValue('opt-color-headings', project.fontOptions.h1.color);
 
-    // Header/footer font options (font families use custom dropdowns)
-    this.fontDropdowns.get('opt-header-font')?.setValue(project.headerFooter.header.font.fontFamily);
-    setInputValue('opt-header-font-size', project.headerFooter.header.font.fontSize.toString());
-    setColorValue('opt-header-color', project.headerFooter.header.font.color);
-    this.fontDropdowns.get('opt-footer-font')?.setValue(project.headerFooter.footer.font.fontFamily);
-    setInputValue('opt-footer-font-size', project.headerFooter.footer.font.fontSize.toString());
-    setColorValue('opt-footer-color', project.headerFooter.footer.font.color);
+    // Header/footer font options are now in the Styles tab (dynamically generated)
 
     // Update input cap labels to reflect current unit
     updateInputCapLabels();

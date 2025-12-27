@@ -723,8 +723,19 @@ export class SpreadEditor {
     // Only update if actually changing spreads
     if (newIndex !== this.currentSpreadIndex) {
       this.currentSpreadIndex = newIndex;
-      // Clear item selection when navigating to a different spread
-      appState.updateEditor({ selectedItemId: null });
+      const newSpread = visualSpreads[newIndex];
+
+      // Update selected page to a page in the new spread (prefer recto, then verso)
+      // This ensures thumbnails highlight the correct spread
+      const newPageNumber = newSpread?.recto?.pageNumber ?? newSpread?.verso?.pageNumber ?? null;
+      const newPosition = newSpread?.recto ? 'recto' : 'verso';
+
+      appState.updateEditor({
+        selectedItemId: null,
+        selectedItemIds: [],
+        selectedPageNumber: newPageNumber,
+        selectedPagePosition: newPageNumber ? newPosition : null,
+      });
       this.updateSpreadIndicator();
       this.render();
     }
@@ -739,8 +750,18 @@ export class SpreadEditor {
 
     if (spreadIndex >= 0 && spreadIndex < totalSpreads) {
       this.currentSpreadIndex = spreadIndex;
-      // Clear item selection when navigating
-      appState.updateEditor({ selectedItemId: null });
+      const newSpread = visualSpreads[spreadIndex];
+
+      // Update selected page to a page in the new spread (prefer recto, then verso)
+      const newPageNumber = newSpread?.recto?.pageNumber ?? newSpread?.verso?.pageNumber ?? null;
+      const newPosition = newSpread?.recto ? 'recto' : 'verso';
+
+      appState.updateEditor({
+        selectedItemId: null,
+        selectedItemIds: [],
+        selectedPageNumber: newPageNumber,
+        selectedPagePosition: newPageNumber ? newPosition : null,
+      });
       this.updateSpreadIndicator();
       this.render();
     }
