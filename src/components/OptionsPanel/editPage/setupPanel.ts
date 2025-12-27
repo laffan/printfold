@@ -6,7 +6,7 @@ import { appState } from '../../../services/state';
 import { switchToSelectedTab } from './shared';
 import { addItemToCurrentPage, addImageToCurrentPage } from './itemCreation';
 import { setupEditPropertyInputs } from './propertyInputs';
-import { downloadPageAsSvg, downloadPageAsPng, replacePageWithImage } from '../../../services/pageExport';
+import { downloadPageAsSvg, downloadPageAsPng, downloadSpreadAsPng, replacePageWithImage, replaceSpreadWithImage } from '../../../services/pageExport';
 import type { PageItem } from '../../../types';
 
 /**
@@ -130,6 +130,14 @@ export function setupEditPagePanel(updateEditSelectedSectionFn: () => void): voi
     }
   });
 
+  // Download spread as PNG
+  document.getElementById('btn-download-spread-png')?.addEventListener('click', () => {
+    const editorState = appState.getEditor();
+    if (editorState.selectedPageNumber !== null) {
+      downloadSpreadAsPng(editorState.selectedPageNumber);
+    }
+  });
+
   // Replace page with image
   document.getElementById('btn-replace-page-image')?.addEventListener('click', () => {
     const editorState = appState.getEditor();
@@ -142,6 +150,23 @@ export function setupEditPagePanel(updateEditSelectedSectionFn: () => void): voi
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file && editorState.selectedPageNumber !== null) {
         await replacePageWithImage(editorState.selectedPageNumber, file);
+      }
+    };
+    input.click();
+  });
+
+  // Replace spread with image
+  document.getElementById('btn-replace-spread-image')?.addEventListener('click', () => {
+    const editorState = appState.getEditor();
+    if (editorState.selectedPageNumber === null) return;
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/png,image/jpeg,image/webp,image/gif';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file && editorState.selectedPageNumber !== null) {
+        await replaceSpreadWithImage(editorState.selectedPageNumber, file);
       }
     };
     input.click();

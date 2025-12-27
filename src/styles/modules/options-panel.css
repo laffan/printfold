@@ -218,7 +218,8 @@
   margin-bottom: 0;
 }
 
-.form-group > label {
+.form-group > label,
+.form-label {
   display: block;
   margin-bottom: 4px;
   font-size: 11px;

@@ -566,3 +566,219 @@ export async function replacePageWithImage(pageNumber: number, file: File): Prom
 
   appState.addItemToPage(pageNumber, imageItem);
 }
+
+/**
+ * Find the spread containing a page number
+ */
+function findSpread(pageNumber: number): { verso: PageContent | null; recto: PageContent | null } | null {
+  const project = appState.getProject();
+
+  // Build visual spreads like thumbnails do
+  const allPages: PageContent[] = [];
+  for (const sig of project.signatures) {
+    for (const spread of sig.spreads) {
+      if (spread.verso) allPages.push(spread.verso);
+      if (spread.recto) allPages.push(spread.recto);
+    }
+  }
+
+  allPages.sort((a, b) => a.pageNumber - b.pageNumber);
+  if (allPages.length === 0) return null;
+
+  const maxPageNum = Math.max(...allPages.map(p => p.pageNumber));
+  const pageMap = new Map<number, PageContent>();
+  for (const page of allPages) {
+    pageMap.set(page.pageNumber, page);
+  }
+
+  // Find which visual spread contains this page
+  // Page 1 is recto of first spread [null|1]
+  // Pages 2,3 are [2|3], pages 4,5 are [4|5], etc.
+  if (pageNumber === 1) {
+    return { verso: null, recto: pageMap.get(1) || null };
+  }
+
+  // For page N > 1: verso is even, recto is odd
+  // Visual spread index = floor((N) / 2)
+  const versoNum = pageNumber % 2 === 0 ? pageNumber : pageNumber - 1;
+  const rectoNum = versoNum + 1;
+
+  return {
+    verso: pageMap.get(versoNum) || null,
+    recto: rectoNum <= maxPageNum ? (pageMap.get(rectoNum) || null) : null
+  };
+}
+
+/**
+ * Download current spread as PNG (300 DPI)
+ */
+export async function downloadSpreadAsPng(pageNumber: number): Promise<void> {
+  const spread = findSpread(pageNumber);
+  if (!spread) return;
+
+  const { width, height } = getPageDimensions();
+  const spreadWidth = width * 2;
+  const scaledWidth = Math.round(spreadWidth * SCALE_FACTOR);
+  const scaledHeight = Math.round(height * SCALE_FACTOR);
+
+  const container = document.createElement('div');
+  container.style.position = 'absolute';
+  container.style.left = '-9999px';
+  container.style.top = '-9999px';
+  document.body.appendChild(container);
+
+  try {
+    const stage = new Konva.Stage({ container, width: scaledWidth, height: scaledHeight });
+    const layer = new Konva.Layer();
+    stage.add(layer);
+
+    // White background for entire spread
+    const bg = new Konva.Rect({ x: 0, y: 0, width: scaledWidth, height: scaledHeight, fill: '#ffffff' });
+    layer.add(bg);
+
+    const imageLoadPromises: Promise<void>[] = [];
+    const scaledPageWidth = width * SCALE_FACTOR;
+
+    // Render verso (left page)
+    if (spread.verso) {
+      // Draw verso background
+      if (spread.verso.backgroundFill) {
+        const versoBg = new Konva.Rect({ x: 0, y: 0, width: scaledPageWidth, height: scaledHeight });
+        applyFillToShape(versoBg, spread.verso.backgroundFill, '#ffffff', scaledPageWidth, scaledHeight, imageLoadPromises);
+        layer.add(versoBg);
+      }
+      // Render verso items
+      if (spread.verso.items) {
+        for (const item of spread.verso.items) {
+          const node = createRenderNode(item, 0, SCALE_FACTOR, imageLoadPromises);
+          if (node) { applyItemShadow(node, item, SCALE_FACTOR); layer.add(node); }
+        }
+      }
+    }
+
+    // Render recto (right page)
+    if (spread.recto) {
+      // Draw recto background (offset by page width)
+      if (spread.recto.backgroundFill) {
+        const rectoBg = new Konva.Rect({ x: scaledPageWidth, y: 0, width: scaledPageWidth, height: scaledHeight });
+        applyFillToShape(rectoBg, spread.recto.backgroundFill, '#ffffff', scaledPageWidth, scaledHeight, imageLoadPromises);
+        layer.add(rectoBg);
+      }
+      // Render recto items (offset by page width)
+      if (spread.recto.items) {
+        for (const item of spread.recto.items) {
+          const node = createRenderNode(item, width, SCALE_FACTOR, imageLoadPromises);
+          if (node) { applyItemShadow(node, item, SCALE_FACTOR); layer.add(node); }
+        }
+      }
+    }
+
+    await Promise.all(imageLoadPromises);
+    layer.draw();
+
+    const dataUrl = stage.toDataURL({ mimeType: 'image/png', pixelRatio: 1 });
+    const blob = await dataUrlToBlob(dataUrl);
+
+    // Name based on pages in spread
+    const versoNum = spread.verso?.pageNumber;
+    const rectoNum = spread.recto?.pageNumber;
+    const filename = versoNum && rectoNum
+      ? `spread-${versoNum}-${rectoNum}.png`
+      : versoNum
+        ? `spread-${versoNum}.png`
+        : `spread-${rectoNum}.png`;
+
+    env.downloadFile(filename, blob);
+    stage.destroy();
+  } finally {
+    document.body.removeChild(container);
+  }
+}
+
+/**
+ * Replace spread content with an image fitted to spread dimensions
+ * The image spans the full spread width (2x page width)
+ * Verso gets the left half, recto gets the right half
+ */
+export async function replaceSpreadWithImage(pageNumber: number, file: File): Promise<void> {
+  const spread = findSpread(pageNumber);
+  if (!spread) return;
+
+  const { width, height } = getPageDimensions();
+
+  // Read file as base64
+  const content = await new Promise<string>((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(',')[1];
+      resolve(base64);
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // Add file to project
+  const projectFile = {
+    id: crypto.randomUUID(),
+    name: file.name,
+    type: 'image' as const,
+    content,
+    isBase64: true,
+    lastModified: file.lastModified,
+  };
+  appState.addFiles([projectFile]);
+
+  // The spread image is 2x page width, so each page shows half
+  // Verso: x=0, shows left half (0 to width)
+  // Recto: x=-width, shows right half (width to 2*width)
+
+  // For verso (left half of image)
+  if (spread.verso) {
+    const versoPageNum = spread.verso.pageNumber;
+    if (spread.verso.items) {
+      for (const item of [...spread.verso.items]) {
+        appState.deleteItemFromPage(versoPageNum, item.id);
+      }
+    }
+
+    // Image positioned at origin, width is 2x page width
+    // Page bounds clip to show left half
+    const versoImage: ImagePageItem = {
+      id: crypto.randomUUID(),
+      type: 'image',
+      x: 0,
+      y: 0,
+      width: width * 2, // Full spread width
+      height,
+      rotation: 0,
+      opacity: 1,
+      imageFileId: projectFile.id,
+    };
+
+    appState.addItemToPage(versoPageNum, versoImage);
+  }
+
+  // For recto (right half of image)
+  if (spread.recto) {
+    const rectoPageNum = spread.recto.pageNumber;
+    if (spread.recto.items) {
+      for (const item of [...spread.recto.items]) {
+        appState.deleteItemFromPage(rectoPageNum, item.id);
+      }
+    }
+
+    // Image positioned at -width, so right half (width to 2*width) is visible
+    const rectoImage: ImagePageItem = {
+      id: crypto.randomUUID(),
+      type: 'image',
+      x: -width, // Offset so right half is visible
+      y: 0,
+      width: width * 2, // Full spread width
+      height,
+      rotation: 0,
+      opacity: 1,
+      imageFileId: projectFile.id,
+    };
+
+    appState.addItemToPage(rectoPageNum, rectoImage);
+  }
+}
