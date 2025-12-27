@@ -78,6 +78,15 @@ export const defaultFontOptions: FontOptions = {
     fontStyle: 'italic',
     color: '#555555',
   },
+  // Inline styles for Obsidian-flavored markdown
+  highlight: {
+    textColor: '#000000',
+    backgroundColor: '#ffff00',
+  },
+  strikethrough: {
+    textColor: '#888888',
+    lineColor: '#888888',
+  },
 };
 
 export const defaultHeaderFooter: HeaderFooterOptions = {

@@ -262,6 +262,19 @@ export interface FontStyle {
   color: string;
   textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
   letterSpacing?: number;
+  lineHeight?: number; // Line height multiplier (e.g., 1.5), optional per-element override
+}
+
+// Inline style for highlighted text (Obsidian ==text== syntax)
+export interface HighlightStyle {
+  textColor: string;
+  backgroundColor: string;
+}
+
+// Inline style for strikethrough text (~~text~~ syntax)
+export interface StrikethroughStyle {
+  textColor: string;
+  lineColor: string;
 }
 
 export interface FontOptions {
@@ -274,6 +287,9 @@ export interface FontOptions {
   h6: FontStyle;
   code: FontStyle;
   blockquote: FontStyle;
+  // Inline styles for Obsidian-flavored markdown
+  highlight?: HighlightStyle;
+  strikethrough?: StrikethroughStyle;
 }
 
 export interface HeaderFooterContent {
