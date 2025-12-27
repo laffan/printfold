@@ -341,6 +341,26 @@ Static spreads exist independently of Markdown content:
 4. **Crossing Items**: Items can extend across page boundaries, including across signatures
 5. **Export**: Items render correctly with proper clipping at page boundaries
 6. **Navigation**: Thumbnails are grouped by signature with visual outlines
+7. **Download/Replace**: Static pages can be exported as PNG for external editing and replaced with images
+8. **Delete**: Static pages can be deleted to restore them to text flow
+
+### Page Export
+
+Static pages can be exported and replaced for external editing:
+
+**Download Options (in Selected tab for static pages):**
+- **Page as PNG (300 DPI)**: Exports the current page at print quality
+- **Spread as PNG (300 DPI)**: Exports both pages in the visual spread (only shown when both pages are static)
+
+**Replace Options:**
+- **Replace Page**: Upload an image to replace all content on the current page
+- **Replace Spread**: Upload an image to replace content across both pages (only shown when both pages are static)
+
+**Blank Templates (in Output tab):**
+- **Single Page (PNG)**: Downloads a blank page-sized template at 300 DPI
+- **Full Spread (PNG)**: Downloads a blank spread-sized template at 300 DPI
+
+This workflow enables external editing in tools like Photoshop or Procreate, then re-importing the edited content.
 
 ### Cross-Page Items
 
@@ -476,6 +496,7 @@ src/
 │   │   ├── dimensions.ts     # Size calculations
 │   │   └── imposition.ts     # Print imposition
 │   ├── pageRenderer.ts       # Konva-based page pre-rendering for PDF
+│   ├── pageExport.ts         # Page/spread PNG export and image replacement
 │   ├── pdfGenerator.ts       # Re-exports from pdfGenerator/
 │   ├── pdfGenerator/         # Modular PDF generation
 │   │   ├── index.ts
@@ -558,6 +579,7 @@ npm run build       # Production build
 |---------|-------|
 | Text Layout | `textFlow/` (parsing, measurement, pagination, imposition) |
 | PDF Export | `pdfGenerator/`, `pageRenderer.ts` (pre-rendering, fonts, images, itemDrawing) |
+| Page Export | `pageExport.ts` (PNG export, image replacement for static pages) |
 | Canvas Editor | `SpreadEditor/component.ts`, `SpreadEditor/items/` |
 | State Management | `state/` (AppStateCore + method extensions) |
 | Page Items | `SpreadEditor/items/`, `OptionsPanel/editPage/` |

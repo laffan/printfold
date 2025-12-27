@@ -34,6 +34,8 @@ Contains:
 - **Edit Selected Section** - Properties for selected items (position, size, type-specific options)
 - **Effects Section** - Fill, stroke, shadow, and array effects
 - **Page Background Section** - Background fill for static pages
+- **Download / Replace Section** - Export and replace static page content (static pages only)
+- **Delete Static Page** - Remove static page and restore to text flow (static pages only)
 
 ### Styles Tab
 
@@ -60,6 +62,7 @@ Contains:
 Contains:
 - **Sheet & Booklet Section** - Paper size, booklet size, signatures
 - **Creep Compensation** - Adjustment for paper thickness in signatures
+- **Download Blanks Section** - Export blank page/spread templates for external editing
 
 ## Main Class (`component.ts`)
 
@@ -201,6 +204,13 @@ function createDebouncer() {
 | `opt-custom-height` | Number | Custom height in current unit |
 | `opt-pages-per-sig` | Select | Pages per signature (4, 8, 12, 16, 20, 24) |
 | `opt-fill-space` | Checkbox | Fill available space mode |
+
+### Download Blanks
+
+| Button | Description |
+|--------|-------------|
+| `btn-download-blank-page` | Downloads blank page PNG at 300 DPI |
+| `btn-download-blank-spread` | Downloads blank spread PNG at 300 DPI |
 
 ### Setup
 
@@ -383,6 +393,26 @@ Dimensions are multiplicative (e.g., 3×2 = 6 total copies). The array uses Konv
 ### Delete Button
 
 Removes selected item from page.
+
+### Download / Replace Section
+
+Shown only when a static page is selected. Allows exporting and replacing page content for external editing.
+
+**Download Options:**
+| Button | Description |
+|--------|-------------|
+| Page as PNG (300 DPI) | Exports current page at print quality |
+| Spread as PNG (300 DPI) | Exports both pages in visual spread (only shown when both pages are static) |
+
+**Replace Options:**
+| Button | Description |
+|--------|-------------|
+| Replace Page | Upload image to replace all content on current page |
+| Replace Spread | Upload image to replace content across both pages (only shown when both pages are static) |
+
+### Delete Static Page
+
+Button shown at bottom of Selected tab for static pages. Removes all content from the page and restores it to text flow, allowing markdown content to flow into the space.
 
 ## CSS Classes
 
