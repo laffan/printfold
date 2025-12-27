@@ -12,6 +12,7 @@ import type { ProjectFile } from '../types';
 export class FilePreview {
   private container!: HTMLElement;
   private filenameSpan!: HTMLElement;
+  private downloadBtn!: HTMLButtonElement;
   private editor: EditorView | null = null;
   private currentFile: ProjectFile | null = null;
   private updateTimeout: number | null = null;
@@ -19,6 +20,10 @@ export class FilePreview {
   mount(): void {
     this.container = document.getElementById('file-preview')!;
     this.filenameSpan = document.getElementById('preview-filename')!;
+    this.downloadBtn = document.getElementById('btn-download-file') as HTMLButtonElement;
+
+    // Setup download button handler
+    this.downloadBtn.addEventListener('click', () => this.downloadCurrentFile());
 
     // Listen for file selection from FileList
     // This is connected through App component
@@ -30,10 +35,12 @@ export class FilePreview {
 
     if (!file) {
       this.showPlaceholder();
+      this.downloadBtn.style.display = 'none';
       return;
     }
 
     this.filenameSpan.textContent = file.name;
+    this.downloadBtn.style.display = 'inline-flex';
 
     switch (file.type) {
       case 'markdown':
@@ -238,6 +245,45 @@ export class FilePreview {
       if (updatedFile && updatedFile.content !== this.editor?.state.doc.toString()) {
         this.showFile(updatedFile);
       }
+    }
+  }
+
+  private downloadCurrentFile(): void {
+    if (!this.currentFile) return;
+
+    let content: string;
+    let mimeType: string;
+    const filename = this.currentFile.name;
+
+    if (this.currentFile.type === 'markdown') {
+      // For markdown, get the current content from the editor (includes any edits)
+      content = this.editor?.state.doc.toString() || this.currentFile.content;
+      mimeType = 'text/markdown';
+
+      const blob = new Blob([content], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else if (this.currentFile.type === 'image' && this.currentFile.isBase64) {
+      // For images, decode base64
+      const ext = filename.split('.').pop()?.toLowerCase() || 'png';
+      mimeType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+
+      const binary = atob(this.currentFile.content);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
     }
   }
 }

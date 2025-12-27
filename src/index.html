@@ -28,10 +28,6 @@
     <main class="app-main">
       <!-- Column 1: Input -->
       <section class="column column-input">
-        <div class="column-header">
-          <h2>Input</h2>
-        </div>
-
         <!-- File List -->
         <div class="panel panel-files">
           <div class="panel-header">
@@ -47,8 +43,8 @@
         <!-- File Preview / Editor -->
         <div class="panel panel-preview">
           <div class="panel-header collapsible">
-            <h3>Preview</h3>
             <span id="preview-filename" class="filename"></span>
+            <button id="btn-download-file" class="btn btn-icon btn-small" title="Download file" style="display: none;">↓</button>
             <span class="collapse-icon">▼</span>
           </div>
           <div id="file-preview" class="file-preview">
@@ -65,7 +61,6 @@
       <!-- Column 2: Editor / Preview -->
       <section class="column column-editor">
         <div class="column-header">
-          <h2>Booklet</h2>
           <div class="tabs" role="tablist">
             <button class="tab active" role="tab" data-tab="editor" aria-selected="true">Editor</button>
             <button class="tab" role="tab" data-tab="preview" aria-selected="false">Preview</button>
@@ -154,6 +149,11 @@
         <div class="options-tab-content">
           <!-- Selected Tab -->
           <div id="tab-selected" class="tab-panel active">
+            <!-- Selected Page Info (condensed) -->
+            <div id="selected-page-section" class="selected-page-info-bar" style="display: none;">
+              <span id="selected-page-summary">Page 1 | Left (verso) | Static</span>
+            </div>
+
             <!-- Multi-select Align & Distribute Controls -->
             <div id="multi-select-controls" class="options-section" style="display: none;">
               <h4 class="section-header">Align & Distribute</h4>
@@ -491,28 +491,6 @@
                 <span id="info-sheets" class="info-value">0</span>
               </div>
 
-              <!-- Selected Page Info -->
-              <div id="selected-page-section" class="selected-page-section" style="display: none;">
-                <div class="section-divider"></div>
-                <div class="info-item">
-                  <span class="info-label">Selected:</span>
-                  <span id="selected-page-number" class="info-value">–</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Position:</span>
-                  <span id="selected-page-position" class="info-value">–</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Type:</span>
-                  <span id="selected-page-type" class="info-value">–</span>
-                </div>
-                <div id="static-page-actions" class="page-actions" style="display: none;">
-                  <button id="btn-delete-page" class="btn btn-secondary btn-small btn-danger">Delete Page</button>
-                </div>
-                <div id="normal-page-actions" class="page-actions" style="display: none;">
-                  <button id="btn-add-blank-after" class="btn btn-secondary btn-small">Add Blank Page After</button>
-                </div>
-              </div>
             </div>
 
             <div class="options-section">

@@ -9,39 +9,7 @@ import { appState } from '../../services/state';
  * Set up the selected page panel event handlers
  */
 export function setupSelectedPagePanel(): void {
-  // Delete page button (for blank/static pages)
-  document.getElementById('btn-delete-page')?.addEventListener('click', () => {
-    const editorState = appState.getEditor();
-    if (editorState.selectedPageNumber !== null) {
-      appState.removeBlankPage(editorState.selectedPageNumber);
-      // Clear selection
-      appState.updateEditor({ selectedPageNumber: null, selectedPagePosition: null });
-    }
-  });
-
-  // Add blank page after button (for content pages)
-  document.getElementById('btn-add-blank-after')?.addEventListener('click', () => {
-    const editorState = appState.getEditor();
-    if (editorState.selectedPageNumber !== null) {
-      const afterPageNumber = editorState.selectedPageNumber;
-      appState.addBlankPage(afterPageNumber);
-
-      // Auto-select the new blank page
-      // The new blank page is inserted after the current page, so it's afterPageNumber + 1
-      const newPageNumber = afterPageNumber + 1;
-      // Odd pages are recto, even pages are verso
-      const newPosition = newPageNumber % 2 === 1 ? 'recto' : 'verso';
-      appState.updateEditor({
-        selectedPageNumber: newPageNumber,
-        selectedPagePosition: newPosition,
-      });
-
-      // Dispatch event to navigate to the new page's spread
-      window.dispatchEvent(new CustomEvent('navigate-to-page', {
-        detail: { pageNumber: newPageNumber }
-      }));
-    }
-  });
+  // No additional setup needed - page info is now display-only
 }
 
 /**
@@ -51,8 +19,9 @@ export function updateSelectedPagePanel(): void {
   const editorState = appState.getEditor();
   const project = appState.getProject();
   const section = document.getElementById('selected-page-section');
+  const summaryEl = document.getElementById('selected-page-summary');
 
-  if (!section) return;
+  if (!section || !summaryEl) return;
 
   // Hide section if no page selected
   if (editorState.selectedPageNumber === null || editorState.selectedPagePosition === null) {
@@ -80,26 +49,11 @@ export function updateSelectedPagePanel(): void {
     if (selectedPage) break;
   }
 
-  // Update info
-  document.getElementById('selected-page-number')!.textContent =
-    editorState.selectedPageNumber.toString();
-  document.getElementById('selected-page-position')!.textContent =
-    editorState.selectedPagePosition === 'verso' ? 'Left (verso)' : 'Right (recto)';
-
-  // Determine page type and show appropriate actions
-  const staticActions = document.getElementById('static-page-actions')!;
-  const normalActions = document.getElementById('normal-page-actions')!;
-
-  // Blank pages are considered "static" from user's perspective
+  // Determine page type
   const isBlankOrStatic = selectedPage?.isBlank || selectedPage?.isStatic;
+  const pageType = isBlankOrStatic ? 'Static' : 'Content';
+  const position = editorState.selectedPagePosition === 'verso' ? 'Left (verso)' : 'Right (recto)';
 
-  if (isBlankOrStatic) {
-    document.getElementById('selected-page-type')!.textContent = 'Blank';
-    staticActions.style.display = 'flex';
-    normalActions.style.display = 'none';
-  } else {
-    document.getElementById('selected-page-type')!.textContent = 'Content';
-    staticActions.style.display = 'none';
-    normalActions.style.display = 'flex';
-  }
+  // Update condensed summary: "Page 2 | Left (verso) | Static"
+  summaryEl.textContent = `Page ${editorState.selectedPageNumber} | ${position} | ${pageType}`;
 }

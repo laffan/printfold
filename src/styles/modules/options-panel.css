@@ -514,6 +514,15 @@
   margin-top: 8px;
 }
 
+/* Condensed selected page info bar at top of Selected tab */
+.selected-page-info-bar {
+  padding: 8px 10px;
+  margin-bottom: 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
 .section-divider {
   height: 1px;
   background: var(--color-border);
