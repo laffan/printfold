@@ -46,12 +46,10 @@ function detectUsedStyles(): DetectedStyles {
     hasStrikethrough: false,
   };
 
-  // If there are markdown files, we have body text
   if (markdownFiles.length > 0) {
     result.hasBody = true;
   }
 
-  // Scan sections from all signatures
   for (const sig of project.signatures) {
     for (const spread of sig.spreads) {
       const pages = [spread.verso, spread.recto].filter(Boolean);
@@ -67,25 +65,16 @@ function detectUsedStyles(): DetectedStyles {
               else if (section.level === 5) result.hasH5 = true;
               else if (section.level === 6) result.hasH6 = true;
               break;
-            case 'paragraph':
-              result.hasBody = true;
-              break;
-            case 'list':
-              result.hasList = true;
-              break;
-            case 'code':
-              result.hasCode = true;
-              break;
-            case 'blockquote':
-              result.hasBlockquote = true;
-              break;
+            case 'paragraph': result.hasBody = true; break;
+            case 'list': result.hasList = true; break;
+            case 'code': result.hasCode = true; break;
+            case 'blockquote': result.hasBlockquote = true; break;
           }
         }
       }
     }
   }
 
-  // Also scan raw markdown for elements that might not be in sections yet
   for (const file of markdownFiles) {
     const content = file.content;
     if (/^# /m.test(content)) result.hasH1 = true;
@@ -97,12 +86,87 @@ function detectUsedStyles(): DetectedStyles {
     if (/^[\*\-\+] /m.test(content) || /^\d+\. /m.test(content)) result.hasList = true;
     if (/```/.test(content) || /^    /m.test(content)) result.hasCode = true;
     if (/^> /m.test(content)) result.hasBlockquote = true;
-    // Detect Obsidian-flavored markdown: highlight (==text==) and strikethrough (~~text~~)
     if (/==.+?==/.test(content)) result.hasHighlight = true;
     if (/~~.+?~~/.test(content)) result.hasStrikethrough = true;
   }
 
   return result;
+}
+
+/**
+ * Generate standard text formatting controls HTML
+ * Standard layout:
+ * - Row 1: Font dropdown
+ * - Row 2: Size, Line Height, Letter Spacing
+ * - Row 3: Color, Alignment (L/C/R), Style (B/I), Background
+ */
+function generateTextFormatControls(prefix: string, options: {
+  showAlignment?: boolean;
+  showBackground?: boolean;
+  showLetterSpacing?: boolean;
+} = {}): string {
+  const { showAlignment = true, showBackground = true, showLetterSpacing = true } = options;
+
+  return `
+    <div class="form-group">
+      <label>Font</label>
+      <select id="${prefix}-font"></select>
+    </div>
+    <div class="form-group inline-sizes">
+      <label>
+        <span>Size</span>
+        <div class="input-with-cap">
+          <input type="number" id="${prefix}-size" min="6" max="72" step="1">
+          <span class="input-cap" data-for="${prefix}-size">pt</span>
+        </div>
+      </label>
+      <label>
+        <span>Line Ht</span>
+        <div class="input-with-cap">
+          <input type="number" id="${prefix}-line-height" min="0.8" max="3" step="0.05">
+          <span class="input-cap" data-for="${prefix}-line-height">×</span>
+        </div>
+      </label>
+      ${showLetterSpacing ? `
+      <label>
+        <span>Spacing</span>
+        <div class="input-with-cap">
+          <input type="number" id="${prefix}-letter-spacing" min="-2" max="10" step="0.1">
+          <span class="input-cap" data-for="${prefix}-letter-spacing">px</span>
+        </div>
+      </label>
+      ` : ''}
+    </div>
+    <div class="form-group style-controls-row">
+      <label>
+        <span>Color</span>
+        <input type="color" id="${prefix}-color">
+      </label>
+      ${showAlignment ? `
+      <div class="control-group">
+        <span>Align</span>
+        <div class="btn-group">
+          <button id="${prefix}-align-left" class="btn btn-icon btn-small" title="Left">◀</button>
+          <button id="${prefix}-align-center" class="btn btn-icon btn-small" title="Center">●</button>
+          <button id="${prefix}-align-right" class="btn btn-icon btn-small" title="Right">▶</button>
+        </div>
+      </div>
+      ` : ''}
+      <div class="control-group">
+        <span>Style</span>
+        <div class="btn-group">
+          <button id="${prefix}-bold" class="btn btn-icon btn-small" title="Bold"><b>B</b></button>
+          <button id="${prefix}-italic" class="btn btn-icon btn-small" title="Italic"><i>I</i></button>
+        </div>
+      </div>
+      ${showBackground ? `
+      <label>
+        <span>Bg</span>
+        <input type="color" id="${prefix}-background">
+      </label>
+      ` : ''}
+    </div>
+  `;
 }
 
 /**
@@ -113,30 +177,7 @@ function createBodySection(): HTMLElement {
   section.className = 'options-section';
   section.innerHTML = `
     <h4 class="section-header">Body Text</h4>
-    <div class="form-group">
-      <label>Font Family</label>
-      <select id="dyn-font-body"></select>
-    </div>
-    <div class="form-group inline-sizes">
-      <label>
-        <span>Size</span>
-        <div class="input-with-cap">
-          <input type="number" id="dyn-font-size-body" min="6" max="24" step="1">
-          <span class="input-cap" data-for="dyn-font-size-body">pt</span>
-        </div>
-      </label>
-      <label>
-        <span>Line Height</span>
-        <div class="input-with-cap">
-          <input type="number" id="dyn-line-height-body" min="0.8" max="3" step="0.05">
-          <span class="input-cap" data-for="dyn-line-height-body">×</span>
-        </div>
-      </label>
-      <label>
-        <span>Color</span>
-        <input type="color" id="dyn-color-body">
-      </label>
-    </div>
+    ${generateTextFormatControls('dyn-body')}
   `;
   return section;
 }
@@ -150,85 +191,72 @@ function createHeadingsSection(styles: DetectedStyles): HTMLElement {
 
   // Build size inputs for only detected heading levels
   const sizeInputs: string[] = [];
-  if (styles.hasH1) sizeInputs.push('<label><span>H1</span><div class="input-with-cap"><input type="number" id="dyn-font-size-h1" min="12" max="72" step="1"><span class="input-cap" data-for="dyn-font-size-h1">pt</span></div></label>');
-  if (styles.hasH2) sizeInputs.push('<label><span>H2</span><div class="input-with-cap"><input type="number" id="dyn-font-size-h2" min="10" max="48" step="1"><span class="input-cap" data-for="dyn-font-size-h2">pt</span></div></label>');
-  if (styles.hasH3) sizeInputs.push('<label><span>H3</span><div class="input-with-cap"><input type="number" id="dyn-font-size-h3" min="8" max="36" step="1"><span class="input-cap" data-for="dyn-font-size-h3">pt</span></div></label>');
-  if (styles.hasH4) sizeInputs.push('<label><span>H4</span><div class="input-with-cap"><input type="number" id="dyn-font-size-h4" min="8" max="24" step="1"><span class="input-cap" data-for="dyn-font-size-h4">pt</span></div></label>');
-  if (styles.hasH5) sizeInputs.push('<label><span>H5</span><div class="input-with-cap"><input type="number" id="dyn-font-size-h5" min="6" max="18" step="1"><span class="input-cap" data-for="dyn-font-size-h5">pt</span></div></label>');
-  if (styles.hasH6) sizeInputs.push('<label><span>H6</span><div class="input-with-cap"><input type="number" id="dyn-font-size-h6" min="6" max="16" step="1"><span class="input-cap" data-for="dyn-font-size-h6">pt</span></div></label>');
+  if (styles.hasH1) sizeInputs.push('<label><span>H1</span><div class="input-with-cap"><input type="number" id="dyn-heading-size-h1" min="12" max="72" step="1"><span class="input-cap" data-for="dyn-heading-size-h1">pt</span></div></label>');
+  if (styles.hasH2) sizeInputs.push('<label><span>H2</span><div class="input-with-cap"><input type="number" id="dyn-heading-size-h2" min="10" max="48" step="1"><span class="input-cap" data-for="dyn-heading-size-h2">pt</span></div></label>');
+  if (styles.hasH3) sizeInputs.push('<label><span>H3</span><div class="input-with-cap"><input type="number" id="dyn-heading-size-h3" min="8" max="36" step="1"><span class="input-cap" data-for="dyn-heading-size-h3">pt</span></div></label>');
+  if (styles.hasH4) sizeInputs.push('<label><span>H4</span><div class="input-with-cap"><input type="number" id="dyn-heading-size-h4" min="8" max="24" step="1"><span class="input-cap" data-for="dyn-heading-size-h4">pt</span></div></label>');
+  if (styles.hasH5) sizeInputs.push('<label><span>H5</span><div class="input-with-cap"><input type="number" id="dyn-heading-size-h5" min="6" max="18" step="1"><span class="input-cap" data-for="dyn-heading-size-h5">pt</span></div></label>');
+  if (styles.hasH6) sizeInputs.push('<label><span>H6</span><div class="input-with-cap"><input type="number" id="dyn-heading-size-h6" min="6" max="16" step="1"><span class="input-cap" data-for="dyn-heading-size-h6">pt</span></div></label>');
 
   section.innerHTML = `
     <h4 class="section-header">Headings</h4>
     <div class="form-group">
-      <label>Font Family</label>
-      <select id="dyn-font-headings"></select>
+      <label>Font</label>
+      <select id="dyn-heading-font"></select>
     </div>
     <div class="form-group inline-sizes">
       ${sizeInputs.join('')}
     </div>
     <div class="form-group inline-sizes">
       <label>
-        <span>Line Height</span>
+        <span>Line Ht</span>
         <div class="input-with-cap">
-          <input type="number" id="dyn-line-height-headings" min="0.8" max="3" step="0.05">
-          <span class="input-cap" data-for="dyn-line-height-headings">×</span>
+          <input type="number" id="dyn-heading-line-height" min="0.8" max="3" step="0.05">
+          <span class="input-cap" data-for="dyn-heading-line-height">×</span>
         </div>
       </label>
       <label>
+        <span>Spacing</span>
+        <div class="input-with-cap">
+          <input type="number" id="dyn-heading-letter-spacing" min="-2" max="10" step="0.1">
+          <span class="input-cap" data-for="dyn-heading-letter-spacing">px</span>
+        </div>
+      </label>
+    </div>
+    <div class="form-group style-controls-row">
+      <label>
         <span>Color</span>
-        <input type="color" id="dyn-color-headings">
+        <input type="color" id="dyn-heading-color">
       </label>
-      <label class="checkbox-label" style="align-self: end; padding-bottom: 6px;">
-        <input type="checkbox" id="dyn-headings-bold">
-        <span>Bold</span>
-      </label>
+      <div class="control-group">
+        <span>Align</span>
+        <div class="btn-group">
+          <button id="dyn-heading-align-left" class="btn btn-icon btn-small" title="Left">◀</button>
+          <button id="dyn-heading-align-center" class="btn btn-icon btn-small" title="Center">●</button>
+          <button id="dyn-heading-align-right" class="btn btn-icon btn-small" title="Right">▶</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <span>Style</span>
+        <div class="btn-group">
+          <button id="dyn-heading-bold" class="btn btn-icon btn-small" title="Bold"><b>B</b></button>
+          <button id="dyn-heading-italic" class="btn btn-icon btn-small" title="Italic"><i>I</i></button>
+        </div>
+      </div>
     </div>
   `;
   return section;
 }
 
 /**
- * Create blockquote style section with full text formatting
+ * Create blockquote style section
  */
 function createBlockquoteSection(): HTMLElement {
   const section = document.createElement('div');
   section.className = 'options-section';
   section.innerHTML = `
     <h4 class="section-header">Blockquote</h4>
-    <div class="form-group">
-      <label>Font Family</label>
-      <select id="dyn-font-blockquote"></select>
-    </div>
-    <div class="form-group inline-sizes">
-      <label>
-        <span>Size</span>
-        <div class="input-with-cap">
-          <input type="number" id="dyn-font-size-blockquote" min="6" max="24" step="1">
-          <span class="input-cap" data-for="dyn-font-size-blockquote">pt</span>
-        </div>
-      </label>
-      <label>
-        <span>Line Height</span>
-        <div class="input-with-cap">
-          <input type="number" id="dyn-line-height-blockquote" min="0.8" max="3" step="0.05">
-          <span class="input-cap" data-for="dyn-line-height-blockquote">×</span>
-        </div>
-      </label>
-      <label>
-        <span>Color</span>
-        <input type="color" id="dyn-color-blockquote">
-      </label>
-    </div>
-    <div class="form-group" style="display: flex; gap: 16px;">
-      <label class="checkbox-label">
-        <input type="checkbox" id="dyn-blockquote-italic">
-        <span>Italic</span>
-      </label>
-      <label class="checkbox-label">
-        <input type="checkbox" id="dyn-blockquote-bold">
-        <span>Bold</span>
-      </label>
-    </div>
+    ${generateTextFormatControls('dyn-blockquote')}
   `;
   return section;
 }
@@ -282,38 +310,18 @@ function createStrikethroughSection(): HTMLElement {
  */
 function createHeaderFooterSection(type: 'header' | 'footer'): HTMLElement {
   const label = type === 'header' ? 'Header' : 'Footer';
+  const prefix = `dyn-${type}`;
   const section = document.createElement('div');
   section.className = 'options-section';
   section.innerHTML = `
     <h4 class="section-header">${label} Text</h4>
-    <div class="form-group">
-      <label>Font Family</label>
-      <select id="dyn-${type}-font"></select>
-    </div>
-    <div class="form-group inline-sizes">
-      <label>
-        <span>Size</span>
-        <div class="input-with-cap">
-          <input type="number" id="dyn-${type}-font-size" min="6" max="24" step="1">
-          <span class="input-cap" data-for="dyn-${type}-font-size">pt</span>
-        </div>
-      </label>
-      <label>
-        <span>Color</span>
-        <input type="color" id="dyn-${type}-color">
-      </label>
-      <label class="checkbox-label" style="align-self: end; padding-bottom: 6px;">
-        <input type="checkbox" id="dyn-${type}-bold">
-        <span>Bold</span>
-      </label>
-    </div>
+    ${generateTextFormatControls(prefix, { showBackground: false, showLetterSpacing: false })}
   `;
   return section;
 }
 
 /**
  * Set up draggable caps for dynamic inputs
- * This needs to be called after dynamic sections are created
  */
 function setupDynamicDraggableCaps(): void {
   const caps = document.querySelectorAll('#styles-content .input-cap[data-for]');
@@ -326,7 +334,6 @@ function setupDynamicDraggableCaps(): void {
     const input = document.getElementById(inputId) as HTMLInputElement;
     if (!input) return;
 
-    // Check if already has drag listener
     if (capElement.dataset.dragSetup) return;
     capElement.dataset.dragSetup = 'true';
 
@@ -341,27 +348,23 @@ function setupDynamicDraggableCaps(): void {
       startValue = parseFloat(input.value) || 0;
       capElement.classList.add('dragging');
       document.body.style.cursor = 'ew-resize';
-
       document.addEventListener('mousemove', onMouseMove);
       document.addEventListener('mouseup', onMouseUp);
     };
 
     const onMouseMove = (e: MouseEvent) => {
       if (!isDragging) return;
-
       const deltaX = e.clientX - startX;
       const step = parseFloat(input.step) || 0.1;
       const sensitivity = step * 2;
       const deltaValue = deltaX * sensitivity;
       let newValue = startValue + deltaValue;
 
-      // Apply min/max constraints
       const min = parseFloat(input.min);
       const max = parseFloat(input.max);
       if (!isNaN(min)) newValue = Math.max(min, newValue);
       if (!isNaN(max)) newValue = Math.min(max, newValue);
 
-      // Round to step precision
       const precision = step < 1 ? Math.ceil(-Math.log10(step)) : 0;
       newValue = parseFloat(newValue.toFixed(precision));
 
@@ -382,77 +385,146 @@ function setupDynamicDraggableCaps(): void {
 }
 
 /**
- * Set up input handlers for style options
+ * Set up standard text format handlers for a section
+ */
+function setupTextFormatHandlers(
+  prefix: string,
+  getStyle: () => { fontSize: number; lineHeight?: number; letterSpacing?: number; color: string; fontWeight: string; fontStyle: string; textAlign?: string; backgroundColor?: string },
+  updateStyle: (updates: Partial<ReturnType<typeof getStyle>>) => void
+): void {
+  // Size
+  const sizeInput = document.getElementById(`${prefix}-size`) as HTMLInputElement;
+  if (sizeInput) {
+    sizeInput.value = getStyle().fontSize.toString();
+    sizeInput.addEventListener('input', () => {
+      const value = parseFloat(sizeInput.value);
+      if (!isNaN(value)) updateStyle({ fontSize: value });
+    });
+  }
+
+  // Line Height
+  const lineHeightInput = document.getElementById(`${prefix}-line-height`) as HTMLInputElement;
+  if (lineHeightInput) {
+    lineHeightInput.value = (getStyle().lineHeight || appState.getProject().layoutOptions.lineHeight || 1.5).toString();
+    lineHeightInput.addEventListener('input', () => {
+      const value = parseFloat(lineHeightInput.value);
+      if (!isNaN(value)) updateStyle({ lineHeight: value });
+    });
+  }
+
+  // Letter Spacing
+  const letterSpacingInput = document.getElementById(`${prefix}-letter-spacing`) as HTMLInputElement;
+  if (letterSpacingInput) {
+    letterSpacingInput.value = (getStyle().letterSpacing || 0).toString();
+    letterSpacingInput.addEventListener('input', () => {
+      const value = parseFloat(letterSpacingInput.value);
+      if (!isNaN(value)) updateStyle({ letterSpacing: value });
+    });
+  }
+
+  // Color
+  const colorInput = document.getElementById(`${prefix}-color`) as HTMLInputElement;
+  if (colorInput) {
+    colorInput.value = getStyle().color || '#000000';
+    colorInput.addEventListener('input', () => updateStyle({ color: colorInput.value }));
+  }
+
+  // Background
+  const bgInput = document.getElementById(`${prefix}-background`) as HTMLInputElement;
+  if (bgInput) {
+    bgInput.value = getStyle().backgroundColor || '#ffffff';
+    bgInput.addEventListener('input', () => updateStyle({ backgroundColor: bgInput.value }));
+  }
+
+  // Alignment buttons
+  const alignments = ['left', 'center', 'right'] as const;
+  alignments.forEach(align => {
+    const btn = document.getElementById(`${prefix}-align-${align}`);
+    if (btn) {
+      if (getStyle().textAlign === align) btn.classList.add('active');
+      btn.addEventListener('click', () => {
+        alignments.forEach(a => document.getElementById(`${prefix}-align-${a}`)?.classList.remove('active'));
+        btn.classList.add('active');
+        updateStyle({ textAlign: align });
+      });
+    }
+  });
+
+  // Bold button
+  const boldBtn = document.getElementById(`${prefix}-bold`);
+  if (boldBtn) {
+    if (getStyle().fontWeight === 'bold') boldBtn.classList.add('active');
+    boldBtn.addEventListener('click', () => {
+      const isActive = boldBtn.classList.toggle('active');
+      updateStyle({ fontWeight: isActive ? 'bold' : 'normal' });
+    });
+  }
+
+  // Italic button
+  const italicBtn = document.getElementById(`${prefix}-italic`);
+  if (italicBtn) {
+    if (getStyle().fontStyle === 'italic') italicBtn.classList.add('active');
+    italicBtn.addEventListener('click', () => {
+      const isActive = italicBtn.classList.toggle('active');
+      updateStyle({ fontStyle: isActive ? 'italic' : 'normal' });
+    });
+  }
+}
+
+/**
+ * Set up all input handlers
  */
 function setupInputHandlers(): void {
-  const fontOptions = appState.getProject().fontOptions;
-
-  // Body text handlers
-  const bodySizeInput = document.getElementById('dyn-font-size-body') as HTMLInputElement;
-  const bodyColorInput = document.getElementById('dyn-color-body') as HTMLInputElement;
-  const bodyLineHeightInput = document.getElementById('dyn-line-height-body') as HTMLInputElement;
-
-  if (bodySizeInput) {
-    bodySizeInput.value = fontOptions.body.fontSize.toString();
-    bodySizeInput.addEventListener('input', () => {
-      const value = parseFloat(bodySizeInput.value);
-      if (!isNaN(value)) {
-        const fonts = appState.getProject().fontOptions;
-        appState.updateFontOptions({ body: { ...fonts.body, fontSize: value } });
-      }
-    });
-  }
-
-  if (bodyColorInput) {
-    bodyColorInput.value = fontOptions.body.color || '#000000';
-    bodyColorInput.addEventListener('input', () => {
+  // Body text
+  setupTextFormatHandlers(
+    'dyn-body',
+    () => appState.getProject().fontOptions.body as any,
+    (updates) => {
       const fonts = appState.getProject().fontOptions;
-      appState.updateFontOptions({ body: { ...fonts.body, color: bodyColorInput.value } });
-    });
-  }
-
-  if (bodyLineHeightInput) {
-    bodyLineHeightInput.value = (appState.getProject().layoutOptions.lineHeight || 1.5).toString();
-    bodyLineHeightInput.addEventListener('input', () => {
-      const value = parseFloat(bodyLineHeightInput.value);
-      if (!isNaN(value)) {
-        appState.updateLayoutOptions({ lineHeight: value });
+      appState.updateFontOptions({ body: { ...fonts.body, ...updates } });
+      // Also update layout line height if it changes
+      if (updates.lineHeight !== undefined) {
+        appState.updateLayoutOptions({ lineHeight: updates.lineHeight });
       }
-    });
-  }
+    }
+  );
 
-  // Heading handlers
+  // Headings
   setupHeadingHandlers();
 
-  // Blockquote handlers
-  setupBlockquoteHandlers();
+  // Blockquote
+  setupTextFormatHandlers(
+    'dyn-blockquote',
+    () => appState.getProject().fontOptions.blockquote as any,
+    (updates) => {
+      const fonts = appState.getProject().fontOptions;
+      appState.updateFontOptions({ blockquote: { ...fonts.blockquote, ...updates } });
+    }
+  );
 
-  // Highlight handlers
+  // Highlight
   setupHighlightHandlers();
 
-  // Strikethrough handlers
+  // Strikethrough
   setupStrikethroughHandlers();
 
-  // Header handlers
+  // Header/Footer
   setupHeaderFooterHandlers('header');
-
-  // Footer handlers
   setupHeaderFooterHandlers('footer');
 }
 
 /**
- * Set up heading input handlers
+ * Set up heading handlers (special case with per-level sizes)
  */
 function setupHeadingHandlers(): void {
   const fontOptions = appState.getProject().fontOptions;
-
-  // Heading size handlers
   const headingLevels = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const;
+
+  // Per-level size inputs
   for (const level of headingLevels) {
-    const sizeInput = document.getElementById(`dyn-font-size-${level}`) as HTMLInputElement;
+    const sizeInput = document.getElementById(`dyn-heading-size-${level}`) as HTMLInputElement;
     if (sizeInput) {
-      const levelFont = fontOptions[level];
-      sizeInput.value = levelFont.fontSize.toString();
+      sizeInput.value = fontOptions[level].fontSize.toString();
       sizeInput.addEventListener('input', () => {
         const value = parseFloat(sizeInput.value);
         if (!isNaN(value)) {
@@ -463,129 +535,84 @@ function setupHeadingHandlers(): void {
     }
   }
 
-  // Heading line height handler (shared across all heading levels)
-  const lineHeightInput = document.getElementById('dyn-line-height-headings') as HTMLInputElement;
+  // Shared controls
+  const sharedProps = ['lineHeight', 'letterSpacing', 'color', 'textAlign', 'fontWeight', 'fontStyle'] as const;
+
+  // Line Height
+  const lineHeightInput = document.getElementById('dyn-heading-line-height') as HTMLInputElement;
   if (lineHeightInput) {
-    // Use H1's line height as the representative value, fall back to layout default
     lineHeightInput.value = (fontOptions.h1.lineHeight || appState.getProject().layoutOptions.lineHeight || 1.5).toString();
     lineHeightInput.addEventListener('input', () => {
       const value = parseFloat(lineHeightInput.value);
-      if (!isNaN(value)) {
-        const fonts = appState.getProject().fontOptions;
-        appState.updateFontOptions({
-          h1: { ...fonts.h1, lineHeight: value },
-          h2: { ...fonts.h2, lineHeight: value },
-          h3: { ...fonts.h3, lineHeight: value },
-          h4: { ...fonts.h4, lineHeight: value },
-          h5: { ...fonts.h5, lineHeight: value },
-          h6: { ...fonts.h6, lineHeight: value },
-        });
-      }
+      if (!isNaN(value)) updateAllHeadings({ lineHeight: value });
     });
   }
 
-  // Heading color handler
-  const headingColorInput = document.getElementById('dyn-color-headings') as HTMLInputElement;
-  if (headingColorInput) {
-    headingColorInput.value = fontOptions.h1.color || '#000000';
-    headingColorInput.addEventListener('input', () => {
-      const fonts = appState.getProject().fontOptions;
-      const color = headingColorInput.value;
-      appState.updateFontOptions({
-        h1: { ...fonts.h1, color },
-        h2: { ...fonts.h2, color },
-        h3: { ...fonts.h3, color },
-        h4: { ...fonts.h4, color },
-        h5: { ...fonts.h5, color },
-        h6: { ...fonts.h6, color },
-      });
+  // Letter Spacing
+  const letterSpacingInput = document.getElementById('dyn-heading-letter-spacing') as HTMLInputElement;
+  if (letterSpacingInput) {
+    letterSpacingInput.value = (fontOptions.h1.letterSpacing || 0).toString();
+    letterSpacingInput.addEventListener('input', () => {
+      const value = parseFloat(letterSpacingInput.value);
+      if (!isNaN(value)) updateAllHeadings({ letterSpacing: value });
     });
   }
 
-  // Heading bold handler
-  const boldCheckbox = document.getElementById('dyn-headings-bold') as HTMLInputElement;
-  if (boldCheckbox) {
-    boldCheckbox.checked = fontOptions.h1.fontWeight === 'bold';
-    boldCheckbox.addEventListener('change', () => {
-      const fonts = appState.getProject().fontOptions;
-      const fontWeight = boldCheckbox.checked ? 'bold' : 'normal';
-      appState.updateFontOptions({
-        h1: { ...fonts.h1, fontWeight },
-        h2: { ...fonts.h2, fontWeight },
-        h3: { ...fonts.h3, fontWeight },
-        h4: { ...fonts.h4, fontWeight },
-        h5: { ...fonts.h5, fontWeight },
-        h6: { ...fonts.h6, fontWeight },
-      });
-    });
-  }
-}
-
-/**
- * Set up blockquote input handlers
- */
-function setupBlockquoteHandlers(): void {
-  const fontOptions = appState.getProject().fontOptions;
-
-  const sizeInput = document.getElementById('dyn-font-size-blockquote') as HTMLInputElement;
-  const lineHeightInput = document.getElementById('dyn-line-height-blockquote') as HTMLInputElement;
-  const colorInput = document.getElementById('dyn-color-blockquote') as HTMLInputElement;
-  const italicCheckbox = document.getElementById('dyn-blockquote-italic') as HTMLInputElement;
-  const boldCheckbox = document.getElementById('dyn-blockquote-bold') as HTMLInputElement;
-
-  if (sizeInput) {
-    sizeInput.value = fontOptions.blockquote.fontSize.toString();
-    sizeInput.addEventListener('input', () => {
-      const value = parseFloat(sizeInput.value);
-      if (!isNaN(value)) {
-        const fonts = appState.getProject().fontOptions;
-        appState.updateFontOptions({ blockquote: { ...fonts.blockquote, fontSize: value } });
-      }
-    });
-  }
-
-  if (lineHeightInput) {
-    lineHeightInput.value = (fontOptions.blockquote.lineHeight || appState.getProject().layoutOptions.lineHeight || 1.5).toString();
-    lineHeightInput.addEventListener('input', () => {
-      const value = parseFloat(lineHeightInput.value);
-      if (!isNaN(value)) {
-        const fonts = appState.getProject().fontOptions;
-        appState.updateFontOptions({ blockquote: { ...fonts.blockquote, lineHeight: value } });
-      }
-    });
-  }
-
+  // Color
+  const colorInput = document.getElementById('dyn-heading-color') as HTMLInputElement;
   if (colorInput) {
-    colorInput.value = fontOptions.blockquote.color || '#555555';
-    colorInput.addEventListener('input', () => {
-      const fonts = appState.getProject().fontOptions;
-      appState.updateFontOptions({ blockquote: { ...fonts.blockquote, color: colorInput.value } });
+    colorInput.value = fontOptions.h1.color || '#000000';
+    colorInput.addEventListener('input', () => updateAllHeadings({ color: colorInput.value }));
+  }
+
+  // Alignment
+  const alignments = ['left', 'center', 'right'] as const;
+  alignments.forEach(align => {
+    const btn = document.getElementById(`dyn-heading-align-${align}`);
+    if (btn) {
+      btn.addEventListener('click', () => {
+        alignments.forEach(a => document.getElementById(`dyn-heading-align-${a}`)?.classList.remove('active'));
+        btn.classList.add('active');
+        updateAllHeadings({ textAlign: align } as any);
+      });
+    }
+  });
+
+  // Bold
+  const boldBtn = document.getElementById('dyn-heading-bold');
+  if (boldBtn) {
+    if (fontOptions.h1.fontWeight === 'bold') boldBtn.classList.add('active');
+    boldBtn.addEventListener('click', () => {
+      const isActive = boldBtn.classList.toggle('active');
+      updateAllHeadings({ fontWeight: isActive ? 'bold' : 'normal' });
     });
   }
 
-  if (italicCheckbox) {
-    italicCheckbox.checked = fontOptions.blockquote.fontStyle === 'italic';
-    italicCheckbox.addEventListener('change', () => {
-      const fonts = appState.getProject().fontOptions;
-      appState.updateFontOptions({
-        blockquote: { ...fonts.blockquote, fontStyle: italicCheckbox.checked ? 'italic' : 'normal' }
-      });
+  // Italic
+  const italicBtn = document.getElementById('dyn-heading-italic');
+  if (italicBtn) {
+    if (fontOptions.h1.fontStyle === 'italic') italicBtn.classList.add('active');
+    italicBtn.addEventListener('click', () => {
+      const isActive = italicBtn.classList.toggle('active');
+      updateAllHeadings({ fontStyle: isActive ? 'italic' : 'normal' });
     });
   }
 
-  if (boldCheckbox) {
-    boldCheckbox.checked = fontOptions.blockquote.fontWeight === 'bold';
-    boldCheckbox.addEventListener('change', () => {
-      const fonts = appState.getProject().fontOptions;
-      appState.updateFontOptions({
-        blockquote: { ...fonts.blockquote, fontWeight: boldCheckbox.checked ? 'bold' : 'normal' }
-      });
+  function updateAllHeadings(updates: Partial<typeof fontOptions.h1>) {
+    const fonts = appState.getProject().fontOptions;
+    appState.updateFontOptions({
+      h1: { ...fonts.h1, ...updates },
+      h2: { ...fonts.h2, ...updates },
+      h3: { ...fonts.h3, ...updates },
+      h4: { ...fonts.h4, ...updates },
+      h5: { ...fonts.h5, ...updates },
+      h6: { ...fonts.h6, ...updates },
     });
   }
 }
 
 /**
- * Set up highlight input handlers
+ * Set up highlight handlers
  */
 function setupHighlightHandlers(): void {
   const fontOptions = appState.getProject().fontOptions;
@@ -598,9 +625,7 @@ function setupHighlightHandlers(): void {
     textColorInput.value = highlight.textColor;
     textColorInput.addEventListener('input', () => {
       const fonts = appState.getProject().fontOptions;
-      appState.updateFontOptions({
-        highlight: { ...fonts.highlight!, textColor: textColorInput.value }
-      });
+      appState.updateFontOptions({ highlight: { ...fonts.highlight!, textColor: textColorInput.value } });
     });
   }
 
@@ -608,15 +633,13 @@ function setupHighlightHandlers(): void {
     bgColorInput.value = highlight.backgroundColor;
     bgColorInput.addEventListener('input', () => {
       const fonts = appState.getProject().fontOptions;
-      appState.updateFontOptions({
-        highlight: { ...fonts.highlight!, backgroundColor: bgColorInput.value }
-      });
+      appState.updateFontOptions({ highlight: { ...fonts.highlight!, backgroundColor: bgColorInput.value } });
     });
   }
 }
 
 /**
- * Set up strikethrough input handlers
+ * Set up strikethrough handlers
  */
 function setupStrikethroughHandlers(): void {
   const fontOptions = appState.getProject().fontOptions;
@@ -629,9 +652,7 @@ function setupStrikethroughHandlers(): void {
     textColorInput.value = strikethrough.textColor;
     textColorInput.addEventListener('input', () => {
       const fonts = appState.getProject().fontOptions;
-      appState.updateFontOptions({
-        strikethrough: { ...fonts.strikethrough!, textColor: textColorInput.value }
-      });
+      appState.updateFontOptions({ strikethrough: { ...fonts.strikethrough!, textColor: textColorInput.value } });
     });
   }
 
@@ -639,67 +660,38 @@ function setupStrikethroughHandlers(): void {
     lineColorInput.value = strikethrough.lineColor;
     lineColorInput.addEventListener('input', () => {
       const fonts = appState.getProject().fontOptions;
-      appState.updateFontOptions({
-        strikethrough: { ...fonts.strikethrough!, lineColor: lineColorInput.value }
-      });
+      appState.updateFontOptions({ strikethrough: { ...fonts.strikethrough!, lineColor: lineColorInput.value } });
     });
   }
 }
 
 /**
- * Set up header/footer input handlers
+ * Set up header/footer handlers
  */
 function setupHeaderFooterHandlers(type: 'header' | 'footer'): void {
-  const headerFooter = appState.getProject().headerFooter;
-  const config = headerFooter[type];
+  const prefix = `dyn-${type}`;
 
-  const sizeInput = document.getElementById(`dyn-${type}-font-size`) as HTMLInputElement;
-  const colorInput = document.getElementById(`dyn-${type}-color`) as HTMLInputElement;
-  const boldCheckbox = document.getElementById(`dyn-${type}-bold`) as HTMLInputElement;
-
-  if (sizeInput) {
-    sizeInput.value = (config.font.fontSize || 10).toString();
-    sizeInput.addEventListener('input', () => {
-      const value = parseFloat(sizeInput.value);
-      if (!isNaN(value)) {
-        const hf = appState.getProject().headerFooter;
-        appState.updateHeaderFooter({
-          [type]: { ...hf[type], font: { ...hf[type].font, fontSize: value } }
-        });
-      }
-    });
-  }
-
-  if (colorInput) {
-    colorInput.value = config.font.color || '#666666';
-    colorInput.addEventListener('input', () => {
+  setupTextFormatHandlers(
+    prefix,
+    () => appState.getProject().headerFooter[type].font as any,
+    (updates) => {
       const hf = appState.getProject().headerFooter;
       appState.updateHeaderFooter({
-        [type]: { ...hf[type], font: { ...hf[type].font, color: colorInput.value } }
+        [type]: { ...hf[type], font: { ...hf[type].font, ...updates } }
       });
-    });
-  }
-
-  if (boldCheckbox) {
-    boldCheckbox.checked = config.font.fontWeight === 'bold';
-    boldCheckbox.addEventListener('change', () => {
-      const hf = appState.getProject().headerFooter;
-      appState.updateHeaderFooter({
-        [type]: { ...hf[type], font: { ...hf[type].font, fontWeight: boldCheckbox.checked ? 'bold' : 'normal' } }
-      });
-    });
-  }
+    }
+  );
 }
 
 /**
- * Set up font dropdowns for style sections
+ * Set up font dropdowns
  */
 function setupFontDropdowns(): void {
   const fontOptions = appState.getProject().fontOptions;
   const headerFooter = appState.getProject().headerFooter;
 
-  // Body font dropdown
-  const bodyDropdown = createFontDropdown('dyn-font-body', (value) => {
+  // Body
+  const bodyDropdown = createFontDropdown('dyn-body-font', (value) => {
     const fonts = appState.getProject().fontOptions;
     appState.updateFontOptions({ body: { ...fonts.body, fontFamily: value } });
   });
@@ -708,8 +700,8 @@ function setupFontDropdowns(): void {
     dynamicFontDropdowns.set('body', bodyDropdown);
   }
 
-  // Headings font dropdown
-  const headingsDropdown = createFontDropdown('dyn-font-headings', (value) => {
+  // Headings
+  const headingsDropdown = createFontDropdown('dyn-heading-font', (value) => {
     const fonts = appState.getProject().fontOptions;
     appState.updateFontOptions({
       h1: { ...fonts.h1, fontFamily: value },
@@ -725,8 +717,8 @@ function setupFontDropdowns(): void {
     dynamicFontDropdowns.set('headings', headingsDropdown);
   }
 
-  // Blockquote font dropdown
-  const blockquoteDropdown = createFontDropdown('dyn-font-blockquote', (value) => {
+  // Blockquote
+  const blockquoteDropdown = createFontDropdown('dyn-blockquote-font', (value) => {
     const fonts = appState.getProject().fontOptions;
     appState.updateFontOptions({ blockquote: { ...fonts.blockquote, fontFamily: value } });
   });
@@ -735,24 +727,20 @@ function setupFontDropdowns(): void {
     dynamicFontDropdowns.set('blockquote', blockquoteDropdown);
   }
 
-  // Header font dropdown
+  // Header
   const headerDropdown = createFontDropdown('dyn-header-font', (value) => {
     const hf = appState.getProject().headerFooter;
-    appState.updateHeaderFooter({
-      header: { ...hf.header, font: { ...hf.header.font, fontFamily: value } }
-    });
+    appState.updateHeaderFooter({ header: { ...hf.header, font: { ...hf.header.font, fontFamily: value } } });
   });
   if (headerDropdown) {
     headerDropdown.setValue(headerFooter.header.font.fontFamily || 'Arial');
     dynamicFontDropdowns.set('header', headerDropdown);
   }
 
-  // Footer font dropdown
+  // Footer
   const footerDropdown = createFontDropdown('dyn-footer-font', (value) => {
     const hf = appState.getProject().headerFooter;
-    appState.updateHeaderFooter({
-      footer: { ...hf.footer, font: { ...hf.footer.font, fontFamily: value } }
-    });
+    appState.updateHeaderFooter({ footer: { ...hf.footer, font: { ...hf.footer.font, fontFamily: value } } });
   });
   if (footerDropdown) {
     footerDropdown.setValue(headerFooter.footer.font.fontFamily || 'Arial');
@@ -761,7 +749,7 @@ function setupFontDropdowns(): void {
 }
 
 /**
- * Update the Styles tab content based on current markdown content
+ * Update the Styles tab content
  */
 export function updateStylesTab(): void {
   const noMarkdownMsg = document.getElementById('styles-no-markdown');
@@ -769,28 +757,18 @@ export function updateStylesTab(): void {
 
   if (!container) return;
 
-  // Clean up old dropdowns
   dynamicFontDropdowns.forEach(dropdown => dropdown.destroy?.());
   dynamicFontDropdowns.clear();
   container.innerHTML = '';
 
   const styles = detectUsedStyles();
   const headerFooter = appState.getProject().headerFooter;
-
-  // Check if we have any markdown content
   const hasMarkdown = appState.getProject().files.some(f => f.type === 'markdown');
 
   if (!hasMarkdown) {
     if (noMarkdownMsg) noMarkdownMsg.style.display = 'block';
-
-    // Still show header/footer if enabled
-    if (headerFooter.header.enabled) {
-      container.appendChild(createHeaderFooterSection('header'));
-    }
-    if (headerFooter.footer.enabled) {
-      container.appendChild(createHeaderFooterSection('footer'));
-    }
-
+    if (headerFooter.header.enabled) container.appendChild(createHeaderFooterSection('header'));
+    if (headerFooter.footer.enabled) container.appendChild(createHeaderFooterSection('footer'));
     if (headerFooter.header.enabled || headerFooter.footer.enabled) {
       setupInputHandlers();
       setupFontDropdowns();
@@ -799,44 +777,20 @@ export function updateStylesTab(): void {
     return;
   }
 
-  // Hide the no markdown message
   if (noMarkdownMsg) noMarkdownMsg.style.display = 'none';
 
-  // Add body section if there's text content
-  if (styles.hasBody) {
-    container.appendChild(createBodySection());
-  }
+  if (styles.hasBody) container.appendChild(createBodySection());
 
-  // Add headings section if any heading level is used
   const hasAnyHeading = styles.hasH1 || styles.hasH2 || styles.hasH3 || styles.hasH4 || styles.hasH5 || styles.hasH6;
-  if (hasAnyHeading) {
-    container.appendChild(createHeadingsSection(styles));
-  }
+  if (hasAnyHeading) container.appendChild(createHeadingsSection(styles));
 
-  // Add blockquote section if blockquotes are detected
-  if (styles.hasBlockquote) {
-    container.appendChild(createBlockquoteSection());
-  }
+  if (styles.hasBlockquote) container.appendChild(createBlockquoteSection());
+  if (styles.hasHighlight) container.appendChild(createHighlightSection());
+  if (styles.hasStrikethrough) container.appendChild(createStrikethroughSection());
 
-  // Add highlight section if highlights are detected
-  if (styles.hasHighlight) {
-    container.appendChild(createHighlightSection());
-  }
+  if (headerFooter.header.enabled) container.appendChild(createHeaderFooterSection('header'));
+  if (headerFooter.footer.enabled) container.appendChild(createHeaderFooterSection('footer'));
 
-  // Add strikethrough section if strikethroughs are detected
-  if (styles.hasStrikethrough) {
-    container.appendChild(createStrikethroughSection());
-  }
-
-  // Add header/footer sections if enabled
-  if (headerFooter.header.enabled) {
-    container.appendChild(createHeaderFooterSection('header'));
-  }
-  if (headerFooter.footer.enabled) {
-    container.appendChild(createHeaderFooterSection('footer'));
-  }
-
-  // Set up handlers
   setupInputHandlers();
   setupFontDropdowns();
   setupDynamicDraggableCaps();
