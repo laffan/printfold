@@ -125,6 +125,14 @@ export class PDFGenerator {
       pages.push(spread.recto);
     }
 
+    // DEBUG: Log pages array with items
+    console.log('[PDF DEBUG] Pages array:', pages.map((p, idx) => ({
+      index: idx,
+      pageNumber: p?.pageNumber,
+      hasItems: p?.items && p.items.length > 0,
+      itemCount: p?.items?.length || 0,
+    })));
+
     const rowsPerSheet = calculateSpreadRowsPerSheet(
       sheetSize,
       pageHeight,
@@ -155,6 +163,20 @@ export class PDFGenerator {
 
         const leftPage = leftPageIndex >= 0 && leftPageIndex < pages.length ? pages[leftPageIndex] : null;
         const rightPage = rightPageIndex >= 0 && rightPageIndex < pages.length ? pages[rightPageIndex] : null;
+
+        // DEBUG: Log page lookup for pages with items
+        if (leftPage?.items?.length || rightPage?.items?.length) {
+          console.log('[PDF DEBUG] Front sheet page lookup:', {
+            impositionLeft: sheet.front.left,
+            impositionRight: sheet.front.right,
+            leftPageIndex,
+            rightPageIndex,
+            leftPageNum: leftPage?.pageNumber,
+            rightPageNum: rightPage?.pageNumber,
+            leftHasItems: leftPage?.items?.length || 0,
+            rightHasItems: rightPage?.items?.length || 0,
+          });
+        }
 
         if (leftPage) {
           const info = spreadForPage.get(leftPage.pageNumber);
