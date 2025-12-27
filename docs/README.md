@@ -118,10 +118,11 @@ Creates print-ready PDFs with booklet imposition.
 - PDF document creation
 - Booklet imposition layout
 - Multi-row sheet support
-- Page content rendering
+- Page content rendering (text and items)
 - Header/footer generation
 - Print marks (cut lines, fold indicators)
-- Cross-page item clipping
+- Cross-page item rendering with proper clipping
+- Pre-rendering items via Konva for gradient/font support
 
 **Quick Reference:**
 ```typescript
@@ -336,13 +337,23 @@ Static spreads exist independently of Markdown content:
 
 1. **Creating**: Click "+ Signature" (adds a full signature worth of spreads) or "+ Page" buttons
 2. **Items**: Add text, shapes, images to static pages (including the back cover)
-3. **Spanning**: Items can bridge across verso and recto
-4. **Export**: Items render correctly with cross-page clipping
-5. **Navigation**: Thumbnails are grouped by signature with visual outlines
+3. **Spanning**: Items can bridge across verso and recto within a spread
+4. **Crossing Items**: Items can extend across page boundaries, including across signatures
+5. **Export**: Items render correctly with proper clipping at page boundaries
+6. **Navigation**: Thumbnails are grouped by signature with visual outlines
+
+### Cross-Page Items
+
+Items that extend past page boundaries are handled specially:
+
+- **Pre-rendering**: Items are pre-rendered using Konva for proper gradient, font, and shadow support
+- **Clipping**: Each page clips items to its boundaries using Konva canvas clipping
+- **Cross-signature**: Items can bridge pages across different signatures (e.g., page 4 to page 5)
+- **Reading order**: Adjacent pages are determined by reading order (page ±1), not physical sheet position
 
 ### Page Items
 
-Items can be placed on static/blank pages:
+Items can be placed on any page type (static, available, or text pages):
 
 | Type | Properties |
 |------|------------|
@@ -452,6 +463,7 @@ src/
 │   │   ├── signatures.ts     # Signature creation
 │   │   ├── dimensions.ts     # Size calculations
 │   │   └── imposition.ts     # Print imposition
+│   ├── pageRenderer.ts       # Konva-based page pre-rendering for PDF
 │   ├── pdfGenerator.ts       # Re-exports from pdfGenerator/
 │   ├── pdfGenerator/         # Modular PDF generation
 │   │   ├── index.ts
@@ -460,7 +472,7 @@ src/
 │   │   ├── textUtils.ts
 │   │   ├── colors.ts
 │   │   ├── fonts.ts
-│   │   ├── images.ts
+│   │   ├── images.ts         # Pre-rendering orchestration
 │   │   ├── printMarks.ts
 │   │   └── itemDrawing.ts
 │   ├── googleFonts.ts
@@ -533,11 +545,12 @@ npm run build       # Production build
 | Feature | Files |
 |---------|-------|
 | Text Layout | `textFlow/` (parsing, measurement, pagination, imposition) |
-| PDF Export | `pdfGenerator/` (fonts, images, printMarks, itemDrawing) |
+| PDF Export | `pdfGenerator/`, `pageRenderer.ts` (pre-rendering, fonts, images, itemDrawing) |
 | Canvas Editor | `SpreadEditor/component.ts`, `SpreadEditor/items/` |
 | State Management | `state/` (AppStateCore + method extensions) |
 | Page Items | `SpreadEditor/items/`, `OptionsPanel/editPage/` |
 | Fills/Gradients | `FillPicker/` (colorTab, gradientTab, patternTab) |
+| Cross-page Items | `pageRenderer.ts`, `pdfGenerator/images.ts`, `pdfGenerator/itemDrawing.ts` |
 | Fonts | `googleFonts.ts`, `OptionsPanel/fontOptions.ts` |
 | Project I/O | `zipHandler.ts` |
 | Settings UI | `OptionsPanel/` |

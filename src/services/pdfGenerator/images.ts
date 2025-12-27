@@ -157,14 +157,6 @@ export async function preRenderStaticPages(
         // (the pre-rendered image will be overlaid on top of text content)
         if (isTextPage) {
           if (hasOwnItems || hasCrossingItems) {
-            console.log('[PRERENDER DEBUG] Adding TEXT page to render (items overlay):', {
-              pageNum: page.pageNumber,
-              pageState: page.pageState,
-              isRecto: page.isRecto,
-              hasOwnItems,
-              hasCrossingItems,
-              adjacentPageNum: adjacentPage?.pageNumber,
-            });
             pagesToRender.push({ page, adjacentPage });
           }
           continue;
@@ -176,14 +168,6 @@ export async function preRenderStaticPages(
         const hasOwnContent = page.items?.length || page.backgroundFill;
 
         if (hasOwnContent || hasCrossingItems) {
-          console.log('[PRERENDER DEBUG] Adding page to render:', {
-            pageNum: page.pageNumber,
-            pageState: page.pageState,
-            isRecto: page.isRecto,
-            hasOwnContent,
-            hasCrossingItems,
-            adjacentPageNum: adjacentPage?.pageNumber,
-          });
           pagesToRender.push({ page, adjacentPage });
         }
       }
