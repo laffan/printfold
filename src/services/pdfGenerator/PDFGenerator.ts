@@ -226,6 +226,22 @@ export class PDFGenerator {
                                  pageContent.pageState === 'available' ||
                                  pageContent.isBlank || pageContent.isStatic;
 
+    // DEBUG: Log page state info for pages with items
+    if (hasItems) {
+      console.log(`[PDF DEBUG] Page ${pageContent.pageNumber}:`, {
+        pageState: pageContent.pageState,
+        isBlank: pageContent.isBlank,
+        isStatic: pageContent.isStatic,
+        hasItems,
+        itemCount: pageContent.items?.length,
+        isTextPage,
+        isStaticOrAvailable,
+        sectionsCount: pageContent.sections?.length,
+        willEnterStaticPath: !isTextPage && (hasItems || hasBackground || isStaticOrAvailable),
+        hasPreRenderedImage: this.renderedPageCache.has(pageContent.pageNumber),
+      });
+    }
+
     // For static/blank pages with items or background, use pre-rendered image if available
     if (!isTextPage && (hasItems || hasBackground || isStaticOrAvailable)) {
       const preRenderedImage = this.renderedPageCache.get(pageContent.pageNumber);
