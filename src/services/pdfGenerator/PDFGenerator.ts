@@ -256,7 +256,8 @@ export class PDFGenerator {
     }) || [];
     if (hasItems || adjCrossingItems.length > 0) {
       console.log('[CROSSING DEBUG] Drawing page', pageContent.pageNumber, {
-        isRecto,
+        physicalIsRecto: isRecto,
+        readingOrderIsRecto: pageContent.isRecto,
         pageState: pageContent.pageState,
         hasItems,
         itemCount: pageContent.items?.length || 0,
@@ -283,7 +284,8 @@ export class PDFGenerator {
       if (pageContent.items && pageContent.items.length > 0) {
         drawPageItemsClipped(pdfPage, pageContent.items, x, y, width, height, 0, width, this.fontCache, this.imageCache);
       }
-      this.drawCrossingItems(pdfPage, adjacentPage, x, y, width, height, isRecto);
+      // Use reading-order position (pageContent.isRecto) not physical sheet position for crossing items
+      this.drawCrossingItems(pdfPage, adjacentPage, x, y, width, height, pageContent.isRecto);
       this.drawSpanningItems(pdfPage, spreadSpanningItems, x, y, width, height, isRecto);
       return;
     }
@@ -415,7 +417,8 @@ export class PDFGenerator {
     }
 
     // Draw crossing items from adjacent pages
-    this.drawCrossingItems(pdfPage, adjacentPage, x, y, width, height, isRecto);
+    // Use reading-order position (pageContent.isRecto) not physical sheet position
+    this.drawCrossingItems(pdfPage, adjacentPage, x, y, width, height, pageContent.isRecto);
 
     // Draw spanning items
     this.drawSpanningItems(pdfPage, spreadSpanningItems, x, y, width, height, isRecto);
@@ -448,7 +451,8 @@ export class PDFGenerator {
     if (crossingItems.length > 0) {
       console.log('[CROSSING DEBUG] drawCrossingItems:', {
         adjacentPageNum: adjacentPage.pageNumber,
-        isRecto,
+        isRectoReadingOrder: isRecto,
+        offsetX: isRecto ? -width : width,
         crossingItemsCount: crossingItems.length,
         crossingItems: crossingItems.map(item => ({
           id: item.id,
