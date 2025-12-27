@@ -53,7 +53,7 @@ Dynamically generated based on markdown content:
 Contains:
 - **Info Section** - Page count, spreads, signatures, sheets
 - **Layout Section** - Margins, spacing, alignment
-- **Headers & Footers Section** - Enable/configure headers and footers
+- **Headers & Footers Section** - Enable toggles and content fields (styling in Styles tab)
 
 ### Output Tab
 
@@ -235,8 +235,8 @@ Custom `FontDropdown` components for font selection:
 |----|---------|
 | `opt-font-body` | Body text font |
 | `opt-font-h1` | Heading font |
-| `opt-header-font` | Header font |
-| `opt-footer-font` | Footer font |
+
+Note: Header/footer font settings are in the **Styles tab** (dynamically created via `stylesTab.ts`).
 
 ### Font Size Controls
 
@@ -246,8 +246,8 @@ Custom `FontDropdown` components for font selection:
 | `opt-font-size-h1` | H1 headings |
 | `opt-font-size-h2` | H2 headings |
 | `opt-font-size-h3` | H3 headings |
-| `opt-header-font-size` | Header text |
-| `opt-footer-font-size` | Footer text |
+
+Note: Header/footer font size controls are in the **Styles tab**.
 
 ### Color Controls
 
@@ -255,8 +255,8 @@ Custom `FontDropdown` components for font selection:
 |----|------------|
 | `opt-color-body` | Body text color |
 | `opt-color-headings` | All heading colors |
-| `opt-header-color` | Header text color |
-| `opt-footer-color` | Footer text color |
+
+Note: Header/footer color controls are in the **Styles tab**.
 
 ### Font Preloading
 
@@ -267,6 +267,11 @@ preloadFonts(): void {
 ```
 
 ## Header/Footer Options (`headerFooterOptions.ts`)
+
+Handles enable toggles and content fields in the **Document tab**.
+Font/size/color styling is in the **Styles tab** (see `stylesTab.ts`).
+
+Note: Header/footer content lives inside the margin area and does not affect content dimensions.
 
 ### Enable Toggles
 

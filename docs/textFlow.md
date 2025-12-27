@@ -102,7 +102,8 @@ Computes page dimensions based on:
 - Sheet size (letter, A4, legal, tabloid, A3)
 - Booklet size (half-letter, quarter-letter, custom, etc.)
 - Margins
-- Header/footer heights
+
+Note: Header/footer content lives inside the margin area and does not affect content dimensions.
 
 #### `flowSections(sections: DocumentSection[], pageDimensions): PageContent[]`
 
