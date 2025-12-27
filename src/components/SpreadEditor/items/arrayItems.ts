@@ -56,10 +56,10 @@ export function createArrayInstanceNodes(
   itemsLayer: Konva.Layer,
   transformer: Konva.Transformer,
   updateTransformerFn: () => void
-): Konva.Node[] {
+): Konva.Shape[] {
   const dimensions = item.arrayDimensions || [];
   const positions = calculateArrayPositions(dimensions);
-  const nodes: Konva.Node[] = [];
+  const nodes: Konva.Shape[] = [];
 
   // Create a node for each position
   for (let i = 0; i < positions.length; i++) {
@@ -88,7 +88,7 @@ export function createArrayInstanceNodes(
     if (node) {
       node.setAttr('arrayInstanceIndex', i);
       node.setAttr('parentItemId', item.id);
-      nodes.push(node);
+      nodes.push(node as Konva.Shape);
     }
   }
 
