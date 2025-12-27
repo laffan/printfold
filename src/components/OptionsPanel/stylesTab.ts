@@ -472,6 +472,14 @@ function setupTextFormatHandlers(
 }
 
 /**
+ * Extract only FontStyle-compatible properties from updates
+ */
+function extractFontStyleUpdates(updates: Record<string, any>): Partial<import('../../types').FontStyle> {
+  const { textAlign, backgroundColor, ...fontStyleUpdates } = updates;
+  return fontStyleUpdates;
+}
+
+/**
  * Set up all input handlers
  */
 function setupInputHandlers(): void {
@@ -481,7 +489,8 @@ function setupInputHandlers(): void {
     () => appState.getProject().fontOptions.body as any,
     (updates) => {
       const fonts = appState.getProject().fontOptions;
-      appState.updateFontOptions({ body: { ...fonts.body, ...updates } });
+      const fontUpdates = extractFontStyleUpdates(updates);
+      appState.updateFontOptions({ body: { ...fonts.body, ...fontUpdates } });
       // Also update layout line height if it changes
       if (updates.lineHeight !== undefined) {
         appState.updateLayoutOptions({ lineHeight: updates.lineHeight });
@@ -498,7 +507,8 @@ function setupInputHandlers(): void {
     () => appState.getProject().fontOptions.blockquote as any,
     (updates) => {
       const fonts = appState.getProject().fontOptions;
-      appState.updateFontOptions({ blockquote: { ...fonts.blockquote, ...updates } });
+      const fontUpdates = extractFontStyleUpdates(updates);
+      appState.updateFontOptions({ blockquote: { ...fonts.blockquote, ...fontUpdates } });
     }
   );
 
