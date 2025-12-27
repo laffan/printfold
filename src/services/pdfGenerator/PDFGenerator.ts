@@ -400,6 +400,17 @@ export class PDFGenerator {
 
     // Draw items on top of text content (for text pages with items)
     if (hasItems) {
+      console.log('[TEXT PAGE DEBUG] Drawing items on text page', pageContent.pageNumber, {
+        itemCount: pageContent.items!.length,
+        items: pageContent.items!.map(item => ({
+          id: item.id,
+          type: item.type,
+          x: item.x,
+          y: item.y,
+          width: item.width,
+          height: item.height,
+        })),
+      });
       drawPageItemsClipped(pdfPage, pageContent.items!, x, y, width, height, 0, width, this.fontCache, this.imageCache);
     }
 
