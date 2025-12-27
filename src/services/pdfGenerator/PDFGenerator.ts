@@ -61,9 +61,23 @@ export class PDFGenerator {
       pageHeight = sheetSize.height;
     }
 
+    // Build a GLOBAL page map across all signatures for reading-order adjacency
+    // This allows crossing items to work between pages in different signatures
+    const globalPageMap: Map<number, PageContent> = new Map();
+    for (const sig of project.signatures) {
+      for (const spread of sig.spreads) {
+        if (spread.verso) {
+          globalPageMap.set(spread.verso.pageNumber, spread.verso);
+        }
+        if (spread.recto) {
+          globalPageMap.set(spread.recto.pageNumber, spread.recto);
+        }
+      }
+    }
+
     // Generate imposed pages for each signature
     for (const signature of project.signatures) {
-      await this.generateSignatureSheets(pdfDoc, signature, sheetSize, pageWidth, pageHeight);
+      await this.generateSignatureSheets(pdfDoc, signature, sheetSize, pageWidth, pageHeight, globalPageMap);
     }
 
     // Calculate rows per sheet for cut marks
@@ -89,28 +103,34 @@ export class PDFGenerator {
     signature: Signature,
     sheetSize: { width: number; height: number },
     pageWidth: number,
-    pageHeight: number
+    pageHeight: number,
+    globalPageMap: Map<number, PageContent>
   ): Promise<void> {
     const project = appState.getProject();
     const imposition = textFlowEngine.calculateImposition(signature);
     const staticSpreads = project.staticSpreads || [];
 
-    // Build maps for looking up pages and spread info by page number
-    const pageByNumber: Map<number, PageContent> = new Map();
+    // Build maps for looking up spread info by page number
     const spreadForPage: Map<number, { spread: Spread; staticSpread?: import('../../types').StaticSpread }> = new Map();
 
     for (const spread of signature.spreads) {
       const staticSpread = staticSpreads.find(s => s.id === spread.id);
 
       if (spread.verso) {
-        pageByNumber.set(spread.verso.pageNumber, spread.verso);
         spreadForPage.set(spread.verso.pageNumber, { spread, staticSpread });
       }
       if (spread.recto) {
-        pageByNumber.set(spread.recto.pageNumber, spread.recto);
         spreadForPage.set(spread.recto.pageNumber, { spread, staticSpread });
       }
     }
+
+    // Helper to get reading-order adjacent page
+    // For a verso (left page), adjacent is pageNumber + 1 (the recto to its right)
+    // For a recto (right page), adjacent is pageNumber - 1 (the verso to its left)
+    const getReadingOrderAdjacent = (page: PageContent): PageContent | null => {
+      const adjacentPageNum = page.isRecto ? page.pageNumber - 1 : page.pageNumber + 1;
+      return globalPageMap.get(adjacentPageNum) || null;
+    };
 
     // DEBUG: Log spread structure
     console.log('[CROSSING DEBUG] Signature', signature.signatureNumber, 'spreads:',
@@ -138,24 +158,24 @@ export class PDFGenerator {
       sheetsInGroup.forEach((sheet, rowIndex) => {
         const rowY = sheetSize.height - (rowIndex + 1) * pageHeight;
 
-        // Look up pages by their page number directly
-        const leftPage = pageByNumber.get(sheet.front.left) || null;
-        const rightPage = pageByNumber.get(sheet.front.right) || null;
+        // Look up pages by their page number from global map
+        const leftPage = globalPageMap.get(sheet.front.left) || null;
+        const rightPage = globalPageMap.get(sheet.front.right) || null;
 
-        // Use physical sheet adjacency for crossing items:
-        // leftPage and rightPage are physically adjacent on the printed sheet
+        // Use reading-order adjacency for crossing items:
+        // Page N's adjacent is N-1 (if recto) or N+1 (if verso) in reading order
         if (leftPage) {
           const info = spreadForPage.get(leftPage.pageNumber);
           const spanningItems = info?.staticSpread?.spanningItems;
-          // Adjacent page for crossing items is the page physically next to this one on the sheet
-          this.drawPage(frontPage, leftPage, 0, rowY, pageWidth, pageHeight, project, leftPage.isRecto, rightPage, spanningItems);
+          const adjacentPage = getReadingOrderAdjacent(leftPage);
+          this.drawPage(frontPage, leftPage, 0, rowY, pageWidth, pageHeight, project, leftPage.isRecto, adjacentPage, spanningItems);
         }
 
         if (rightPage) {
           const info = spreadForPage.get(rightPage.pageNumber);
           const spanningItems = info?.staticSpread?.spanningItems;
-          // Adjacent page for crossing items is the page physically next to this one on the sheet
-          this.drawPage(frontPage, rightPage, pageWidth, rowY, pageWidth, pageHeight, project, rightPage.isRecto, leftPage, spanningItems);
+          const adjacentPage = getReadingOrderAdjacent(rightPage);
+          this.drawPage(frontPage, rightPage, pageWidth, rowY, pageWidth, pageHeight, project, rightPage.isRecto, adjacentPage, spanningItems);
         }
       });
 
@@ -165,21 +185,23 @@ export class PDFGenerator {
       sheetsInGroup.forEach((sheet, rowIndex) => {
         const rowY = sheetSize.height - (rowIndex + 1) * pageHeight;
 
-        // Look up pages by their page number directly
-        const leftPage = pageByNumber.get(sheet.back.left) || null;
-        const rightPage = pageByNumber.get(sheet.back.right) || null;
+        // Look up pages by their page number from global map
+        const leftPage = globalPageMap.get(sheet.back.left) || null;
+        const rightPage = globalPageMap.get(sheet.back.right) || null;
 
-        // Use physical sheet adjacency for crossing items
+        // Use reading-order adjacency for crossing items
         if (leftPage) {
           const info = spreadForPage.get(leftPage.pageNumber);
           const spanningItems = info?.staticSpread?.spanningItems;
-          this.drawPage(backPage, leftPage, 0, rowY, pageWidth, pageHeight, project, leftPage.isRecto, rightPage, spanningItems);
+          const adjacentPage = getReadingOrderAdjacent(leftPage);
+          this.drawPage(backPage, leftPage, 0, rowY, pageWidth, pageHeight, project, leftPage.isRecto, adjacentPage, spanningItems);
         }
 
         if (rightPage) {
           const info = spreadForPage.get(rightPage.pageNumber);
           const spanningItems = info?.staticSpread?.spanningItems;
-          this.drawPage(backPage, rightPage, pageWidth, rowY, pageWidth, pageHeight, project, rightPage.isRecto, leftPage, spanningItems);
+          const adjacentPage = getReadingOrderAdjacent(rightPage);
+          this.drawPage(backPage, rightPage, pageWidth, rowY, pageWidth, pageHeight, project, rightPage.isRecto, adjacentPage, spanningItems);
         }
       });
     }
