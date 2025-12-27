@@ -315,12 +315,36 @@ export class PDFGenerator {
       }
 
       const lines = (section as { lines?: string[] }).lines || [section.content];
+      // Use per-element textAlign if set, otherwise fall back to layoutOptions
+      const textAlign = fontStyle.textAlign || layoutOptions.textAlign || 'left';
 
       for (const line of lines) {
         if (currentY < contentY) break;
 
-        pdfPage.drawText(sanitizeText(line), {
-          x: contentX,
+        const sanitizedLine = sanitizeText(line);
+        const textWidth = font.widthOfTextAtSize(sanitizedLine, fontStyle.fontSize);
+
+        // Calculate x position based on alignment
+        let lineX = contentX;
+        if (textAlign === 'center') {
+          lineX = contentX + (contentWidth - textWidth) / 2;
+        } else if (textAlign === 'right') {
+          lineX = contentX + contentWidth - textWidth;
+        }
+
+        // Draw inline background color (highlight) if set
+        if (fontStyle.backgroundColor && fontStyle.backgroundColor !== '#ffffff') {
+          pdfPage.drawRectangle({
+            x: lineX,
+            y: currentY - fontStyle.fontSize,
+            width: textWidth,
+            height: lineHeight,
+            color: parseColor(fontStyle.backgroundColor),
+          });
+        }
+
+        pdfPage.drawText(sanitizedLine, {
+          x: lineX,
           y: currentY - fontStyle.fontSize,
           size: fontStyle.fontSize,
           font,

@@ -132,11 +132,20 @@ export function drawPageContent(
 
     // Draw text content
     const lines = (section as { lines?: string[] }).lines || [section.content];
-    const textAlign = project.layoutOptions.textAlign;
+    // Use per-element textAlign if set, otherwise fall back to layoutOptions
+    const textAlign = fontStyle.textAlign || project.layoutOptions.textAlign;
 
     for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
       const line = lines[lineIndex];
       if (currentY > y + height) break;
+
+      // Combine fontWeight and fontStyle for Konva
+      let combinedFontStyle = '';
+      if (fontStyle.fontWeight === 'bold') combinedFontStyle += 'bold';
+      if (fontStyle.fontStyle === 'italic') {
+        combinedFontStyle += (combinedFontStyle ? ' ' : '') + 'italic';
+      }
+      if (!combinedFontStyle) combinedFontStyle = 'normal';
 
       const text = new Konva.Text({
         x,
@@ -144,7 +153,7 @@ export function drawPageContent(
         text: line,
         fontSize: fontStyle.fontSize,
         fontFamily: fontStyle.fontFamily,
-        fontStyle: fontStyle.fontStyle === 'italic' ? 'italic' : 'normal',
+        fontStyle: combinedFontStyle,
         fill: fontStyle.color,
         width,
         // For justify, we need wrap enabled; for left align, disable wrap to use pre-wrapped lines
@@ -153,8 +162,18 @@ export function drawPageContent(
         ellipsis: textAlign !== 'justify',
       });
 
-      if (fontStyle.fontWeight === 'bold') {
-        text.fontStyle('bold');
+      // Draw inline background color (highlight) if set
+      if (fontStyle.backgroundColor && fontStyle.backgroundColor !== '#ffffff') {
+        const textWidth = text.width();
+        const textHeight = lineHeight;
+        const bgRect = new Konva.Rect({
+          x,
+          y: currentY,
+          width: textWidth,
+          height: textHeight,
+          fill: fontStyle.backgroundColor,
+        });
+        layer.add(bgRect);
       }
 
       layer.add(text);

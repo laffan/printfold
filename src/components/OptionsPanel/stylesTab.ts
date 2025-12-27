@@ -243,6 +243,10 @@ function createHeadingsSection(styles: DetectedStyles): HTMLElement {
           <button id="dyn-heading-italic" class="btn btn-icon btn-small" title="Italic"><i>I</i></button>
         </div>
       </div>
+      <label>
+        <span>Bg</span>
+        <input type="color" id="dyn-heading-background">
+      </label>
     </div>
   `;
   return section;
@@ -429,11 +433,11 @@ function setupTextFormatHandlers(
     colorInput.addEventListener('input', () => updateStyle({ color: colorInput.value }));
   }
 
-  // Background
+  // Background - use 'change' event to avoid premature picker closing
   const bgInput = document.getElementById(`${prefix}-background`) as HTMLInputElement;
   if (bgInput) {
     bgInput.value = getStyle().backgroundColor || '#ffffff';
-    bgInput.addEventListener('input', () => updateStyle({ backgroundColor: bgInput.value }));
+    bgInput.addEventListener('change', () => updateStyle({ backgroundColor: bgInput.value }));
   }
 
   // Alignment buttons
@@ -473,10 +477,11 @@ function setupTextFormatHandlers(
 
 /**
  * Extract only FontStyle-compatible properties from updates
+ * Note: textAlign and backgroundColor are now part of FontStyle
  */
 function extractFontStyleUpdates(updates: Record<string, any>): Partial<import('../../types').FontStyle> {
-  const { textAlign, backgroundColor, ...fontStyleUpdates } = updates;
-  return fontStyleUpdates;
+  // All properties are now valid FontStyle properties
+  return updates;
 }
 
 /**
@@ -577,13 +582,16 @@ function setupHeadingHandlers(): void {
 
   // Alignment
   const alignments = ['left', 'center', 'right'] as const;
+  const currentAlign = fontOptions.h1.textAlign || 'left';
   alignments.forEach(align => {
     const btn = document.getElementById(`dyn-heading-align-${align}`);
     if (btn) {
+      // Set initial active state
+      if (currentAlign === align) btn.classList.add('active');
       btn.addEventListener('click', () => {
         alignments.forEach(a => document.getElementById(`dyn-heading-align-${a}`)?.classList.remove('active'));
         btn.classList.add('active');
-        updateAllHeadings({ textAlign: align } as any);
+        updateAllHeadings({ textAlign: align });
       });
     }
   });
@@ -606,6 +614,13 @@ function setupHeadingHandlers(): void {
       const isActive = italicBtn.classList.toggle('active');
       updateAllHeadings({ fontStyle: isActive ? 'italic' : 'normal' });
     });
+  }
+
+  // Background color
+  const bgInput = document.getElementById('dyn-heading-background') as HTMLInputElement;
+  if (bgInput) {
+    bgInput.value = fontOptions.h1.backgroundColor || '#ffffff';
+    bgInput.addEventListener('change', () => updateAllHeadings({ backgroundColor: bgInput.value }));
   }
 
   function updateAllHeadings(updates: Partial<typeof fontOptions.h1>) {

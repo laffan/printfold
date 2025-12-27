@@ -263,6 +263,8 @@ export interface FontStyle {
   textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
   letterSpacing?: number;
   lineHeight?: number; // Line height multiplier (e.g., 1.5), optional per-element override
+  textAlign?: 'left' | 'center' | 'right' | 'justify';
+  backgroundColor?: string; // Inline background color (like a highlight)
 }
 
 // Inline style for highlighted text (Obsidian ==text== syntax)
