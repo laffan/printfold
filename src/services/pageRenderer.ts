@@ -329,6 +329,21 @@ export async function renderPageToImage(
         }
       });
 
+      if (crossingItems.length > 0) {
+        console.log('[PRERENDER DEBUG] Rendering crossing items for page', page.pageNumber, {
+          isRecto: page.isRecto,
+          adjacentPageNum: adjacentPage.pageNumber,
+          crossingItemsCount: crossingItems.length,
+          crossingItems: crossingItems.map(item => ({
+            id: item.id,
+            x: item.x,
+            width: item.width,
+            xPlusWidth: item.x + item.width,
+            pageWidth,
+          })),
+        });
+      }
+
       for (const item of crossingItems) {
         // Adjust x position for the crossing item
         const offsetX = page.isRecto ? -pageWidth : pageWidth;

@@ -112,6 +112,16 @@ export class PDFGenerator {
       }
     }
 
+    // DEBUG: Log spread structure
+    console.log('[CROSSING DEBUG] Signature', signature.signatureNumber, 'spreads:',
+      signature.spreads.map(sp => ({
+        verso: sp.verso?.pageNumber,
+        recto: sp.recto?.pageNumber,
+        versoIsRecto: sp.verso?.isRecto,
+        rectoIsRecto: sp.recto?.isRecto,
+      }))
+    );
+
     const rowsPerSheet = calculateSpreadRowsPerSheet(
       sheetSize,
       pageHeight,
@@ -212,6 +222,28 @@ export class PDFGenerator {
     const isStaticOrAvailable = pageContent.pageState === 'static' ||
                                  pageContent.pageState === 'available' ||
                                  pageContent.isBlank || pageContent.isStatic;
+
+    // DEBUG: Log page being drawn and its adjacent page
+    const adjCrossingItems = adjacentPage?.items?.filter(item => {
+      if (isRecto) {
+        return item.x + item.width > width;
+      } else {
+        return item.x < 0;
+      }
+    }) || [];
+    if (hasItems || adjCrossingItems.length > 0) {
+      console.log('[CROSSING DEBUG] Drawing page', pageContent.pageNumber, {
+        isRecto,
+        pageState: pageContent.pageState,
+        hasItems,
+        itemCount: pageContent.items?.length || 0,
+        adjacentPageNum: adjacentPage?.pageNumber,
+        adjacentPageState: adjacentPage?.pageState,
+        adjacentItemCount: adjacentPage?.items?.length || 0,
+        crossingItemsFromAdjacent: adjCrossingItems.length,
+        hasPreRendered: this.renderedPageCache.has(pageContent.pageNumber),
+      });
+    }
 
     // For static/blank pages with items or background, use pre-rendered image if available
     if (!isTextPage && (hasItems || hasBackground || isStaticOrAvailable)) {
@@ -380,6 +412,18 @@ export class PDFGenerator {
     });
 
     if (crossingItems.length > 0) {
+      console.log('[CROSSING DEBUG] drawCrossingItems:', {
+        adjacentPageNum: adjacentPage.pageNumber,
+        isRecto,
+        crossingItemsCount: crossingItems.length,
+        crossingItems: crossingItems.map(item => ({
+          id: item.id,
+          x: item.x,
+          width: item.width,
+          xPlusWidth: item.x + item.width,
+          pageWidth: width,
+        })),
+      });
       const offsetX = isRecto ? -width : width;
       drawPageItemsClipped(pdfPage, crossingItems, x, y, width, height, offsetX, width, this.fontCache, this.imageCache);
     }

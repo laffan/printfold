@@ -141,6 +141,15 @@ export async function preRenderStaticPages(
         });
 
         if (hasOwnContent || hasCrossingItems) {
+          console.log('[PRERENDER DEBUG] Adding page to render:', {
+            pageNum: page.pageNumber,
+            pageState: page.pageState,
+            isRecto: page.isRecto,
+            hasOwnContent,
+            hasCrossingItems,
+            adjacentPageNum: adjacentPage?.pageNumber,
+            adjacentPageState: adjacentPage?.pageState,
+          });
           pagesToRender.push({ page, adjacentPage: adjacentPage || null });
         }
       }
