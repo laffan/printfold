@@ -98,7 +98,8 @@ function detectUsedStyles(): DetectedStyles {
  * Standard layout:
  * - Row 1: Font dropdown
  * - Row 2: Size, Line Height, Letter Spacing
- * - Row 3: Color, Alignment (L/C/R), Style (B/I), Background
+ * - Row 3: Style buttons (B/I/U/S)
+ * - Row 4: Color, Background, Alignment
  */
 function generateTextFormatControls(prefix: string, options: {
   showAlignment?: boolean;
@@ -138,10 +139,27 @@ function generateTextFormatControls(prefix: string, options: {
       ` : ''}
     </div>
     <div class="form-group style-controls-row">
+      <div class="control-group">
+        <span>Style</span>
+        <div class="btn-group">
+          <button id="${prefix}-bold" class="btn btn-icon btn-small" title="Bold"><b>B</b></button>
+          <button id="${prefix}-italic" class="btn btn-icon btn-small" title="Italic"><i>I</i></button>
+          <button id="${prefix}-underline" class="btn btn-icon btn-small" title="Underline"><u>U</u></button>
+          <button id="${prefix}-strikethrough" class="btn btn-icon btn-small" title="Strikethrough"><s>S</s></button>
+        </div>
+      </div>
+    </div>
+    <div class="form-group style-controls-row">
       <label>
         <span>Color</span>
         <input type="color" id="${prefix}-color">
       </label>
+      ${showBackground ? `
+      <label>
+        <span>Bg</span>
+        <input type="color" id="${prefix}-background">
+      </label>
+      ` : ''}
       ${showAlignment ? `
       <div class="control-group">
         <span>Align</span>
@@ -151,19 +169,6 @@ function generateTextFormatControls(prefix: string, options: {
           <button id="${prefix}-align-right" class="btn btn-icon btn-small" title="Right">▶</button>
         </div>
       </div>
-      ` : ''}
-      <div class="control-group">
-        <span>Style</span>
-        <div class="btn-group">
-          <button id="${prefix}-bold" class="btn btn-icon btn-small" title="Bold"><b>B</b></button>
-          <button id="${prefix}-italic" class="btn btn-icon btn-small" title="Italic"><i>I</i></button>
-        </div>
-      </div>
-      ${showBackground ? `
-      <label>
-        <span>Bg</span>
-        <input type="color" id="${prefix}-background">
-      </label>
       ` : ''}
     </div>
   `;
@@ -224,9 +229,24 @@ function createHeadingsSection(styles: DetectedStyles): HTMLElement {
       </label>
     </div>
     <div class="form-group style-controls-row">
+      <div class="control-group">
+        <span>Style</span>
+        <div class="btn-group">
+          <button id="dyn-heading-bold" class="btn btn-icon btn-small" title="Bold"><b>B</b></button>
+          <button id="dyn-heading-italic" class="btn btn-icon btn-small" title="Italic"><i>I</i></button>
+          <button id="dyn-heading-underline" class="btn btn-icon btn-small" title="Underline"><u>U</u></button>
+          <button id="dyn-heading-strikethrough" class="btn btn-icon btn-small" title="Strikethrough"><s>S</s></button>
+        </div>
+      </div>
+    </div>
+    <div class="form-group style-controls-row">
       <label>
         <span>Color</span>
         <input type="color" id="dyn-heading-color">
+      </label>
+      <label>
+        <span>Bg</span>
+        <input type="color" id="dyn-heading-background">
       </label>
       <div class="control-group">
         <span>Align</span>
@@ -234,13 +254,6 @@ function createHeadingsSection(styles: DetectedStyles): HTMLElement {
           <button id="dyn-heading-align-left" class="btn btn-icon btn-small" title="Left">◀</button>
           <button id="dyn-heading-align-center" class="btn btn-icon btn-small" title="Center">●</button>
           <button id="dyn-heading-align-right" class="btn btn-icon btn-small" title="Right">▶</button>
-        </div>
-      </div>
-      <div class="control-group">
-        <span>Style</span>
-        <div class="btn-group">
-          <button id="dyn-heading-bold" class="btn btn-icon btn-small" title="Bold"><b>B</b></button>
-          <button id="dyn-heading-italic" class="btn btn-icon btn-small" title="Italic"><i>I</i></button>
         </div>
       </div>
     </div>
@@ -389,7 +402,7 @@ function setupDynamicDraggableCaps(): void {
  */
 function setupTextFormatHandlers(
   prefix: string,
-  getStyle: () => { fontSize: number; lineHeight?: number; letterSpacing?: number; color: string; fontWeight: string; fontStyle: string; textAlign?: string; backgroundColor?: string },
+  getStyle: () => { fontSize: number; lineHeight?: number; letterSpacing?: number; color: string; fontWeight: string; fontStyle: string; textAlign?: string; backgroundColor?: string; textDecoration?: string },
   updateStyle: (updates: Partial<ReturnType<typeof getStyle>>) => void
 ): void {
   // Size
@@ -429,11 +442,11 @@ function setupTextFormatHandlers(
     colorInput.addEventListener('input', () => updateStyle({ color: colorInput.value }));
   }
 
-  // Background
+  // Background - use 'change' event to avoid premature picker closing
   const bgInput = document.getElementById(`${prefix}-background`) as HTMLInputElement;
   if (bgInput) {
     bgInput.value = getStyle().backgroundColor || '#ffffff';
-    bgInput.addEventListener('input', () => updateStyle({ backgroundColor: bgInput.value }));
+    bgInput.addEventListener('change', () => updateStyle({ backgroundColor: bgInput.value }));
   }
 
   // Alignment buttons
@@ -469,14 +482,51 @@ function setupTextFormatHandlers(
       updateStyle({ fontStyle: isActive ? 'italic' : 'normal' });
     });
   }
+
+  // Underline button
+  const underlineBtn = document.getElementById(`${prefix}-underline`);
+  if (underlineBtn) {
+    const currentDeco = getStyle().textDecoration || 'none';
+    if (currentDeco.includes('underline')) underlineBtn.classList.add('active');
+    underlineBtn.addEventListener('click', () => {
+      const isActive = underlineBtn.classList.toggle('active');
+      const strikeBtn = document.getElementById(`${prefix}-strikethrough`);
+      const hasStrike = strikeBtn?.classList.contains('active');
+      updateStyle({ textDecoration: getTextDecoration(isActive, hasStrike) });
+    });
+  }
+
+  // Strikethrough button
+  const strikeBtn = document.getElementById(`${prefix}-strikethrough`);
+  if (strikeBtn) {
+    const currentDeco = getStyle().textDecoration || 'none';
+    if (currentDeco.includes('line-through')) strikeBtn.classList.add('active');
+    strikeBtn.addEventListener('click', () => {
+      const isActive = strikeBtn.classList.toggle('active');
+      const underBtn = document.getElementById(`${prefix}-underline`);
+      const hasUnderline = underBtn?.classList.contains('active');
+      updateStyle({ textDecoration: getTextDecoration(hasUnderline, isActive) });
+    });
+  }
+}
+
+/**
+ * Helper to compute textDecoration value from underline and strikethrough states
+ */
+function getTextDecoration(underline: boolean | undefined, strikethrough: boolean | undefined): 'none' | 'underline' | 'line-through' | 'underline line-through' {
+  if (underline && strikethrough) return 'underline line-through';
+  if (underline) return 'underline';
+  if (strikethrough) return 'line-through';
+  return 'none';
 }
 
 /**
  * Extract only FontStyle-compatible properties from updates
+ * Note: textAlign and backgroundColor are now part of FontStyle
  */
 function extractFontStyleUpdates(updates: Record<string, any>): Partial<import('../../types').FontStyle> {
-  const { textAlign, backgroundColor, ...fontStyleUpdates } = updates;
-  return fontStyleUpdates;
+  // All properties are now valid FontStyle properties
+  return updates;
 }
 
 /**
@@ -577,13 +627,16 @@ function setupHeadingHandlers(): void {
 
   // Alignment
   const alignments = ['left', 'center', 'right'] as const;
+  const currentAlign = fontOptions.h1.textAlign || 'left';
   alignments.forEach(align => {
     const btn = document.getElementById(`dyn-heading-align-${align}`);
     if (btn) {
+      // Set initial active state
+      if (currentAlign === align) btn.classList.add('active');
       btn.addEventListener('click', () => {
         alignments.forEach(a => document.getElementById(`dyn-heading-align-${a}`)?.classList.remove('active'));
         btn.classList.add('active');
-        updateAllHeadings({ textAlign: align } as any);
+        updateAllHeadings({ textAlign: align });
       });
     }
   });
@@ -606,6 +659,39 @@ function setupHeadingHandlers(): void {
       const isActive = italicBtn.classList.toggle('active');
       updateAllHeadings({ fontStyle: isActive ? 'italic' : 'normal' });
     });
+  }
+
+  // Underline
+  const underlineBtn = document.getElementById('dyn-heading-underline');
+  if (underlineBtn) {
+    const currentDeco = fontOptions.h1.textDecoration || 'none';
+    if (currentDeco.includes('underline')) underlineBtn.classList.add('active');
+    underlineBtn.addEventListener('click', () => {
+      const isActive = underlineBtn.classList.toggle('active');
+      const strikeBtn = document.getElementById('dyn-heading-strikethrough');
+      const hasStrike = strikeBtn?.classList.contains('active');
+      updateAllHeadings({ textDecoration: getTextDecoration(isActive, hasStrike) });
+    });
+  }
+
+  // Strikethrough
+  const strikeBtn = document.getElementById('dyn-heading-strikethrough');
+  if (strikeBtn) {
+    const currentDeco = fontOptions.h1.textDecoration || 'none';
+    if (currentDeco.includes('line-through')) strikeBtn.classList.add('active');
+    strikeBtn.addEventListener('click', () => {
+      const isActive = strikeBtn.classList.toggle('active');
+      const underBtn = document.getElementById('dyn-heading-underline');
+      const hasUnderline = underBtn?.classList.contains('active');
+      updateAllHeadings({ textDecoration: getTextDecoration(hasUnderline, isActive) });
+    });
+  }
+
+  // Background color
+  const bgInput = document.getElementById('dyn-heading-background') as HTMLInputElement;
+  if (bgInput) {
+    bgInput.value = fontOptions.h1.backgroundColor || '#ffffff';
+    bgInput.addEventListener('change', () => updateAllHeadings({ backgroundColor: bgInput.value }));
   }
 
   function updateAllHeadings(updates: Partial<typeof fontOptions.h1>) {
