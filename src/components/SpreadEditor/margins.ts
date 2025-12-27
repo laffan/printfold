@@ -190,25 +190,27 @@ export function drawMarginGuides(
   const contentWidth = dimensions.width - leftMargin - rightMargin;
   const contentX = x + leftMargin;
 
-  // Header (if enabled)
+  // Header (if enabled) - lives INSIDE the top margin area
   if (project.headerFooter.header.enabled) {
     const headerHeight = project.headerFooter.header.height;
-    const headerY = y + margins.top;
-    const headerLineY = headerY + headerHeight;
     const headerFontSize = project.headerFooter.header.font.fontSize;
+    // Header line is at the margin boundary (where content starts)
+    const headerLineY = y + margins.top;
+    // Header text sits on the line, extending upward into the margin
+    const headerTextY = headerLineY - headerFontSize - 2;
 
-    // Draw header content - text sits on the orange line (baseline at line position)
+    // Draw header content - text sits on the orange line (inside margin area)
     drawHeaderFooterContent(
       project.headerFooter.header,
       pageContent.isRecto,
       pageContent.pageNumber,
       contentX,
-      headerLineY - headerFontSize - 2, // Position text so baseline sits on line
+      headerTextY,
       contentWidth,
       layer
     );
 
-    // Draw header drag line (at bottom of header area)
+    // Draw header drag line (at margin boundary - controls how far up text extends into margin)
     const headerLine = new Konva.Line({
       points: [x, headerLineY, x + dimensions.width, headerLineY],
       stroke: headerFooterLineColor,
@@ -217,27 +219,28 @@ export function drawMarginGuides(
       hitStrokeWidth: 15,
     });
     marginLayer.add(headerLine);
-    addHeaderFooterDragHandler(headerLine, 'header', pageContent.pageNumber, headerY, zoomLevel, stage, marginLayer, isDraggingMarginRef);
+    // Pass the top of header area for drag calculations
+    addHeaderFooterDragHandler(headerLine, 'header', pageContent.pageNumber, headerLineY - headerHeight, zoomLevel, stage, marginLayer, isDraggingMarginRef);
   }
 
-  // Footer (if enabled)
+  // Footer (if enabled) - lives INSIDE the bottom margin area
   if (project.headerFooter.footer.enabled) {
     const footerHeight = project.headerFooter.footer.height;
-    const footerLineY = y + dimensions.height - margins.bottom - footerHeight;
-    const footerFontSize = project.headerFooter.footer.font.fontSize;
+    // Footer line is at the margin boundary (where content ends)
+    const footerLineY = y + dimensions.height - margins.bottom;
 
-    // Draw footer content - text sits on the orange line (just below the line)
+    // Draw footer content - text sits on the orange line (inside margin area)
     drawHeaderFooterContent(
       project.headerFooter.footer,
       pageContent.isRecto,
       pageContent.pageNumber,
       contentX,
-      footerLineY + 2, // Position text just below the line
+      footerLineY + 2, // Position text just below the line (inside margin)
       contentWidth,
       layer
     );
 
-    // Draw footer drag line (at top of footer area)
+    // Draw footer drag line (at margin boundary - controls how far down text extends into margin)
     const footerLine = new Konva.Line({
       points: [x, footerLineY, x + dimensions.width, footerLineY],
       stroke: headerFooterLineColor,
@@ -246,7 +249,8 @@ export function drawMarginGuides(
       hitStrokeWidth: 15,
     });
     marginLayer.add(footerLine);
-    addHeaderFooterDragHandler(footerLine, 'footer', pageContent.pageNumber, y + dimensions.height - margins.bottom, zoomLevel, stage, marginLayer, isDraggingMarginRef);
+    // Pass the bottom of footer area for drag calculations
+    addHeaderFooterDragHandler(footerLine, 'footer', pageContent.pageNumber, footerLineY + footerHeight, zoomLevel, stage, marginLayer, isDraggingMarginRef);
   }
 }
 
