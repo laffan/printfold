@@ -110,8 +110,8 @@ function isEntireSpreadStatic(pageNumber: number): boolean {
     pageMap.set(page.pageNumber, page);
   }
 
-  const isPageStatic = (p: import('../../../types').PageContent | undefined) =>
-    p?.pageState === 'static' || p?.isStatic;
+  const isPageStatic = (p: import('../../../types').PageContent | undefined): boolean =>
+    p?.pageState === 'static' || p?.isStatic === true;
 
   // Page 1 is recto of first spread [null|1] - only need page 1 to be static
   if (pageNumber === 1) {
