@@ -48,25 +48,6 @@ export function setupEditPropertyInputs(updateEditSelectedSectionFn: () => void)
   setupColorInput('item-stroke', 'strokeColor');
   setupPropInput('item-stroke-width', 'strokeWidth');
 
-  // Shape fill/stroke toggle handlers
-  const shapeHasFill = document.getElementById('shape-has-fill') as HTMLInputElement;
-  const shapeFillSection = document.getElementById('shape-fill-section');
-  shapeHasFill?.addEventListener('change', () => {
-    const editorState = appState.getEditor();
-    if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
-    appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { hasFill: shapeHasFill.checked });
-    if (shapeFillSection) shapeFillSection.style.display = shapeHasFill.checked ? 'block' : 'none';
-  });
-
-  const shapeHasStroke = document.getElementById('shape-has-stroke') as HTMLInputElement;
-  const shapeStrokeSection = document.getElementById('shape-stroke-section');
-  shapeHasStroke?.addEventListener('change', () => {
-    const editorState = appState.getEditor();
-    if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
-    appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { hasStroke: shapeHasStroke.checked });
-    if (shapeStrokeSection) shapeStrokeSection.style.display = shapeHasStroke.checked ? 'block' : 'none';
-  });
-
   // Text properties - use custom font dropdown
   const fontDropdown = createFontDropdown('item-font-family', (value) => {
     const editorState = appState.getEditor();
@@ -76,29 +57,6 @@ export function setupEditPropertyInputs(updateEditSelectedSectionFn: () => void)
   setItemFontDropdown(fontDropdown);
 
   setupPropInput('item-font-size', 'fontSize');
-
-  // Text fill/stroke toggle handlers
-  const textHasFill = document.getElementById('text-has-fill') as HTMLInputElement;
-  const textFillSection = document.getElementById('text-fill-section');
-  textHasFill?.addEventListener('change', () => {
-    const editorState = appState.getEditor();
-    if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
-    appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { hasFill: textHasFill.checked });
-    if (textFillSection) textFillSection.style.display = textHasFill.checked ? 'block' : 'none';
-  });
-
-  const textHasStroke = document.getElementById('text-has-stroke') as HTMLInputElement;
-  const textStrokeSection = document.getElementById('text-stroke-section');
-  textHasStroke?.addEventListener('change', () => {
-    const editorState = appState.getEditor();
-    if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
-    appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { hasStroke: textHasStroke.checked });
-    if (textStrokeSection) textStrokeSection.style.display = textHasStroke.checked ? 'block' : 'none';
-  });
-
-  // Text stroke properties
-  setupColorInput('text-stroke-color', 'strokeColor');
-  setupPropInput('text-stroke-width', 'strokeWidth');
 
   // Text align buttons
   ['left', 'center', 'right'].forEach(align => {
@@ -138,6 +96,16 @@ export function setupEditPropertyInputs(updateEditSelectedSectionFn: () => void)
   });
 
   // === Effects Section Handlers ===
+
+  // Unified fill toggle (for all item types)
+  const itemHasFill = document.getElementById('item-has-fill') as HTMLInputElement;
+  const itemFillSection = document.getElementById('item-fill-section');
+  itemHasFill?.addEventListener('change', () => {
+    const editorState = appState.getEditor();
+    if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+    appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { hasFill: itemHasFill.checked });
+    if (itemFillSection) itemFillSection.style.display = itemHasFill.checked ? 'block' : 'none';
+  });
 
   // Unified stroke toggle (for all item types)
   const itemHasStroke = document.getElementById('item-has-stroke') as HTMLInputElement;

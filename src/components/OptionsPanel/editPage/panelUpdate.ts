@@ -8,9 +8,7 @@ import {
   switchToSelectedTab,
   itemFontDropdown,
   itemFillPicker,
-  textFillPicker,
-  setItemFillPicker,
-  setTextFillPicker
+  setItemFillPicker
 } from './shared';
 import { updateMultiSelectControls } from './multiSelect';
 import { updateArrayDimensionsList, setupAddDimensionButton } from './arrayInstances';
@@ -206,55 +204,66 @@ export function updateEditSelectedSection(): void {
   updateArrayDimensionsList(item);
   setupAddDimensionButton();
 
+  // Update unified fill toggle and picker (works for both shapes and text)
+  let hasFill = true;
+  let currentFill: FillConfig;
+  let defaultFillColor = '#cccccc';
+
+  if (item.type === 'shape') {
+    const shapeItem = item as ShapePageItem;
+    const isLinear = shapeItem.shapeType === 'line' || shapeItem.shapeType === 'arrow';
+    hasFill = shapeItem.hasFill ?? !isLinear;
+    defaultFillColor = shapeItem.fillColor || '#cccccc';
+    currentFill = shapeItem.fill || { type: 'color', color: defaultFillColor };
+  } else if (item.type === 'text') {
+    const textItem = item as TextPageItem;
+    hasFill = textItem.hasFill ?? true;
+    defaultFillColor = textItem.color || '#000000';
+    currentFill = textItem.fill || { type: 'color', color: defaultFillColor };
+  } else {
+    currentFill = { type: 'color', color: defaultFillColor };
+  }
+
+  const itemHasFillCheckbox = document.getElementById('item-has-fill') as HTMLInputElement;
+  const itemFillSection = document.getElementById('item-fill-section');
+  if (itemHasFillCheckbox) itemHasFillCheckbox.checked = hasFill;
+  if (itemFillSection) itemFillSection.style.display = hasFill ? 'block' : 'none';
+
+  // Set up unified fill picker
+  const fillPickerContainer = document.getElementById('item-fill-picker');
+  if (fillPickerContainer) {
+    if (itemFillPicker) {
+      itemFillPicker.setFill(currentFill);
+    } else {
+      const picker = createFillPicker(fillPickerContainer, currentFill, (fill) => {
+        const editorState = appState.getEditor();
+        if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+
+        const currentItem = appState.getItemFromPage(editorState.selectedPageNumber, editorState.selectedItemId);
+        if (!currentItem) return;
+
+        // Update fill with backwards compatibility
+        if (currentItem.type === 'shape') {
+          appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, {
+            fill,
+            fillColor: fill.type === 'color' ? fill.color : undefined
+          });
+        } else if (currentItem.type === 'text') {
+          appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, {
+            fill,
+            color: fill.type === 'color' ? (fill.color || '#000000') : '#000000'
+          });
+        }
+      });
+      setItemFillPicker(picker);
+    }
+  }
+
   // Show/hide type-specific properties
   if (item.type === 'shape') {
     const shapeItem = item as ShapePageItem;
     shapeProps!.style.display = 'block';
     textProps!.style.display = 'none';
-
-    // Determine default fill/stroke based on shape type
-    const isLinear = shapeItem.shapeType === 'line' || shapeItem.shapeType === 'arrow';
-    const hasFill = shapeItem.hasFill ?? !isLinear;
-    const shapeHasStroke = shapeItem.hasStroke ?? true;
-
-    // Update fill toggle
-    const shapeHasFillCheckbox = document.getElementById('shape-has-fill') as HTMLInputElement;
-    const shapeFillSection = document.getElementById('shape-fill-section');
-    if (shapeHasFillCheckbox) shapeHasFillCheckbox.checked = hasFill;
-    if (shapeFillSection) shapeFillSection.style.display = hasFill ? 'block' : 'none';
-
-    // Update stroke toggle
-    const shapeHasStrokeCheckbox = document.getElementById('shape-has-stroke') as HTMLInputElement;
-    const shapeStrokeSection = document.getElementById('shape-stroke-section');
-    if (shapeHasStrokeCheckbox) shapeHasStrokeCheckbox.checked = shapeHasStroke;
-    if (shapeStrokeSection) shapeStrokeSection.style.display = shapeHasStroke ? 'block' : 'none';
-
-    // Set up fill picker
-    const fillPickerContainer = document.getElementById('item-fill-picker');
-    if (fillPickerContainer) {
-      // Get current fill, falling back to fillColor for backwards compatibility
-      const currentFill: FillConfig = shapeItem.fill || {
-        type: 'color',
-        color: shapeItem.fillColor || '#cccccc'
-      };
-
-      if (itemFillPicker) {
-        itemFillPicker.setFill(currentFill);
-      } else {
-        const picker = createFillPicker(fillPickerContainer, currentFill, (fill) => {
-          const editorState = appState.getEditor();
-          if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
-
-          // Update fill property
-          appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, {
-            fill,
-            // Also update fillColor for backwards compatibility
-            fillColor: fill.type === 'color' ? fill.color : undefined
-          });
-        });
-        setItemFillPicker(picker);
-      }
-    }
 
     setInputValue('item-stroke', shapeItem.strokeColor || '#000000');
     setInputValue('item-stroke-width', (shapeItem.strokeWidth || 1).toString());
@@ -268,51 +277,6 @@ export function updateEditSelectedSection(): void {
       itemFontDropdown.setValue(textItem.fontFamily);
     }
     setInputValue('item-font-size', textItem.fontSize.toString());
-
-    // Update fill toggle (default: true for text)
-    const hasFill = textItem.hasFill ?? true;
-    const textHasFillCheckbox = document.getElementById('text-has-fill') as HTMLInputElement;
-    const textFillSection = document.getElementById('text-fill-section');
-    if (textHasFillCheckbox) textHasFillCheckbox.checked = hasFill;
-    if (textFillSection) textFillSection.style.display = hasFill ? 'block' : 'none';
-
-    // Update stroke toggle (default: false for text)
-    const textHasStroke = textItem.hasStroke ?? false;
-    const textHasStrokeCheckbox = document.getElementById('text-has-stroke') as HTMLInputElement;
-    const textStrokeSection = document.getElementById('text-stroke-section');
-    if (textHasStrokeCheckbox) textHasStrokeCheckbox.checked = textHasStroke;
-    if (textStrokeSection) textStrokeSection.style.display = textHasStroke ? 'block' : 'none';
-
-    // Set up text fill picker
-    const textFillPickerContainer = document.getElementById('text-fill-picker');
-    if (textFillPickerContainer) {
-      // Get current fill, falling back to color for backwards compatibility
-      const currentFill: FillConfig = textItem.fill || {
-        type: 'color',
-        color: textItem.color || '#000000'
-      };
-
-      if (textFillPicker) {
-        textFillPicker.setFill(currentFill);
-      } else {
-        const picker = createFillPicker(textFillPickerContainer, currentFill, (fill) => {
-          const editorState = appState.getEditor();
-          if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
-
-          // Update fill property
-          appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, {
-            fill,
-            // Also update color for backwards compatibility
-            color: fill.type === 'color' ? (fill.color || '#000000') : '#000000'
-          });
-        });
-        setTextFillPicker(picker);
-      }
-    }
-
-    // Update stroke properties
-    setInputValue('text-stroke-color', textItem.strokeColor || '#000000');
-    setInputValue('text-stroke-width', (textItem.strokeWidth || 1).toString());
 
     // Update align button states
     ['left', 'center', 'right'].forEach(align => {
