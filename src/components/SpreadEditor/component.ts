@@ -1180,19 +1180,6 @@ export class SpreadEditor {
       dash: [8, 4],
     });
     this.layer.add(placeholder);
-
-    // Add a label indicating this is the booklet edge
-    const label = new Konva.Text({
-      x: x + width / 2,
-      y: y + height / 2,
-      text: '(outside cover)',
-      fontSize: 11,
-      fill: '#888888',
-      align: 'center',
-    });
-    label.offsetX(label.width() / 2);
-    label.offsetY(label.height() / 2);
-    this.layer.add(label);
   }
 
   private drawPageBackground(x: number, y: number, width: number, height: number, backgroundFill?: FillConfig): void {

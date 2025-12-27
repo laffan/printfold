@@ -149,6 +149,11 @@
         <div class="options-tab-content">
           <!-- Selected Tab -->
           <div id="tab-selected" class="tab-panel active">
+            <!-- Selected Page Info (condensed) -->
+            <div id="selected-page-section" class="selected-page-info-bar" style="display: none;">
+              <span id="selected-page-summary">Page 1 | Left (verso) | Static</span>
+            </div>
+
             <!-- Multi-select Align & Distribute Controls -->
             <div id="multi-select-controls" class="options-section" style="display: none;">
               <h4 class="section-header">Align & Distribute</h4>
@@ -486,28 +491,6 @@
                 <span id="info-sheets" class="info-value">0</span>
               </div>
 
-              <!-- Selected Page Info -->
-              <div id="selected-page-section" class="selected-page-section" style="display: none;">
-                <div class="section-divider"></div>
-                <div class="info-item">
-                  <span class="info-label">Selected:</span>
-                  <span id="selected-page-number" class="info-value">–</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Position:</span>
-                  <span id="selected-page-position" class="info-value">–</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Type:</span>
-                  <span id="selected-page-type" class="info-value">–</span>
-                </div>
-                <div id="static-page-actions" class="page-actions" style="display: none;">
-                  <button id="btn-delete-page" class="btn btn-secondary btn-small btn-danger">Delete Page</button>
-                </div>
-                <div id="normal-page-actions" class="page-actions" style="display: none;">
-                  <button id="btn-add-blank-after" class="btn btn-secondary btn-small">Add Blank Page After</button>
-                </div>
-              </div>
             </div>
 
             <div class="options-section">
