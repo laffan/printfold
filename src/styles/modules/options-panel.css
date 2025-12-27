@@ -218,7 +218,8 @@
   margin-bottom: 0;
 }
 
-.form-group > label {
+.form-group > label,
+.form-label {
   display: block;
   margin-bottom: 4px;
   font-size: 11px;
@@ -572,3 +573,14 @@
   font-size: 12px;
 }
 
+/* Vertical button group for download/action sections */
+.button-group-vertical {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.button-group-vertical .btn {
+  width: 100%;
+  justify-content: center;
+}

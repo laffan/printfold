@@ -5,10 +5,38 @@
  */
 
 import { appState } from '../../services/state';
-import type { PageContent } from '../../types';
+import type { PageContent, ImagePageItem } from '../../types';
 
 // Track drag state for individual pages
 let draggedPageNumber: number = -1;
+
+// Image cache for thumbnail rendering
+const imageCache = new Map<string, HTMLImageElement>();
+
+/**
+ * Preload images for thumbnail rendering
+ */
+export function preloadThumbnailImages(): void {
+  const project = appState.getProject();
+
+  for (const file of project.files) {
+    if (file.type === 'image' && !imageCache.has(file.id)) {
+      const img = new Image();
+      img.onload = () => {
+        imageCache.set(file.id, img);
+      };
+      const mimeType = file.name.endsWith('.png') ? 'image/png' : 'image/jpeg';
+      img.src = `data:${mimeType};base64,${file.content}`;
+    }
+  }
+}
+
+/**
+ * Get cached image or return null
+ */
+function getCachedImage(fileId: string): HTMLImageElement | null {
+  return imageCache.get(fileId) || null;
+}
 
 /**
  * Render all page thumbnails as visual spreads
@@ -24,6 +52,9 @@ export function renderThumbnails(
 ): void {
   const project = appState.getProject();
   const editorState = appState.getEditor();
+
+  // Preload images for thumbnail rendering
+  preloadThumbnailImages();
 
   // Clear existing thumbnails
   thumbnailContainer.innerHTML = '';
@@ -451,17 +482,20 @@ function drawPageContent(
           yPos += lineHeight + lineSpacing;
         }
       } else if (item.type === 'image') {
-        // Draw image placeholder as a light gray box with an X
-        ctx.fillStyle = '#e0e0e0';
-        ctx.fillRect(itemX, itemY, itemW, itemH);
-        ctx.strokeStyle = '#999999';
-        ctx.lineWidth = 0.5;
-        ctx.beginPath();
-        ctx.moveTo(itemX, itemY);
-        ctx.lineTo(itemX + itemW, itemY + itemH);
-        ctx.moveTo(itemX + itemW, itemY);
-        ctx.lineTo(itemX, itemY + itemH);
-        ctx.stroke();
+        const imageItem = item as ImagePageItem;
+        const cachedImg = getCachedImage(imageItem.imageFileId);
+
+        if (cachedImg) {
+          // Draw the image scaled to fit the item bounds
+          ctx.drawImage(cachedImg, itemX, itemY, itemW, itemH);
+        } else {
+          // Fallback: Draw a light gray box (no X, looks less broken)
+          ctx.fillStyle = '#f0f0f0';
+          ctx.fillRect(itemX, itemY, itemW, itemH);
+          ctx.strokeStyle = '#cccccc';
+          ctx.lineWidth = 0.5;
+          ctx.strokeRect(itemX, itemY, itemW, itemH);
+        }
       }
     }
   }
