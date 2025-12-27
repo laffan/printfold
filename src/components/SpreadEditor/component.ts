@@ -940,6 +940,8 @@ export class SpreadEditor {
     appState.updateEditor({
       selectedPageNumber: pageNumber,
       selectedPagePosition: position,
+      selectedItemId: null,
+      selectedItemIds: [],
     });
     this.render();
   }
