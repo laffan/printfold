@@ -16,6 +16,8 @@ PDFGenerator.generate()
       │
       ├──▶ Create PDFDocument
       ├──▶ Embed fonts (StandardFonts)
+      ├──▶ Build global page map (for cross-signature adjacency)
+      ├──▶ Pre-render pages with items (via Konva/pageRenderer)
       ├──▶ Embed images
       │
       ▼
@@ -24,10 +26,10 @@ For each Signature:
       ├──▶ generateSignatureSheets()
       │         │
       │         ├──▶ Front page (multiple rows if fill mode)
-      │         │         └──▶ drawPage() for each position
+      │         │         └──▶ drawPageContent() for each position
       │         │
       │         └──▶ Back page (same layout, for duplex)
-      │                   └──▶ drawPage() for each position
+      │                   └──▶ drawPageContent() for each position
       │
       └──▶ addPrintMarks()
               │
@@ -35,6 +37,29 @@ For each Signature:
       │
       ▼
   Uint8Array (PDF bytes)
+```
+
+## Pre-rendering Pipeline
+
+Items on pages are pre-rendered using Konva for high-fidelity output:
+
+```
+preRenderStaticPages()
+      │
+      ├──▶ Build global page map for reading-order adjacency
+      │
+      ├──▶ For each page (static, available, or text with items):
+      │         │
+      │         ├──▶ Find reading-order adjacent page (pageNumber ± 1)
+      │         ├──▶ Detect crossing items from adjacent page
+      │         └──▶ renderPageToImage() via Konva
+      │                   │
+      │                   ├──▶ Draw background (if any)
+      │                   ├──▶ Draw page items with gradients/fonts
+      │                   ├──▶ Draw crossing items (offset and clipped)
+      │                   └──▶ Export as PNG at 300 DPI
+      │
+      └──▶ Cache as PDFImage for each page number
 ```
 
 ## Key Methods
@@ -48,10 +73,12 @@ Generates the complete PDF document.
 **Process:**
 1. Creates PDFDocument instance
 2. Embeds standard fonts (Times Roman family + Courier)
-3. Embeds images used in static pages
-4. Generates signature sheets with imposition
-5. Adds print marks (cut marks, fold indicators)
-6. Returns PDF as Uint8Array
+3. Builds global page map for cross-signature adjacency lookup
+4. Pre-renders pages with items via Konva (preserves gradients, fonts, shadows)
+5. Embeds images used in static pages
+6. Generates signature sheets with imposition
+7. Adds print marks (cut marks, fold indicators)
+8. Returns PDF as Uint8Array
 
 ### Signature Generation
 
@@ -67,16 +94,25 @@ Creates imposed sheets for a single signature.
 
 ### Page Drawing
 
-#### `drawPage(pdfPage, pageContent, x, y, width, height, project, isRecto, adjacentPage?, spanningItems?)`
+#### `drawPageContent(pdfPage, pageContent, x, y, width, height, project, isRecto, adjacentPage?, spanningItems?)`
 
 Draws a single page at the specified position.
 
+**For static/available pages:**
+- Uses pre-rendered image if available (includes items with gradients, fonts, shadows)
+- Falls back to direct pdf-lib drawing with clipping if pre-render unavailable
+
+**For text pages:**
+- Renders text content via pdf-lib (headings, paragraphs)
+- Overlays pre-rendered items image if page has items
+- Falls back to direct item drawing with pdf-lib clipping
+
 **Handles:**
-- Page backgrounds (solid colors, gradients)
+- Page backgrounds (solid colors, gradients via pre-render)
 - Content sections (headings, paragraphs, images)
 - Headers and footers with placeholders (`{{pageNumber}}`)
-- Items on static/blank pages
-- Cross-page items from adjacent pages
+- Items on any page type (static, available, or text)
+- Cross-page items from adjacent pages (using reading-order adjacency)
 - Spanning items that bridge verso and recto
 
 #### `drawPageItems(pdfPage, items, pageX, pageY, pageWidth, pageHeight)`
@@ -90,13 +126,15 @@ Renders page items (shapes, text, images) on static pages.
 
 #### `drawPageItemsClipped(pdfPage, items, pageX, pageY, pageWidth, pageHeight, itemOffsetX, clipWidth)`
 
-Renders items with clipping for cross-page content.
+Renders items with clipping for cross-page content (fallback when pre-rendering unavailable).
 
 **Features:**
 - Calculates visible portion of items
 - Applies offset for adjacent page items
 - Clips rectangles to visible region
-- Handles ellipses and circles (natural PDF clipping)
+- Used with pdf-lib clipping path for proper boundary enforcement
+
+**Note:** This is primarily a fallback. Items are normally pre-rendered via Konva which provides proper clipping for all shape types including circles and ellipses.
 
 ### Print Marks
 
@@ -287,8 +325,16 @@ When creep is enabled with "Fill available space" mode, crop marks are positione
 
 ## Limitations
 
-1. **Fonts**: Uses standard PDF fonts only (no custom font embedding)
-2. **Gradients**: pdf-lib doesn't support gradients; uses first color stop
-3. **Patterns**: Patterns render as light gray placeholder
-4. **Rich Text**: No inline formatting (bold within paragraphs)
-5. **Images**: Only PNG and JPEG formats supported
+1. **Fonts**: Body text uses standard PDF fonts; custom fonts on items are pre-rendered as images
+2. **Rich Text**: No inline formatting (bold within paragraphs) for body text
+3. **Images**: Only PNG and JPEG formats supported
+
+## Resolved Limitations
+
+The following were previously limitations but are now fully supported via Konva pre-rendering:
+
+- **Gradients**: Linear and radial gradients render correctly on page items
+- **Patterns**: Pattern fills render correctly on shapes
+- **Custom Fonts**: Custom fonts on text items render correctly
+- **Shadows**: Drop shadows render correctly
+- **Cross-page Items**: Items spanning page boundaries render correctly with proper clipping

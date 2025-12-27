@@ -132,16 +132,6 @@ export class PDFGenerator {
       return globalPageMap.get(adjacentPageNum) || null;
     };
 
-    // DEBUG: Log spread structure
-    console.log('[CROSSING DEBUG] Signature', signature.signatureNumber, 'spreads:',
-      signature.spreads.map(sp => ({
-        verso: sp.verso?.pageNumber,
-        recto: sp.recto?.pageNumber,
-        versoIsRecto: sp.verso?.isRecto,
-        rectoIsRecto: sp.recto?.isRecto,
-      }))
-    );
-
     const rowsPerSheet = calculateSpreadRowsPerSheet(
       sheetSize,
       pageHeight,
@@ -245,29 +235,6 @@ export class PDFGenerator {
     const isStaticOrAvailable = pageContent.pageState === 'static' ||
                                  pageContent.pageState === 'available' ||
                                  pageContent.isBlank || pageContent.isStatic;
-
-    // DEBUG: Log page being drawn and its adjacent page
-    const adjCrossingItems = adjacentPage?.items?.filter(item => {
-      if (isRecto) {
-        return item.x + item.width > width;
-      } else {
-        return item.x < 0;
-      }
-    }) || [];
-    if (hasItems || adjCrossingItems.length > 0) {
-      console.log('[CROSSING DEBUG] Drawing page', pageContent.pageNumber, {
-        physicalIsRecto: isRecto,
-        readingOrderIsRecto: pageContent.isRecto,
-        pageState: pageContent.pageState,
-        hasItems,
-        itemCount: pageContent.items?.length || 0,
-        adjacentPageNum: adjacentPage?.pageNumber,
-        adjacentPageState: adjacentPage?.pageState,
-        adjacentItemCount: adjacentPage?.items?.length || 0,
-        crossingItemsFromAdjacent: adjCrossingItems.length,
-        hasPreRendered: this.renderedPageCache.has(pageContent.pageNumber),
-      });
-    }
 
     // For static/blank pages with items or background, use pre-rendered image if available
     if (!isTextPage && (hasItems || hasBackground || isStaticOrAvailable)) {
@@ -424,7 +391,6 @@ export class PDFGenerator {
     // Check for pre-rendered image first (preserves gradients, custom fonts, etc.)
     const preRenderedItemsImage = this.renderedPageCache.get(pageContent.pageNumber);
     if (preRenderedItemsImage) {
-      console.log('[TEXT PAGE DEBUG] Using pre-rendered items overlay for text page', pageContent.pageNumber);
       pdfPage.drawImage(preRenderedItemsImage, { x, y, width, height });
     } else if (hasItems || (adjacentPage?.items && adjacentPage.items.length > 0)) {
       // Fallback: use clipping to prevent items from extending past page boundaries
@@ -440,17 +406,6 @@ export class PDFGenerator {
       );
 
       if (hasItems) {
-        console.log('[TEXT PAGE DEBUG] Drawing items on text page (fallback)', pageContent.pageNumber, {
-          itemCount: pageContent.items!.length,
-          items: pageContent.items!.map(item => ({
-            id: item.id,
-            type: item.type,
-            x: item.x,
-            y: item.y,
-            width: item.width,
-            height: item.height,
-          })),
-        });
         drawPageItemsClipped(pdfPage, pageContent.items!, x, y, width, height, 0, width, this.fontCache, this.imageCache);
       }
 
@@ -491,19 +446,6 @@ export class PDFGenerator {
     });
 
     if (crossingItems.length > 0) {
-      console.log('[CROSSING DEBUG] drawCrossingItems:', {
-        adjacentPageNum: adjacentPage.pageNumber,
-        isRectoReadingOrder: isRecto,
-        offsetX: isRecto ? -width : width,
-        crossingItemsCount: crossingItems.length,
-        crossingItems: crossingItems.map(item => ({
-          id: item.id,
-          x: item.x,
-          width: item.width,
-          xPlusWidth: item.x + item.width,
-          pageWidth: width,
-        })),
-      });
       const offsetX = isRecto ? -width : width;
       drawPageItemsClipped(pdfPage, crossingItems, x, y, width, height, offsetX, width, this.fontCache, this.imageCache);
     }
