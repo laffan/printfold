@@ -8,11 +8,12 @@ import { SHEET_SIZES } from '../../types';
 
 /**
  * Calculate page content dimensions
+ * Note: Header/footer live INSIDE the margin area, so they don't affect content dimensions
  */
 export function calculatePageDimensions(
   outputOptions: OutputOptions,
   layoutOptions: LayoutOptions,
-  headerFooter: HeaderFooterOptions
+  _headerFooter: HeaderFooterOptions
 ): PageDimensions {
   const sheetSize = SHEET_SIZES[outputOptions.sheetSize];
 
@@ -31,11 +32,9 @@ export function calculatePageDimensions(
   }
 
   const margins = layoutOptions.margins;
-  const headerHeight = headerFooter.header.enabled ? headerFooter.header.height : 0;
-  const footerHeight = headerFooter.footer.enabled ? headerFooter.footer.height : 0;
-
+  // Header/footer are inside the margin area, so they don't reduce content height
   const contentWidth = pageWidth - margins.inner - margins.outer;
-  const contentHeight = pageHeight - margins.top - margins.bottom - headerHeight - footerHeight;
+  const contentHeight = pageHeight - margins.top - margins.bottom;
 
   return { width: pageWidth, height: pageHeight, contentWidth, contentHeight };
 }

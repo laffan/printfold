@@ -35,23 +35,7 @@ export function initFontDropdowns(fontDropdowns: Map<string, FontDropdown>): voi
   });
   if (headingDropdown) fontDropdowns.set('opt-font-h1', headingDropdown);
 
-  // Header font dropdown
-  const headerDropdown = createFontDropdown('opt-header-font', (value) => {
-    const header = appState.getProject().headerFooter.header;
-    appState.updateHeaderFooter({
-      header: { ...header, font: { ...header.font, fontFamily: value } },
-    });
-  });
-  if (headerDropdown) fontDropdowns.set('opt-header-font', headerDropdown);
-
-  // Footer font dropdown
-  const footerDropdown = createFontDropdown('opt-footer-font', (value) => {
-    const footer = appState.getProject().headerFooter.footer;
-    appState.updateHeaderFooter({
-      footer: { ...footer, font: { ...footer.font, fontFamily: value } },
-    });
-  });
-  if (footerDropdown) fontDropdowns.set('opt-footer-font', footerDropdown);
+  // Header/footer font dropdowns are now in the Styles tab (dynamically created)
 }
 
 /**

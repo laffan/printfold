@@ -183,69 +183,79 @@ export function drawMarginGuides(
   marginLabels.push({ text: outerLabel, type: 'outer', pageNumber: pageContent.pageNumber });
 
   // Header/Footer rendering and drag lines (orange)
+  // Header/footer live INSIDE the margin area as independent layers
   const project = appState.getProject();
-  const headerFooterLineColor = 'rgba(255, 140, 0, 0.5)';
+  const headerFooterLineColor = 'rgba(255, 140, 0, 0.7)';
 
   // Use existing leftMargin/rightMargin for positioning header/footer content
   const contentWidth = dimensions.width - leftMargin - rightMargin;
   const contentX = x + leftMargin;
 
-  // Header (if enabled)
+  // Header (if enabled) - lives INSIDE the top margin area
   if (project.headerFooter.header.enabled) {
     const headerHeight = project.headerFooter.header.height;
-    const headerY = y + margins.top;
-    const headerLineY = headerY + headerHeight;
+    const headerFontSize = project.headerFooter.header.font.fontSize;
+    // Header line is positioned inside the margin, offset from the margin boundary
+    // headerHeight determines how far into the margin the line is placed
+    const marginBoundaryY = y + margins.top;
+    const headerLineY = marginBoundaryY - headerHeight;
+    // Header text sits on the line
+    const headerTextY = headerLineY - headerFontSize - 2;
 
-    // Draw header content
+    // Draw header content - text sits on the orange line (inside margin area)
     drawHeaderFooterContent(
       project.headerFooter.header,
       pageContent.isRecto,
       pageContent.pageNumber,
       contentX,
-      headerY + headerHeight / 2 - 5,
+      headerTextY,
       contentWidth,
       layer
     );
 
-    // Draw header drag line (at bottom of header area)
+    // Draw header drag line (inside margin - independent of margin line)
     const headerLine = new Konva.Line({
       points: [x, headerLineY, x + dimensions.width, headerLineY],
       stroke: headerFooterLineColor,
-      strokeWidth: 1,
-      dash: [2, 2],
+      strokeWidth: 2,
+      dash: [4, 4],
       hitStrokeWidth: 15,
     });
     marginLayer.add(headerLine);
-    addHeaderFooterDragHandler(headerLine, 'header', pageContent.pageNumber, headerY, zoomLevel, stage, marginLayer, isDraggingMarginRef);
+    // Reference point is the margin boundary for calculating height
+    addHeaderFooterDragHandler(headerLine, 'header', pageContent.pageNumber, marginBoundaryY, zoomLevel, stage, marginLayer, isDraggingMarginRef);
   }
 
-  // Footer (if enabled)
+  // Footer (if enabled) - lives INSIDE the bottom margin area
   if (project.headerFooter.footer.enabled) {
     const footerHeight = project.headerFooter.footer.height;
-    const footerLineY = y + dimensions.height - margins.bottom - footerHeight;
-    const footerContentY = footerLineY + footerHeight / 2 - 5;
+    // Footer line is positioned inside the margin, offset from the margin boundary
+    // footerHeight determines how far into the margin the line is placed
+    const marginBoundaryY = y + dimensions.height - margins.bottom;
+    const footerLineY = marginBoundaryY + footerHeight;
 
-    // Draw footer content
+    // Draw footer content - text sits just below the orange line (inside margin area)
     drawHeaderFooterContent(
       project.headerFooter.footer,
       pageContent.isRecto,
       pageContent.pageNumber,
       contentX,
-      footerContentY,
+      footerLineY + 2,
       contentWidth,
       layer
     );
 
-    // Draw footer drag line (at top of footer area)
+    // Draw footer drag line (inside margin - independent of margin line)
     const footerLine = new Konva.Line({
       points: [x, footerLineY, x + dimensions.width, footerLineY],
       stroke: headerFooterLineColor,
-      strokeWidth: 1,
-      dash: [2, 2],
+      strokeWidth: 2,
+      dash: [4, 4],
       hitStrokeWidth: 15,
     });
     marginLayer.add(footerLine);
-    addHeaderFooterDragHandler(footerLine, 'footer', pageContent.pageNumber, y + dimensions.height - margins.bottom, zoomLevel, stage, marginLayer, isDraggingMarginRef);
+    // Reference point is the margin boundary for calculating height
+    addHeaderFooterDragHandler(footerLine, 'footer', pageContent.pageNumber, marginBoundaryY, zoomLevel, stage, marginLayer, isDraggingMarginRef);
   }
 }
 
@@ -329,16 +339,16 @@ function addHeaderFooterDragHandler(
 ): void {
   line.on('mouseenter', () => {
     stage.container().style.cursor = 'ns-resize';
-    line.stroke('rgba(255, 140, 0, 0.9)');
-    line.strokeWidth(2);
+    line.stroke('rgba(255, 140, 0, 1)');
+    line.strokeWidth(3);
     marginLayer.draw();
   });
 
   line.on('mouseleave', () => {
     if (!isDraggingMarginRef.value) {
       stage.container().style.cursor = 'default';
-      line.stroke('rgba(255, 140, 0, 0.5)');
-      line.strokeWidth(1);
+      line.stroke('rgba(255, 140, 0, 0.7)');
+      line.strokeWidth(2);
       marginLayer.draw();
     }
   });
@@ -364,15 +374,17 @@ function addHeaderFooterDragHandler(
 
       const dy = (pos.y - startPos.y) / zoomLevel;
 
-      // Header: dragging down increases height (line moves down)
-      // Footer: dragging up increases height (line moves up)
+      // Header: line is at (marginBoundary - height), inside top margin
+      // Dragging UP (negative dy) moves line up = increases distance from margin = increases height
+      // Dragging DOWN (positive dy) moves line down = decreases distance from margin = decreases height
+      // Footer: line is at (marginBoundary + height), inside bottom margin
+      // Dragging DOWN (positive dy) moves line down = increases distance from margin = increases height
+      // Dragging UP (negative dy) moves line up = decreases distance from margin = decreases height
       if (type === 'header') {
-        currentHeight = Math.max(12, Math.min(72, startHeight + dy));
+        currentHeight = Math.max(0, startHeight - dy);
         line.points([startPoints[0], startPoints[1] + dy, startPoints[2], startPoints[3] + dy]);
       } else {
-        // Footer line is at top of footer area - line should follow cursor (+ dy)
-        // but height increases when dragging up (- dy for height calc)
-        currentHeight = Math.max(12, Math.min(72, startHeight - dy));
+        currentHeight = Math.max(0, startHeight + dy);
         line.points([startPoints[0], startPoints[1] + dy, startPoints[2], startPoints[3] + dy]);
       }
 
@@ -473,16 +485,16 @@ function addMarginDragHandler(
         currentMarginValue = Math.max(0, startMargins.bottom - dy);
         line.points([startPoints[0], startPoints[1] + dy, startPoints[2], startPoints[3] + dy]);
       } else if (type === 'inner') {
-        // Inner margin: dragging the line toward the spine shrinks margin, away from spine expands it
-        // For recto: inner line is on LEFT. Drag LEFT (toward spine) = shrink, drag RIGHT = expand
-        // For verso: inner line is on RIGHT. Drag RIGHT (toward spine) = shrink, drag LEFT = expand
-        currentMarginValue = Math.max(0, startMargins.inner + (isRecto ? -dx : dx));
+        // Inner margin: dragging the line toward content shrinks margin, away from content expands it
+        // For recto: inner line is on LEFT. Drag LEFT = shrink margin, drag RIGHT = expand
+        // For verso: inner line is on RIGHT. Drag RIGHT = shrink margin, drag LEFT = expand
+        currentMarginValue = Math.max(0, startMargins.inner + (isRecto ? dx : -dx));
         line.points([startPoints[0] + dx, startPoints[1], startPoints[2] + dx, startPoints[3]]);
       } else if (type === 'outer') {
-        // Outer margin: dragging toward the outer edge shrinks margin, toward content expands it
-        // For recto: outer line is on RIGHT. Drag RIGHT (toward edge) = shrink, drag LEFT = expand
-        // For verso: outer line is on LEFT. Drag LEFT (toward edge) = shrink, drag RIGHT = expand
-        currentMarginValue = Math.max(0, startMargins.outer + (isRecto ? dx : -dx));
+        // Outer margin: dragging the line toward content shrinks margin, away from content expands it
+        // For recto: outer line is on RIGHT. Drag RIGHT = shrink margin, drag LEFT = expand
+        // For verso: outer line is on LEFT. Drag LEFT = shrink margin, drag RIGHT = expand
+        currentMarginValue = Math.max(0, startMargins.outer + (isRecto ? -dx : dx));
         line.points([startPoints[0] + dx, startPoints[1], startPoints[2] + dx, startPoints[3]]);
       }
 

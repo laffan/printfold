@@ -219,13 +219,11 @@ export class PDFGenerator {
 
     const innerMargin = isRecto ? margins.inner : margins.outer;
     const outerMargin = isRecto ? margins.outer : margins.inner;
-    const headerHeight = headerFooter.header.enabled ? headerFooter.header.height : 0;
-    const footerHeight = headerFooter.footer.enabled ? headerFooter.footer.height : 0;
-
+    // Header/footer live inside the margin area, so they don't affect content dimensions
     const contentX = x + innerMargin;
-    const contentY = y + margins.bottom + footerHeight;
+    const contentY = y + margins.bottom;
     const contentWidth = width - innerMargin - outerMargin;
-    const contentHeight = height - margins.top - margins.bottom - headerHeight - footerHeight;
+    const contentHeight = height - margins.top - margins.bottom;
 
     const hasItems = pageContent.items && pageContent.items.length > 0;
     const hasBackground = !!pageContent.backgroundFill;
@@ -277,8 +275,8 @@ export class PDFGenerator {
       return;
     }
 
-    // Draw content
-    let currentY = y + height - margins.top - headerHeight;
+    // Draw content - header/footer are inside margin, so content starts at margin boundary
+    let currentY = y + height - margins.top;
 
     for (const section of pageContent.sections) {
       const fontStyle = getFontStyleForSection(section.type, section.level, fontOptions);
