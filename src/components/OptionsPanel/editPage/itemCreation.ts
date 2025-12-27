@@ -52,6 +52,19 @@ export function addItemToCurrentPage(itemType: 'text' | 'rectangle' | 'ellipse' 
     } as ShapePageItem;
   }
 
+  // DEBUG: Log when adding item
+  const page = appState.getProject().signatures
+    .flatMap(s => s.spreads)
+    .flatMap(sp => [sp.verso, sp.recto])
+    .find(p => p?.pageNumber === editorState.selectedPageNumber);
+  console.log('[SHAPE DEBUG] Adding item to page:', {
+    pageNumber: editorState.selectedPageNumber,
+    pageState: page?.pageState,
+    isStatic: page?.isStatic,
+    itemType: item.type,
+    itemId: item.id,
+  });
+
   appState.addItemToPage(editorState.selectedPageNumber, item);
   appState.updateEditor({ selectedItemId: item.id });
   switchToSelectedTab();

@@ -26,6 +26,19 @@ export class PDFGenerator {
    */
   async generate(): Promise<Uint8Array> {
     const project = appState.getProject();
+
+    // DEBUG: Log all pages with items at start of generation
+    const pagesWithItems = project.signatures
+      .flatMap(s => s.spreads)
+      .flatMap(sp => [sp.verso, sp.recto])
+      .filter(p => p?.items && p.items.length > 0);
+    console.log('[PDF DEBUG] Starting PDF generation. Pages with items:', pagesWithItems.map(p => ({
+      pageNumber: p?.pageNumber,
+      pageState: p?.pageState,
+      isStatic: p?.isStatic,
+      itemCount: p?.items?.length,
+    })));
+
     const pdfDoc = await PDFDocument.create();
 
     // Embed fonts
