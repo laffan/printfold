@@ -7,7 +7,7 @@ import { PDFDocument, PDFPage, PDFImage, rgb, StandardFonts, pushGraphicsState, 
 import { appState } from '../state';
 import { textFlowEngine } from '../textFlow';
 import type { Signature, Spread, PageContent, PageItem, SpanningItem, StaticSpread } from '../../types';
-import { SHEET_SIZES, calculateSpreadRowsPerSheet } from '../../types';
+import { SHEET_SIZES, getOrientedSheetSize, calculateSpreadRowsPerSheet } from '../../types';
 import type { FontCache, ImageCacheType, RenderedPageCacheType, ImpositionSheet } from './types';
 import { sanitizeText } from './textUtils';
 import { parseColor } from './colors';
@@ -43,29 +43,35 @@ export class PDFGenerator {
     // Pre-render static/blank pages as high-res images for gradient/pattern/font support
     await preRenderStaticPages(pdfDoc, project, this.renderedPageCache);
 
-    // Get sheet dimensions
-    const sheetSize = SHEET_SIZES[project.outputOptions.sheetSize];
+    // Get sheet dimensions (with orientation applied)
+    const sheetSize = getOrientedSheetSize(
+      project.outputOptions.sheetSize,
+      project.outputOptions.orientation
+    );
 
     // Calculate page dimensions based on booklet size
-    let pageWidth: number;
+    let pageWidth: number = sheetSize.width / 2;
     let pageHeight: number;
 
-    if (project.outputOptions.bookletSize === 'custom') {
-      pageWidth = project.outputOptions.customWidth || sheetSize.width / 2;
-      pageHeight = project.outputOptions.customHeight || sheetSize.height;
-    } else if (project.outputOptions.bookletSize.startsWith('eighth-')) {
-      pageWidth = sheetSize.width / 2;
-      pageHeight = sheetSize.height / 4;
-    } else if (project.outputOptions.bookletSize.startsWith('sixth-')) {
-      pageWidth = sheetSize.width / 2;
-      pageHeight = sheetSize.height / 3;
-    } else if (project.outputOptions.bookletSize.startsWith('quarter-')) {
-      pageWidth = sheetSize.width / 2;
-      pageHeight = sheetSize.height / 2;
-    } else {
-      // half-letter, half-a4, etc.
-      pageWidth = sheetSize.width / 2;
-      pageHeight = sheetSize.height;
+    switch (project.outputOptions.bookletSize) {
+      case 'custom':
+        pageWidth = project.outputOptions.customWidth || sheetSize.width / 2;
+        pageHeight = project.outputOptions.customHeight || sheetSize.height;
+        break;
+      case 'half':
+        pageHeight = sheetSize.height;
+        break;
+      case 'quarter':
+        pageHeight = sheetSize.height / 2;
+        break;
+      case 'eighth':
+        pageHeight = sheetSize.height / 4;
+        break;
+      case 'sixteenth':
+        pageHeight = sheetSize.height / 8;
+        break;
+      default:
+        pageHeight = sheetSize.height;
     }
 
     // Build a GLOBAL page map across all signatures for reading-order adjacency

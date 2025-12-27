@@ -5,7 +5,7 @@
 
 import { appState } from '../../services/state';
 import type { OutputOptions } from '../../types';
-import { SHEET_SIZES, UNIT_CONVERSIONS } from '../../types';
+import { getOrientedSheetSize, UNIT_CONVERSIONS } from '../../types';
 import { bindSelect, bindCheckbox, type DebounceCallback } from './helpers';
 import { downloadBlankPage, downloadBlankSpread } from '../../services/pageExport';
 
@@ -16,6 +16,12 @@ export function setupOutputOptions(debounce: (fn: DebounceCallback) => void): vo
   // Sheet size
   bindSelect('opt-sheet-size', (value) => {
     appState.updateOutputOptions({ sheetSize: value as OutputOptions['sheetSize'] });
+    updateFillSpaceVisibility();
+  }, debounce);
+
+  // Orientation
+  bindSelect('opt-orientation', (value) => {
+    appState.updateOutputOptions({ orientation: value as OutputOptions['orientation'] });
     updateFillSpaceVisibility();
   }, debounce);
 
@@ -112,18 +118,24 @@ export function setupOutputOptions(debounce: (fn: DebounceCallback) => void): vo
  */
 export function getPageHeight(): number {
   const project = appState.getProject();
-  const sheetSize = SHEET_SIZES[project.outputOptions.sheetSize];
+  const sheetSize = getOrientedSheetSize(
+    project.outputOptions.sheetSize,
+    project.outputOptions.orientation
+  );
 
-  if (project.outputOptions.bookletSize === 'custom') {
-    return project.outputOptions.customHeight || sheetSize.height;
-  } else if (project.outputOptions.bookletSize.startsWith('eighth-')) {
-    return sheetSize.height / 4;
-  } else if (project.outputOptions.bookletSize.startsWith('sixth-')) {
-    return sheetSize.height / 3;
-  } else if (project.outputOptions.bookletSize.startsWith('quarter-')) {
-    return sheetSize.height / 2;
-  } else {
-    return sheetSize.height;
+  switch (project.outputOptions.bookletSize) {
+    case 'custom':
+      return project.outputOptions.customHeight || sheetSize.height;
+    case 'half':
+      return sheetSize.height;
+    case 'quarter':
+      return sheetSize.height / 2;
+    case 'eighth':
+      return sheetSize.height / 4;
+    case 'sixteenth':
+      return sheetSize.height / 8;
+    default:
+      return sheetSize.height;
   }
 }
 
@@ -132,7 +144,10 @@ export function getPageHeight(): number {
  */
 export function updateFillSpaceVisibility(): void {
   const project = appState.getProject();
-  const sheetSize = SHEET_SIZES[project.outputOptions.sheetSize];
+  const sheetSize = getOrientedSheetSize(
+    project.outputOptions.sheetSize,
+    project.outputOptions.orientation
+  );
   const pageHeight = getPageHeight();
 
   // Calculate how many rows could fit

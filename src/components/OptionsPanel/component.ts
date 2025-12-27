@@ -120,6 +120,7 @@ export class OptionsPanel {
 
     // Output options
     setSelectValue('opt-sheet-size', project.outputOptions.sheetSize);
+    setSelectValue('opt-orientation', project.outputOptions.orientation);
     setSelectValue('opt-booklet-size', project.outputOptions.bookletSize);
     setSelectValue('opt-pages-per-sig', project.outputOptions.pagesPerSignature.toString());
 
