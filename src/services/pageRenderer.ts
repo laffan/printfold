@@ -242,17 +242,25 @@ function createRenderNode(
  * Render a page's items to a high-resolution image
  * Returns a data URL of the rendered image
  *
- * NOTE: This only renders the page's OWN items. Crossing items from adjacent pages
- * are handled during PDF generation based on physical sheet adjacency.
+ * This renders both the page's own items AND crossing items from the adjacent page.
+ * Konva's canvas automatically clips at boundaries, so all shapes are properly clipped.
  */
 export async function renderPageToImage(
   page: PageContent,
   pageWidth: number,
   pageHeight: number,
-  _adjacentPage?: PageContent | null // Kept for API compatibility but not used
+  adjacentPage?: PageContent | null
 ): Promise<string | null> {
-  // Check if page has items worth rendering (only the page's own content)
-  const hasItems = page.items && page.items.length > 0;
+  // Check if page has items worth rendering
+  const hasOwnItems = page.items && page.items.length > 0;
+  const hasCrossingItems = adjacentPage?.items?.some(item => {
+    if (page.isRecto) {
+      return item.x + item.width > pageWidth;
+    } else {
+      return item.x < 0;
+    }
+  });
+  const hasItems = hasOwnItems || hasCrossingItems;
 
   if (!hasItems && !page.backgroundFill) {
     return null;
@@ -312,9 +320,37 @@ export async function renderPageToImage(
       }
     }
 
-    // NOTE: Crossing items from adjacent pages are NOT rendered during pre-rendering.
-    // They are rendered during PDF generation based on physical sheet adjacency,
-    // which may differ from spread adjacency (especially for edge pages in signatures).
+    // Render crossing items from adjacent page
+    // Konva's canvas automatically clips at boundaries, so circles etc. will be properly clipped
+    if (adjacentPage?.items) {
+      const crossingItems = adjacentPage.items.filter(item => {
+        if (page.isRecto) {
+          // This is recto, adjacent is verso - items extending right past verso boundary
+          return item.x + item.width > pageWidth;
+        } else {
+          // This is verso, adjacent is recto - items with negative x extending left
+          return item.x < 0;
+        }
+      });
+
+      for (const item of crossingItems) {
+        // Adjust x position for the crossing item
+        const offsetX = page.isRecto ? -pageWidth : pageWidth;
+        const node = createRenderNode(item, offsetX, SCALE_FACTOR, imageLoadPromises);
+        if (node) {
+          // Apply shadow if enabled
+          if (item.hasShadow) {
+            node.shadowEnabled(true);
+            node.shadowColor(item.shadowColor || '#000000');
+            node.shadowBlur((item.shadowBlur ?? 5) * SCALE_FACTOR);
+            node.shadowOffsetX((item.shadowOffsetX ?? 3) * SCALE_FACTOR);
+            node.shadowOffsetY((item.shadowOffsetY ?? 3) * SCALE_FACTOR);
+            node.shadowOpacity(item.shadowOpacity ?? 0.5);
+          }
+          layer.add(node);
+        }
+      }
+    }
 
     // Wait for all images to load
     await Promise.all(imageLoadPromises);

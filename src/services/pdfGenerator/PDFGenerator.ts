@@ -273,13 +273,13 @@ export class PDFGenerator {
       const preRenderedImage = this.renderedPageCache.get(pageContent.pageNumber);
       if (preRenderedImage) {
         pdfPage.drawImage(preRenderedImage, { x, y, width, height });
-        // Still render crossing items from adjacent pages after the pre-rendered image
-        this.drawCrossingItems(pdfPage, adjacentPage, x, y, width, height, isRecto);
+        // Pre-rendered image already includes crossing items from adjacent pages (rendered via Konva)
+        // Only need to render spanning items which are separate
         this.drawSpanningItems(pdfPage, spreadSpanningItems, x, y, width, height, isRecto);
         return;
       }
 
-      // Fallback: draw items directly for static/blank pages
+      // Fallback: draw items directly for static/blank pages (when pre-render failed or wasn't done)
       if (pageContent.items && pageContent.items.length > 0) {
         drawPageItemsClipped(pdfPage, pageContent.items, x, y, width, height, 0, width, this.fontCache, this.imageCache);
       }

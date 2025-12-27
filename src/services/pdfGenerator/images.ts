@@ -107,6 +107,21 @@ export async function preRenderStaticPages(
     pageHeight = sheetSize.height;
   }
 
+  // Build a global page map for reading-order adjacency lookup
+  const globalPageMap: Map<number, import('../../types').PageContent> = new Map();
+  for (const sig of project.signatures) {
+    for (const spread of sig.spreads) {
+      if (spread.verso) globalPageMap.set(spread.verso.pageNumber, spread.verso);
+      if (spread.recto) globalPageMap.set(spread.recto.pageNumber, spread.recto);
+    }
+  }
+
+  // Helper to get reading-order adjacent page
+  const getReadingOrderAdjacent = (page: import('../../types').PageContent): import('../../types').PageContent | null => {
+    const adjacentPageNum = page.isRecto ? page.pageNumber - 1 : page.pageNumber + 1;
+    return globalPageMap.get(adjacentPageNum) || null;
+  };
+
   // Collect static/blank pages that need rendering
   // Note: Text pages (pages with sections/text content) are NOT pre-rendered
   // because the PDF generator handles text content differently (using pdf-lib text rendering)
@@ -130,19 +145,30 @@ export async function preRenderStaticPages(
                                      page.isBlank || page.isStatic;
         if (!(hasOwnItems || hasBackgroundFill || isStaticOrAvailable)) continue;
 
-        // Pre-render pages that have their own content (items or background)
-        // Crossing items are NOT included in pre-render - they're added during PDF generation
-        // based on physical sheet adjacency which may differ from spread adjacency
+        // Get reading-order adjacent page for crossing items
+        const adjacentPage = getReadingOrderAdjacent(page);
+
+        // Check for crossing items from adjacent page
+        const hasCrossingItems = adjacentPage?.items?.some(item => {
+          if (page.isRecto) {
+            return item.x + item.width > pageWidth;
+          } else {
+            return item.x < 0;
+          }
+        });
+
         const hasOwnContent = page.items?.length || page.backgroundFill;
 
-        if (hasOwnContent) {
+        if (hasOwnContent || hasCrossingItems) {
           console.log('[PRERENDER DEBUG] Adding page to render:', {
             pageNum: page.pageNumber,
             pageState: page.pageState,
             isRecto: page.isRecto,
             hasOwnContent,
+            hasCrossingItems,
+            adjacentPageNum: adjacentPage?.pageNumber,
           });
-          pagesToRender.push({ page, adjacentPage: null });
+          pagesToRender.push({ page, adjacentPage });
         }
       }
     }
