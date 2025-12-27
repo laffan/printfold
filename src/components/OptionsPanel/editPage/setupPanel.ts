@@ -172,6 +172,14 @@ export function setupEditPagePanel(updateEditSelectedSectionFn: () => void): voi
     input.click();
   });
 
+  // Delete static page
+  document.getElementById('btn-delete-static-page')?.addEventListener('click', () => {
+    const editorState = appState.getEditor();
+    if (editorState.selectedPageNumber !== null) {
+      appState.deleteStaticPage(editorState.selectedPageNumber);
+    }
+  });
+
   // Property input handlers
   setupEditPropertyInputs(updateEditSelectedSectionFn);
 }

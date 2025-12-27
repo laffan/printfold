@@ -105,8 +105,9 @@ export function updateEditSelectedSection(): void {
 
   const selectedCount = editorState.selectedItemIds.length;
 
-  // Get download/replace section and check if page is static
+  // Get download/replace and delete sections, check if page is static
   const downloadReplaceSection = document.getElementById('download-replace-section');
+  const deleteStaticPageSection = document.getElementById('delete-static-page-section');
   const noSelectionMessage = document.getElementById('no-selection-message');
   const selectedPage = findSelectedPage();
   const isStaticPage = selectedPage?.pageState === 'static' || selectedPage?.isStatic;
@@ -116,6 +117,7 @@ export function updateEditSelectedSection(): void {
     section.style.display = 'none';
     if (pageBackgroundSection) pageBackgroundSection.style.display = 'none';
     if (downloadReplaceSection) downloadReplaceSection.style.display = 'none';
+    if (deleteStaticPageSection) deleteStaticPageSection.style.display = 'none';
     if (noSelectionMessage) noSelectionMessage.style.display = 'none';
     const effectsSection = document.getElementById('effects-section');
     if (effectsSection) effectsSection.style.display = 'none';
@@ -123,16 +125,19 @@ export function updateEditSelectedSection(): void {
     return;
   }
 
-  // If page selected but no item, show page background options plus download/replace (if static)
+  // If page selected but no item, show page background options plus download/replace/delete (if static)
   if (editorState.selectedPageNumber && selectedCount === 0) {
     section.style.display = 'none';
     if (pageBackgroundSection) {
       pageBackgroundSection.style.display = 'block';
       setupPageBackgroundPicker(editorState.selectedPageNumber);
     }
-    // Show download/replace section only for static pages
+    // Show download/replace and delete sections only for static pages
     if (downloadReplaceSection) {
       downloadReplaceSection.style.display = isStaticPage ? 'block' : 'none';
+    }
+    if (deleteStaticPageSection) {
+      deleteStaticPageSection.style.display = isStaticPage ? 'block' : 'none';
     }
     if (noSelectionMessage) noSelectionMessage.style.display = 'none';
     if (panel) panel.style.display = 'block';
@@ -148,6 +153,7 @@ export function updateEditSelectedSection(): void {
   if (selectedCount === 0 || !editorState.selectedPageNumber) {
     section.style.display = 'none';
     if (downloadReplaceSection) downloadReplaceSection.style.display = 'none';
+    if (deleteStaticPageSection) deleteStaticPageSection.style.display = 'none';
     if (noSelectionMessage) noSelectionMessage.style.display = 'block';
     const effectsSection = document.getElementById('effects-section');
     if (effectsSection) effectsSection.style.display = 'none';
@@ -155,9 +161,12 @@ export function updateEditSelectedSection(): void {
     return;
   }
 
-  // When an item is selected, show download/replace section only for static pages
+  // When an item is selected, show download/replace and delete sections only for static pages
   if (downloadReplaceSection) {
     downloadReplaceSection.style.display = isStaticPage ? 'block' : 'none';
+  }
+  if (deleteStaticPageSection) {
+    deleteStaticPageSection.style.display = isStaticPage ? 'block' : 'none';
   }
   if (noSelectionMessage) noSelectionMessage.style.display = 'none';
 
