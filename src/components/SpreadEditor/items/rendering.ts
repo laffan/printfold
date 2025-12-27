@@ -51,11 +51,13 @@ export function renderPageItems(
     group.setAttr('isArrayGroup', true);
 
     // Create all array instances within the group using multi-dimensional calculation
+    // Add in reverse order so later copies appear below earlier ones (first copy on top)
     const instanceNodes = createArrayInstanceNodes(
       item, 0, page.pageNumber, zoomLevel, stage, itemsLayer, transformer, updateTransformerFn
     );
 
-    for (const instanceNode of instanceNodes) {
+    for (let i = instanceNodes.length - 1; i >= 0; i--) {
+      const instanceNode = instanceNodes[i];
       // Remove individual event handlers - group handles interactions
       instanceNode.draggable(false);
       instanceNode.off('click tap dragstart dragmove dragend transform transformend');

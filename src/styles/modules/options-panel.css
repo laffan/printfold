@@ -457,6 +457,11 @@
   border-radius: var(--radius-sm);
 }
 
+/* Array section should not be indented */
+#item-array-section {
+  margin-left: 0;
+}
+
 /* Help text */
 .help-text {
   display: block;

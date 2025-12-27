@@ -43,11 +43,17 @@ function createDimensionElement(index: number, dim: ArrayDimension): HTMLElement
       </div>
       <div class="input-row">
         <label>X Offset</label>
-        <input type="number" class="dim-offset-x" data-index="${index}" value="${dim.offsetX}" />
+        <div class="input-with-cap">
+          <input type="number" class="dim-offset-x" data-index="${index}" value="${dim.offsetX}" />
+          <span class="input-cap" data-input="dim-offset-x-${index}">pt</span>
+        </div>
       </div>
       <div class="input-row">
         <label>Y Offset</label>
-        <input type="number" class="dim-offset-y" data-index="${index}" value="${dim.offsetY}" />
+        <div class="input-with-cap">
+          <input type="number" class="dim-offset-y" data-index="${index}" value="${dim.offsetY}" />
+          <span class="input-cap" data-input="dim-offset-y-${index}">pt</span>
+        </div>
       </div>
     </div>
   `;
@@ -65,7 +71,61 @@ function createDimensionElement(index: number, dim: ArrayDimension): HTMLElement
   const offsetYInput = wrapper.querySelector('.dim-offset-y') as HTMLInputElement;
   offsetYInput?.addEventListener('input', () => updateDimensionProperty(index, 'offsetY', parseFloat(offsetYInput.value) || 0));
 
+  // Set up draggable caps for offset inputs
+  const caps = wrapper.querySelectorAll('.input-cap');
+  caps.forEach(cap => {
+    const capElement = cap as HTMLElement;
+    const inputWrapper = capElement.parentElement;
+    const input = inputWrapper?.querySelector('input') as HTMLInputElement;
+    if (!input) return;
+
+    setupDraggableCap(capElement, input);
+  });
+
   return wrapper;
+}
+
+/**
+ * Set up drag handling for an input cap element
+ */
+function setupDraggableCap(capElement: HTMLElement, input: HTMLInputElement): void {
+  let startX = 0;
+  let startValue = 0;
+  let isDragging = false;
+
+  const onMouseDown = (e: MouseEvent) => {
+    e.preventDefault();
+    isDragging = true;
+    startX = e.clientX;
+    startValue = parseFloat(input.value) || 0;
+    capElement.classList.add('dragging');
+    document.body.style.cursor = 'ew-resize';
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  };
+
+  const onMouseMove = (e: MouseEvent) => {
+    if (!isDragging) return;
+
+    const deltaX = e.clientX - startX;
+    // Sensitivity: 1 pixel = 1 unit for offset values
+    const newValue = Math.round(startValue + deltaX);
+
+    input.value = newValue.toString();
+    // Dispatch input event to trigger existing handlers
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+
+  const onMouseUp = () => {
+    isDragging = false;
+    capElement.classList.remove('dragging');
+    document.body.style.cursor = '';
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+  };
+
+  capElement.addEventListener('mousedown', onMouseDown);
 }
 
 /**
