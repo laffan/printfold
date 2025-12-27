@@ -416,6 +416,25 @@
               <p class="hint">Select an item to edit its properties.</p>
             </div>
 
+            <!-- Download Page Section (shown when page is selected) -->
+            <div id="download-page-section" class="options-section" style="display: none;">
+              <h4 class="section-header">Download Page</h4>
+              <p class="hint">Export selected page for external editing.</p>
+              <div class="form-group button-group-vertical">
+                <button id="btn-download-page-svg" class="btn btn-secondary btn-small">Download as SVG</button>
+                <button id="btn-download-page-png" class="btn btn-secondary btn-small">Download as PNG (300 DPI)</button>
+              </div>
+            </div>
+
+            <!-- Replace Page Section (shown when page is selected) -->
+            <div id="replace-page-section" class="options-section" style="display: none;">
+              <h4 class="section-header">Replace with Image</h4>
+              <p class="hint">Replace page content with an image.</p>
+              <div class="form-group">
+                <button id="btn-replace-page-image" class="btn btn-secondary btn-small">Choose Image...</button>
+              </div>
+            </div>
+
             <!-- Placeholder when nothing is selected -->
             <div id="no-selection-message" class="options-section">
               <p class="hint">Select a static page to add items, or select an item to edit its properties.</p>
@@ -677,6 +696,15 @@
                   </label>
                   <small class="help-text">Amount to narrow each successive sheet (0.0625" typical for bond paper)</small>
                 </div>
+              </div>
+            </div>
+
+            <div class="options-section">
+              <h4 class="section-header">Download Blanks</h4>
+              <p class="hint">Download blank pages for external editing.</p>
+              <div class="form-group button-group-vertical">
+                <button id="btn-download-blank-page" class="btn btn-secondary btn-small">Single Page (PNG)</button>
+                <button id="btn-download-blank-spread" class="btn btn-secondary btn-small">Full Spread (PNG)</button>
               </div>
             </div>
           </div>

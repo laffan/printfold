@@ -6,6 +6,7 @@ import { appState } from '../../../services/state';
 import { switchToSelectedTab } from './shared';
 import { addItemToCurrentPage, addImageToCurrentPage } from './itemCreation';
 import { setupEditPropertyInputs } from './propertyInputs';
+import { downloadPageAsSvg, downloadPageAsPng, replacePageWithImage } from '../../../services/pageExport';
 import type { PageItem } from '../../../types';
 
 /**
@@ -111,6 +112,39 @@ export function setupEditPagePanel(updateEditSelectedSectionFn: () => void): voi
     if (editorState.selectedPageNumber && editorState.selectedItemId) {
       appState.moveItemBackward(editorState.selectedPageNumber, editorState.selectedItemId);
     }
+  });
+
+  // Download page as SVG
+  document.getElementById('btn-download-page-svg')?.addEventListener('click', () => {
+    const editorState = appState.getEditor();
+    if (editorState.selectedPageNumber !== null) {
+      downloadPageAsSvg(editorState.selectedPageNumber);
+    }
+  });
+
+  // Download page as PNG
+  document.getElementById('btn-download-page-png')?.addEventListener('click', () => {
+    const editorState = appState.getEditor();
+    if (editorState.selectedPageNumber !== null) {
+      downloadPageAsPng(editorState.selectedPageNumber);
+    }
+  });
+
+  // Replace page with image
+  document.getElementById('btn-replace-page-image')?.addEventListener('click', () => {
+    const editorState = appState.getEditor();
+    if (editorState.selectedPageNumber === null) return;
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/png,image/jpeg,image/webp,image/gif';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file && editorState.selectedPageNumber !== null) {
+        await replacePageWithImage(editorState.selectedPageNumber, file);
+      }
+    };
+    input.click();
   });
 
   // Property input handlers

@@ -81,23 +81,35 @@ export function updateEditSelectedSection(): void {
 
   const selectedCount = editorState.selectedItemIds.length;
 
+  // Get download and replace sections
+  const downloadPageSection = document.getElementById('download-page-section');
+  const replacePageSection = document.getElementById('replace-page-section');
+  const noSelectionMessage = document.getElementById('no-selection-message');
+
   // If multiple items selected, only show multi-select controls
   if (selectedCount > 1) {
     section.style.display = 'none';
     if (pageBackgroundSection) pageBackgroundSection.style.display = 'none';
+    if (downloadPageSection) downloadPageSection.style.display = 'none';
+    if (replacePageSection) replacePageSection.style.display = 'none';
+    if (noSelectionMessage) noSelectionMessage.style.display = 'none';
     const effectsSection = document.getElementById('effects-section');
     if (effectsSection) effectsSection.style.display = 'none';
     if (panel) panel.style.display = 'block';
     return;
   }
 
-  // If page selected but no item, show page background options
+  // If page selected but no item, show page background options plus download/replace
   if (editorState.selectedPageNumber && selectedCount === 0) {
     section.style.display = 'none';
     if (pageBackgroundSection) {
       pageBackgroundSection.style.display = 'block';
       setupPageBackgroundPicker(editorState.selectedPageNumber);
     }
+    // Show download and replace sections when page is selected
+    if (downloadPageSection) downloadPageSection.style.display = 'block';
+    if (replacePageSection) replacePageSection.style.display = 'block';
+    if (noSelectionMessage) noSelectionMessage.style.display = 'none';
     if (panel) panel.style.display = 'block';
     return;
   }
@@ -110,11 +122,19 @@ export function updateEditSelectedSection(): void {
   // Hide if no item selected
   if (selectedCount === 0 || !editorState.selectedPageNumber) {
     section.style.display = 'none';
+    if (downloadPageSection) downloadPageSection.style.display = 'none';
+    if (replacePageSection) replacePageSection.style.display = 'none';
+    if (noSelectionMessage) noSelectionMessage.style.display = 'block';
     const effectsSection = document.getElementById('effects-section');
     if (effectsSection) effectsSection.style.display = 'none';
     if (panel) panel.style.display = 'none';
     return;
   }
+
+  // When an item is selected, still show download/replace sections
+  if (downloadPageSection) downloadPageSection.style.display = 'block';
+  if (replacePageSection) replacePageSection.style.display = 'block';
+  if (noSelectionMessage) noSelectionMessage.style.display = 'none';
 
   // Get the selected item (single selection case)
   const selectedItemId = editorState.selectedItemIds[0];

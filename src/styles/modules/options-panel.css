@@ -572,3 +572,14 @@
   font-size: 12px;
 }
 
+/* Vertical button group for download/action sections */
+.button-group-vertical {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.button-group-vertical .btn {
+  width: 100%;
+  justify-content: center;
+}
