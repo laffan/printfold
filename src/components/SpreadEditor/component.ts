@@ -640,6 +640,13 @@ export class SpreadEditor {
       };
     }
 
+    if (project.outputOptions.bookletSize.startsWith('eighth-')) {
+      return {
+        width: sheetSize.width / 2,
+        height: sheetSize.height / 4,
+      };
+    }
+
     if (project.outputOptions.bookletSize.startsWith('quarter-')) {
       return {
         width: sheetSize.width / 2,
@@ -647,6 +654,7 @@ export class SpreadEditor {
       };
     }
 
+    // half-letter, half-a4, etc.
     return {
       width: sheetSize.width / 2,
       height: sheetSize.height,

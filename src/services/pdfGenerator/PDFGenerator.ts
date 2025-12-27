@@ -6,9 +6,9 @@
 import { PDFDocument, PDFPage, PDFImage, rgb, StandardFonts, pushGraphicsState, popGraphicsState, moveTo, lineTo, closePath, clip, endPath } from 'pdf-lib';
 import { appState } from '../state';
 import { textFlowEngine } from '../textFlow';
-import type { Signature, Spread, PageContent, PageItem, SpanningItem } from '../../types';
+import type { Signature, Spread, PageContent, PageItem, SpanningItem, StaticSpread } from '../../types';
 import { SHEET_SIZES, calculateSpreadRowsPerSheet } from '../../types';
-import type { FontCache, ImageCacheType, RenderedPageCacheType } from './types';
+import type { FontCache, ImageCacheType, RenderedPageCacheType, ImpositionSheet } from './types';
 import { sanitizeText } from './textUtils';
 import { parseColor } from './colors';
 import { getFontStyleForSection, getFont } from './fonts';
@@ -53,10 +53,14 @@ export class PDFGenerator {
     if (project.outputOptions.bookletSize === 'custom') {
       pageWidth = project.outputOptions.customWidth || sheetSize.width / 2;
       pageHeight = project.outputOptions.customHeight || sheetSize.height;
+    } else if (project.outputOptions.bookletSize.startsWith('eighth-')) {
+      pageWidth = sheetSize.width / 2;
+      pageHeight = sheetSize.height / 4;
     } else if (project.outputOptions.bookletSize.startsWith('quarter-')) {
       pageWidth = sheetSize.width / 2;
       pageHeight = sheetSize.height / 2;
     } else {
+      // half-letter, half-a4, etc.
       pageWidth = sheetSize.width / 2;
       pageHeight = sheetSize.height;
     }
@@ -75,17 +79,45 @@ export class PDFGenerator {
       }
     }
 
-    // Generate imposed pages for each signature
-    for (const signature of project.signatures) {
-      await this.generateSignatureSheets(pdfDoc, signature, sheetSize, pageWidth, pageHeight, globalPageMap);
-    }
-
-    // Calculate rows per sheet for cut marks
+    // Calculate rows per sheet for fill mode
     const rowsPerSheet = calculateSpreadRowsPerSheet(
       sheetSize,
       pageHeight,
       project.outputOptions.fillAvailableSpace
     );
+
+    // Collect all imposition sheets from all signatures for cross-signature fill mode
+    const allSheets: Array<{
+      sheet: ImpositionSheet;
+      signature: Signature;
+      spreadForPage: Map<number, { spread: Spread; staticSpread?: StaticSpread }>;
+    }> = [];
+
+    const staticSpreads = project.staticSpreads || [];
+
+    for (const signature of project.signatures) {
+      const imposition = textFlowEngine.calculateImposition(signature);
+
+      // Build maps for looking up spread info by page number
+      const spreadForPage: Map<number, { spread: Spread; staticSpread?: StaticSpread }> = new Map();
+      for (const spread of signature.spreads) {
+        const staticSpread = staticSpreads.find(s => s.id === spread.id);
+        if (spread.verso) {
+          spreadForPage.set(spread.verso.pageNumber, { spread, staticSpread });
+        }
+        if (spread.recto) {
+          spreadForPage.set(spread.recto.pageNumber, { spread, staticSpread });
+        }
+      }
+
+      // Add all imposition sheets from this signature
+      for (const sheet of imposition) {
+        allSheets.push({ sheet, signature, spreadForPage });
+      }
+    }
+
+    // Generate PDF pages by grouping sheets across signatures
+    await this.generateCombinedSheets(pdfDoc, allSheets, sheetSize, pageWidth, pageHeight, rowsPerSheet, globalPageMap);
 
     // Add cut marks and fold indicators if there are pages
     if (project.signatures.length > 0) {
@@ -96,64 +128,43 @@ export class PDFGenerator {
   }
 
   /**
-   * Generate imposition sheets for a signature
+   * Generate combined PDF sheets from all signatures, grouping across signatures for fill mode
    */
-  private async generateSignatureSheets(
+  private async generateCombinedSheets(
     pdfDoc: PDFDocument,
-    signature: Signature,
+    allSheets: Array<{
+      sheet: ImpositionSheet;
+      signature: Signature;
+      spreadForPage: Map<number, { spread: Spread; staticSpread?: StaticSpread }>;
+    }>,
     sheetSize: { width: number; height: number },
     pageWidth: number,
     pageHeight: number,
+    rowsPerSheet: number,
     globalPageMap: Map<number, PageContent>
   ): Promise<void> {
     const project = appState.getProject();
-    const imposition = textFlowEngine.calculateImposition(signature);
-    const staticSpreads = project.staticSpreads || [];
-
-    // Build maps for looking up spread info by page number
-    const spreadForPage: Map<number, { spread: Spread; staticSpread?: import('../../types').StaticSpread }> = new Map();
-
-    for (const spread of signature.spreads) {
-      const staticSpread = staticSpreads.find(s => s.id === spread.id);
-
-      if (spread.verso) {
-        spreadForPage.set(spread.verso.pageNumber, { spread, staticSpread });
-      }
-      if (spread.recto) {
-        spreadForPage.set(spread.recto.pageNumber, { spread, staticSpread });
-      }
-    }
 
     // Helper to get reading-order adjacent page
-    // For a verso (left page), adjacent is pageNumber + 1 (the recto to its right)
-    // For a recto (right page), adjacent is pageNumber - 1 (the verso to its left)
     const getReadingOrderAdjacent = (page: PageContent): PageContent | null => {
       const adjacentPageNum = page.isRecto ? page.pageNumber - 1 : page.pageNumber + 1;
       return globalPageMap.get(adjacentPageNum) || null;
     };
 
-    const rowsPerSheet = calculateSpreadRowsPerSheet(
-      sheetSize,
-      pageHeight,
-      project.outputOptions.fillAvailableSpace
-    );
-
-    // Group imposition sheets for multi-row layout
-    for (let i = 0; i < imposition.length; i += rowsPerSheet) {
-      const sheetsInGroup = imposition.slice(i, i + rowsPerSheet);
+    // Group sheets across all signatures by rowsPerSheet
+    for (let i = 0; i < allSheets.length; i += rowsPerSheet) {
+      const sheetsInGroup = allSheets.slice(i, i + rowsPerSheet);
 
       // Front of combined sheet
       const frontPage = pdfDoc.addPage([sheetSize.width, sheetSize.height]);
 
-      sheetsInGroup.forEach((sheet, rowIndex) => {
+      sheetsInGroup.forEach(({ sheet, spreadForPage }, rowIndex) => {
         const rowY = sheetSize.height - (rowIndex + 1) * pageHeight;
 
         // Look up pages by their page number from global map
         const leftPage = globalPageMap.get(sheet.front.left) || null;
         const rightPage = globalPageMap.get(sheet.front.right) || null;
 
-        // Use reading-order adjacency for crossing items:
-        // Page N's adjacent is N-1 (if recto) or N+1 (if verso) in reading order
         if (leftPage) {
           const info = spreadForPage.get(leftPage.pageNumber);
           const spanningItems = info?.staticSpread?.spanningItems;
@@ -172,14 +183,13 @@ export class PDFGenerator {
       // Back of combined sheet
       const backPage = pdfDoc.addPage([sheetSize.width, sheetSize.height]);
 
-      sheetsInGroup.forEach((sheet, rowIndex) => {
+      sheetsInGroup.forEach(({ sheet, spreadForPage }, rowIndex) => {
         const rowY = sheetSize.height - (rowIndex + 1) * pageHeight;
 
         // Look up pages by their page number from global map
         const leftPage = globalPageMap.get(sheet.back.left) || null;
         const rightPage = globalPageMap.get(sheet.back.right) || null;
 
-        // Use reading-order adjacency for crossing items
         if (leftPage) {
           const info = spreadForPage.get(leftPage.pageNumber);
           const spanningItems = info?.staticSpread?.spanningItems;

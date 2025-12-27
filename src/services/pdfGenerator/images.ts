@@ -99,10 +99,14 @@ export async function preRenderStaticPages(
   if (project.outputOptions.bookletSize === 'custom') {
     pageWidth = project.outputOptions.customWidth || sheetSize.width / 2;
     pageHeight = project.outputOptions.customHeight || sheetSize.height;
+  } else if (project.outputOptions.bookletSize.startsWith('eighth-')) {
+    pageWidth = sheetSize.width / 2;
+    pageHeight = sheetSize.height / 4;
   } else if (project.outputOptions.bookletSize.startsWith('quarter-')) {
     pageWidth = sheetSize.width / 2;
     pageHeight = sheetSize.height / 2;
   } else {
+    // half-letter, half-a4, etc.
     pageWidth = sheetSize.width / 2;
     pageHeight = sheetSize.height;
   }
