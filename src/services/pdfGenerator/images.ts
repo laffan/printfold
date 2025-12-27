@@ -134,16 +134,12 @@ export async function preRenderStaticPages(
     for (const spread of sig.spreads) {
       const pages = [spread.verso, spread.recto].filter(Boolean) as import('../../types').PageContent[];
       for (const page of pages) {
-        // Skip text pages - they are rendered via the normal text flow
         const isTextPage = page.pageState === 'text';
-        if (isTextPage) continue;
-
         const hasOwnItems = page.items && page.items.length > 0;
         const hasBackgroundFill = !!page.backgroundFill;
         const isStaticOrAvailable = page.pageState === 'static' ||
                                      page.pageState === 'available' ||
                                      page.isBlank || page.isStatic;
-        if (!(hasOwnItems || hasBackgroundFill || isStaticOrAvailable)) continue;
 
         // Get reading-order adjacent page for crossing items
         const adjacentPage = getReadingOrderAdjacent(page);
@@ -156,6 +152,26 @@ export async function preRenderStaticPages(
             return item.x < 0;
           }
         });
+
+        // For text pages: only pre-render if they have items or crossing items
+        // (the pre-rendered image will be overlaid on top of text content)
+        if (isTextPage) {
+          if (hasOwnItems || hasCrossingItems) {
+            console.log('[PRERENDER DEBUG] Adding TEXT page to render (items overlay):', {
+              pageNum: page.pageNumber,
+              pageState: page.pageState,
+              isRecto: page.isRecto,
+              hasOwnItems,
+              hasCrossingItems,
+              adjacentPageNum: adjacentPage?.pageNumber,
+            });
+            pagesToRender.push({ page, adjacentPage });
+          }
+          continue;
+        }
+
+        // For static/available pages: pre-render if they have content
+        if (!(hasOwnItems || hasBackgroundFill || isStaticOrAvailable)) continue;
 
         const hasOwnContent = page.items?.length || page.backgroundFill;
 

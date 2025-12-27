@@ -421,9 +421,13 @@ export class PDFGenerator {
     }
 
     // Draw items on top of text content (for text pages with items)
-    // Use clipping to prevent items from extending past page boundaries
-    if (hasItems || (adjacentPage?.items && adjacentPage.items.length > 0)) {
-      // Set up clipping rectangle for the page bounds
+    // Check for pre-rendered image first (preserves gradients, custom fonts, etc.)
+    const preRenderedItemsImage = this.renderedPageCache.get(pageContent.pageNumber);
+    if (preRenderedItemsImage) {
+      console.log('[TEXT PAGE DEBUG] Using pre-rendered items overlay for text page', pageContent.pageNumber);
+      pdfPage.drawImage(preRenderedItemsImage, { x, y, width, height });
+    } else if (hasItems || (adjacentPage?.items && adjacentPage.items.length > 0)) {
+      // Fallback: use clipping to prevent items from extending past page boundaries
       pdfPage.pushOperators(
         pushGraphicsState(),
         moveTo(x, y),
@@ -436,7 +440,7 @@ export class PDFGenerator {
       );
 
       if (hasItems) {
-        console.log('[TEXT PAGE DEBUG] Drawing items on text page', pageContent.pageNumber, {
+        console.log('[TEXT PAGE DEBUG] Drawing items on text page (fallback)', pageContent.pageNumber, {
           itemCount: pageContent.items!.length,
           items: pageContent.items!.map(item => ({
             id: item.id,
