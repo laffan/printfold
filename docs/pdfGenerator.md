@@ -138,14 +138,18 @@ Renders items with clipping for cross-page content (fallback when pre-rendering 
 
 ### Print Marks
 
-#### `addPrintMarks(pdfDoc, sheetSize, pageHeight, rowsPerSheet)`
+#### `addPrintMarks(pdfDoc, sheetSize, pageHeight, rowsPerSheet, showFoldMarks)`
 
 Adds production marks to all pages.
 
+**Parameters:**
+- `showFoldMarks` (boolean, default: false) - Whether to show fold marks
+
 **Marks Added:**
-- Corner cut marks (L-shaped)
-- Center fold line (top and bottom)
-- Horizontal cut marks for multi-row layouts
+- Corner cut marks (L-shaped, black)
+- Center fold marks (top and bottom, light gray) - only if `showFoldMarks` is true
+- Horizontal cut marks for multi-row layouts (black)
+- Horizontal fold marks at cut lines - only if `showFoldMarks` is true
 
 ### Font Handling
 
@@ -230,7 +234,11 @@ The generator reads from project state:
 
 ```typescript
 const project = appState.getProject();
-const sheetSize = SHEET_SIZES[project.outputOptions.sheetSize];
+// Use getOrientedSheetSize to respect orientation setting
+const sheetSize = getOrientedSheetSize(
+  project.outputOptions.sheetSize,
+  project.outputOptions.orientation
+);
 ```
 
 ## Imposition Layout
