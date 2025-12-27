@@ -183,8 +183,9 @@ export function drawMarginGuides(
   marginLabels.push({ text: outerLabel, type: 'outer', pageNumber: pageContent.pageNumber });
 
   // Header/Footer rendering and drag lines (orange)
+  // Header/footer live INSIDE the margin area as independent layers
   const project = appState.getProject();
-  const headerFooterLineColor = 'rgba(255, 140, 0, 0.5)';
+  const headerFooterLineColor = 'rgba(255, 140, 0, 0.7)';
 
   // Use existing leftMargin/rightMargin for positioning header/footer content
   const contentWidth = dimensions.width - leftMargin - rightMargin;
@@ -194,9 +195,11 @@ export function drawMarginGuides(
   if (project.headerFooter.header.enabled) {
     const headerHeight = project.headerFooter.header.height;
     const headerFontSize = project.headerFooter.header.font.fontSize;
-    // Header line is at the margin boundary (where content starts)
-    const headerLineY = y + margins.top;
-    // Header text sits on the line, extending upward into the margin
+    // Header line is positioned inside the margin, offset from the margin boundary
+    // headerHeight determines how far into the margin the line is placed
+    const marginBoundaryY = y + margins.top;
+    const headerLineY = marginBoundaryY - headerHeight;
+    // Header text sits on the line
     const headerTextY = headerLineY - headerFontSize - 2;
 
     // Draw header content - text sits on the orange line (inside margin area)
@@ -210,47 +213,49 @@ export function drawMarginGuides(
       layer
     );
 
-    // Draw header drag line (at margin boundary - controls how far up text extends into margin)
+    // Draw header drag line (inside margin - independent of margin line)
     const headerLine = new Konva.Line({
       points: [x, headerLineY, x + dimensions.width, headerLineY],
       stroke: headerFooterLineColor,
-      strokeWidth: 1,
-      dash: [2, 2],
+      strokeWidth: 2,
+      dash: [4, 4],
       hitStrokeWidth: 15,
     });
     marginLayer.add(headerLine);
-    // Pass the top of header area for drag calculations
-    addHeaderFooterDragHandler(headerLine, 'header', pageContent.pageNumber, headerLineY - headerHeight, zoomLevel, stage, marginLayer, isDraggingMarginRef);
+    // Reference point is the margin boundary for calculating height
+    addHeaderFooterDragHandler(headerLine, 'header', pageContent.pageNumber, marginBoundaryY, zoomLevel, stage, marginLayer, isDraggingMarginRef);
   }
 
   // Footer (if enabled) - lives INSIDE the bottom margin area
   if (project.headerFooter.footer.enabled) {
     const footerHeight = project.headerFooter.footer.height;
-    // Footer line is at the margin boundary (where content ends)
-    const footerLineY = y + dimensions.height - margins.bottom;
+    // Footer line is positioned inside the margin, offset from the margin boundary
+    // footerHeight determines how far into the margin the line is placed
+    const marginBoundaryY = y + dimensions.height - margins.bottom;
+    const footerLineY = marginBoundaryY + footerHeight;
 
-    // Draw footer content - text sits on the orange line (inside margin area)
+    // Draw footer content - text sits just below the orange line (inside margin area)
     drawHeaderFooterContent(
       project.headerFooter.footer,
       pageContent.isRecto,
       pageContent.pageNumber,
       contentX,
-      footerLineY + 2, // Position text just below the line (inside margin)
+      footerLineY + 2,
       contentWidth,
       layer
     );
 
-    // Draw footer drag line (at margin boundary - controls how far down text extends into margin)
+    // Draw footer drag line (inside margin - independent of margin line)
     const footerLine = new Konva.Line({
       points: [x, footerLineY, x + dimensions.width, footerLineY],
       stroke: headerFooterLineColor,
-      strokeWidth: 1,
-      dash: [2, 2],
+      strokeWidth: 2,
+      dash: [4, 4],
       hitStrokeWidth: 15,
     });
     marginLayer.add(footerLine);
-    // Pass the bottom of footer area for drag calculations
-    addHeaderFooterDragHandler(footerLine, 'footer', pageContent.pageNumber, footerLineY + footerHeight, zoomLevel, stage, marginLayer, isDraggingMarginRef);
+    // Reference point is the margin boundary for calculating height
+    addHeaderFooterDragHandler(footerLine, 'footer', pageContent.pageNumber, marginBoundaryY, zoomLevel, stage, marginLayer, isDraggingMarginRef);
   }
 }
 
@@ -334,16 +339,16 @@ function addHeaderFooterDragHandler(
 ): void {
   line.on('mouseenter', () => {
     stage.container().style.cursor = 'ns-resize';
-    line.stroke('rgba(255, 140, 0, 0.9)');
-    line.strokeWidth(2);
+    line.stroke('rgba(255, 140, 0, 1)');
+    line.strokeWidth(3);
     marginLayer.draw();
   });
 
   line.on('mouseleave', () => {
     if (!isDraggingMarginRef.value) {
       stage.container().style.cursor = 'default';
-      line.stroke('rgba(255, 140, 0, 0.5)');
-      line.strokeWidth(1);
+      line.stroke('rgba(255, 140, 0, 0.7)');
+      line.strokeWidth(2);
       marginLayer.draw();
     }
   });
@@ -369,15 +374,17 @@ function addHeaderFooterDragHandler(
 
       const dy = (pos.y - startPos.y) / zoomLevel;
 
-      // Header: dragging down increases height (line moves down)
-      // Footer: dragging up increases height (line moves up)
+      // Header: line is at (marginBoundary - height), inside top margin
+      // Dragging UP (negative dy) moves line up = increases distance from margin = increases height
+      // Dragging DOWN (positive dy) moves line down = decreases distance from margin = decreases height
+      // Footer: line is at (marginBoundary + height), inside bottom margin
+      // Dragging DOWN (positive dy) moves line down = increases distance from margin = increases height
+      // Dragging UP (negative dy) moves line up = decreases distance from margin = decreases height
       if (type === 'header') {
-        currentHeight = Math.max(12, Math.min(72, startHeight + dy));
+        currentHeight = Math.max(0, startHeight - dy);
         line.points([startPoints[0], startPoints[1] + dy, startPoints[2], startPoints[3] + dy]);
       } else {
-        // Footer line is at top of footer area - line should follow cursor (+ dy)
-        // but height increases when dragging up (- dy for height calc)
-        currentHeight = Math.max(12, Math.min(72, startHeight - dy));
+        currentHeight = Math.max(0, startHeight + dy);
         line.points([startPoints[0], startPoints[1] + dy, startPoints[2], startPoints[3] + dy]);
       }
 
