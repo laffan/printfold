@@ -6,7 +6,7 @@ import { appState } from '../../../services/state';
 import { switchToSelectedTab } from './shared';
 import { addItemToCurrentPage, addImageToCurrentPage } from './itemCreation';
 import { setupEditPropertyInputs } from './propertyInputs';
-import { downloadPageAsSvg, downloadPageAsPng, downloadSpreadAsPng, replacePageWithImage, replaceSpreadWithImage } from '../../../services/pageExport';
+import { downloadPageAsPng, downloadSpreadAsPng, replacePageWithImage, replaceSpreadWithImage } from '../../../services/pageExport';
 import type { PageItem } from '../../../types';
 
 /**
@@ -111,14 +111,6 @@ export function setupEditPagePanel(updateEditSelectedSectionFn: () => void): voi
     const editorState = appState.getEditor();
     if (editorState.selectedPageNumber && editorState.selectedItemId) {
       appState.moveItemBackward(editorState.selectedPageNumber, editorState.selectedItemId);
-    }
-  });
-
-  // Download page as SVG
-  document.getElementById('btn-download-page-svg')?.addEventListener('click', () => {
-    const editorState = appState.getEditor();
-    if (editorState.selectedPageNumber !== null) {
-      downloadPageAsSvg(editorState.selectedPageNumber);
     }
   });
 

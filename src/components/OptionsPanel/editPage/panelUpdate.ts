@@ -88,6 +88,49 @@ function findSelectedPage(): import('../../../types').PageContent | null {
 }
 
 /**
+ * Check if both pages in the visual spread are static
+ */
+function isEntireSpreadStatic(pageNumber: number): boolean {
+  const project = appState.getProject();
+
+  // Build visual spreads like thumbnails do
+  const allPages: import('../../../types').PageContent[] = [];
+  for (const sig of project.signatures) {
+    for (const spread of sig.spreads) {
+      if (spread.verso) allPages.push(spread.verso);
+      if (spread.recto) allPages.push(spread.recto);
+    }
+  }
+
+  allPages.sort((a, b) => a.pageNumber - b.pageNumber);
+  if (allPages.length === 0) return false;
+
+  const pageMap = new Map<number, import('../../../types').PageContent>();
+  for (const page of allPages) {
+    pageMap.set(page.pageNumber, page);
+  }
+
+  const isPageStatic = (p: import('../../../types').PageContent | undefined) =>
+    p?.pageState === 'static' || p?.isStatic;
+
+  // Page 1 is recto of first spread [null|1] - only need page 1 to be static
+  if (pageNumber === 1) {
+    const page1 = pageMap.get(1);
+    return isPageStatic(page1);
+  }
+
+  // For page N > 1: visual spread is [even|odd]
+  const versoNum = pageNumber % 2 === 0 ? pageNumber : pageNumber - 1;
+  const rectoNum = versoNum + 1;
+
+  const verso = pageMap.get(versoNum);
+  const recto = pageMap.get(rectoNum);
+
+  // Both pages must exist and be static
+  return isPageStatic(verso) && isPageStatic(recto);
+}
+
+/**
  * Update the Edit Selected section based on current item selection
  */
 export function updateEditSelectedSection(): void {
@@ -111,6 +154,12 @@ export function updateEditSelectedSection(): void {
   const noSelectionMessage = document.getElementById('no-selection-message');
   const selectedPage = findSelectedPage();
   const isStaticPage = selectedPage?.pageState === 'static' || selectedPage?.isStatic;
+
+  // Get spread buttons to control their visibility
+  const downloadSpreadBtn = document.getElementById('btn-download-spread-png');
+  const replaceSpreadBtn = document.getElementById('btn-replace-spread-image');
+  const spreadStatic = editorState.selectedPageNumber !== null &&
+    isEntireSpreadStatic(editorState.selectedPageNumber);
 
   // If multiple items selected, only show multi-select controls
   if (selectedCount > 1) {
@@ -136,6 +185,9 @@ export function updateEditSelectedSection(): void {
     if (downloadReplaceSection) {
       downloadReplaceSection.style.display = isStaticPage ? 'block' : 'none';
     }
+    // Show spread buttons only when both pages in spread are static
+    if (downloadSpreadBtn) downloadSpreadBtn.style.display = spreadStatic ? 'block' : 'none';
+    if (replaceSpreadBtn) replaceSpreadBtn.style.display = spreadStatic ? 'block' : 'none';
     if (deleteStaticPageSection) {
       deleteStaticPageSection.style.display = isStaticPage ? 'block' : 'none';
     }
@@ -165,6 +217,9 @@ export function updateEditSelectedSection(): void {
   if (downloadReplaceSection) {
     downloadReplaceSection.style.display = isStaticPage ? 'block' : 'none';
   }
+  // Show spread buttons only when both pages in spread are static
+  if (downloadSpreadBtn) downloadSpreadBtn.style.display = spreadStatic ? 'block' : 'none';
+  if (replaceSpreadBtn) replaceSpreadBtn.style.display = spreadStatic ? 'block' : 'none';
   if (deleteStaticPageSection) {
     deleteStaticPageSection.style.display = isStaticPage ? 'block' : 'none';
   }
