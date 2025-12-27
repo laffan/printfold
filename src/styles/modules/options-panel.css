@@ -518,11 +518,9 @@
 .selected-page-info-bar {
   padding: 8px 10px;
   margin-bottom: 12px;
-  background: var(--color-bg-tertiary);
-  border-radius: var(--radius-sm);
-  border-left: 3px solid var(--color-primary);
+  text-align: center;
   font-size: 12px;
-  color: var(--color-text);
+  color: var(--color-text-secondary);
 }
 
 .section-divider {
