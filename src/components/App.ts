@@ -143,6 +143,9 @@ export class App {
           activeTab: tabName as 'editor' | 'preview',
         });
 
+        // Update options tabs state based on mode
+        this.updateOptionsTabsForMode(tabName as 'editor' | 'preview');
+
         // Trigger resize for canvas components
         if (tabName === 'editor') {
           this.spreadEditor.resize();
@@ -153,12 +156,46 @@ export class App {
     });
   }
 
+  /**
+   * Update options tabs based on editor/preview mode
+   * In preview mode, disable the "Selected" tab since there's nothing to select
+   */
+  private updateOptionsTabsForMode(mode: 'editor' | 'preview'): void {
+    const selectedTabBtn = document.querySelector('.options-tabs .tab-btn[data-tab="selected"]') as HTMLButtonElement;
+    const optionsTabButtons = document.querySelectorAll('.options-tabs .tab-btn');
+    const optionsTabPanels = document.querySelectorAll('.options-tab-content > .tab-panel');
+
+    if (!selectedTabBtn) return;
+
+    if (mode === 'preview') {
+      // Disable the Selected tab
+      selectedTabBtn.disabled = true;
+
+      // If Selected tab is currently active, switch to Output tab
+      if (selectedTabBtn.classList.contains('active')) {
+        const outputTabBtn = document.querySelector('.options-tabs .tab-btn[data-tab="output"]');
+        if (outputTabBtn) {
+          optionsTabButtons.forEach(b => b.classList.toggle('active', b === outputTabBtn));
+          optionsTabPanels.forEach(panel => {
+            panel.classList.toggle('active', panel.id === 'tab-output');
+          });
+        }
+      }
+    } else {
+      // Re-enable the Selected tab in editor mode
+      selectedTabBtn.disabled = false;
+    }
+  }
+
   private setupOptionsTabs(): void {
     const tabButtons = document.querySelectorAll('.options-tabs .tab-btn');
     const tabPanels = document.querySelectorAll('.options-tab-content > .tab-panel');
 
     tabButtons.forEach(btn => {
       btn.addEventListener('click', () => {
+        // Don't switch to disabled tabs
+        if ((btn as HTMLButtonElement).disabled) return;
+
         const tabName = btn.getAttribute('data-tab');
 
         // Update button states
