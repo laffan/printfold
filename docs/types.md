@@ -186,25 +186,27 @@ interface PageItemBase {
   shadowOffsetX?: number;
   shadowOffsetY?: number;
   shadowOpacity?: number;
-  // Array duplication properties
-  arrayCount?: number;       // Number of instances (1 = no duplication)
-  arrayOffsetX?: number;     // X offset between instances
-  arrayOffsetY?: number;     // Y offset between instances
-  arrayInstances?: ArrayInstance[];  // Per-instance overrides
+  // Array duplication - multi-dimensional support
+  arrayDimensions?: ArrayDimension[];  // Each dimension creates copies with its own offset
 }
 ```
 
-### ArrayInstance
+### ArrayDimension
 
 ```typescript
-interface ArrayInstance {
-  index: number;         // Instance index (0-based)
-  fill?: FillConfig;     // Override fill for this instance
-  opacity?: number;      // Override opacity for this instance
+interface ArrayDimension {
+  id: string;          // Unique identifier for this dimension
+  count: number;       // Number of copies in this dimension (minimum 2)
+  offsetX: number;     // X offset between copies in this dimension
+  offsetY: number;     // Y offset between copies in this dimension
 }
 ```
 
-When array is enabled (`arrayCount > 1`), items are rendered as a Konva.Group containing all instances. Each instance can have its own fill configuration through the `arrayInstances` array.
+The array feature supports multi-dimensional duplication:
+- Each dimension defines a count and offset (X, Y)
+- Dimensions are multiplicative: 3×2 = 6 total copies
+- Copies render in reverse order (first copy on top, later copies below)
+- Example: Dimension 1 (count=3, x=30, y=0) + Dimension 2 (count=2, x=0, y=40) creates a 3×2 grid
 
 ### TextPageItem
 

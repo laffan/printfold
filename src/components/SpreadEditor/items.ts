@@ -7,7 +7,9 @@ export {
   applyFillToShape,
   startTextEditing,
   createItemNode,
-  createArrayInstanceNode,
+  createArrayInstanceNodes,
+  calculateArrayPositions,
+  getTotalArrayInstances,
   renderPageItems,
   renderSpanningItems
 } from './items/index';

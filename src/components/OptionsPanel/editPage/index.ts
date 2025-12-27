@@ -9,5 +9,5 @@ export { setupMultiSelectControls, updateMultiSelectControls } from './multiSele
 export { addItemToCurrentPage, addImageToCurrentPage, addImageFromFileToPage } from './itemCreation';
 export { setupEditPagePanel } from './setupPanel';
 export { updateEditPagePanel, updateEditSelectedSection } from './panelUpdate';
-export { updateArrayInstancesList } from './arrayInstances';
+export { updateArrayDimensionsList, addArrayDimension, setupAddDimensionButton } from './arrayInstances';
 export { setupPageBackgroundPicker } from './pageBackground';

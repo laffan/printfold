@@ -137,18 +137,16 @@ export interface PageItemBase {
   shadowOffsetX?: number;
   shadowOffsetY?: number;
   shadowOpacity?: number;
-  // Array duplication properties
-  arrayCount?: number; // Number of duplicates (1 = no duplication)
-  arrayOffsetX?: number; // X offset between each duplicate
-  arrayOffsetY?: number; // Y offset between each duplicate
-  arrayInstances?: ArrayInstance[]; // Per-instance overrides
+  // Array duplication - multi-dimensional support
+  arrayDimensions?: ArrayDimension[]; // Each dimension creates copies with its own offset
 }
 
-// Array instance with individual fill override
-export interface ArrayInstance {
-  index: number;
-  fill?: FillConfig;
-  opacity?: number;
+// Array dimension configuration
+export interface ArrayDimension {
+  id: string;          // Unique identifier for this dimension
+  count: number;       // Number of copies in this dimension (minimum 2)
+  offsetX: number;     // X offset between copies in this dimension
+  offsetY: number;     // Y offset between copies in this dimension
 }
 
 export interface TextPageItem extends PageItemBase {

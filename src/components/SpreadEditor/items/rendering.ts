@@ -6,7 +6,7 @@ import Konva from 'konva';
 import { appState } from '../../../services/state';
 import { switchToSelectedTab } from '../../OptionsPanel/editPage';
 import { createItemNode } from './nodeCreation';
-import { createArrayInstanceNode } from './arrayItems';
+import { createArrayInstanceNodes, getTotalArrayInstances } from './arrayItems';
 import type { PageContent, PageItem, SpanningItem, TextPageItem, ShapePageItem, ImagePageItem } from '../../../types';
 
 /**
@@ -26,13 +26,11 @@ export function renderPageItems(
   if (!page.items) return;
 
   for (const item of page.items) {
-    const arrayCount = item.arrayCount || 1;
-    const arrayOffsetX = item.arrayOffsetX || 0;
-    const arrayOffsetY = item.arrayOffsetY || 0;
-    const arrayInstances = item.arrayInstances || [];
+    const dimensions = item.arrayDimensions || [];
+    const totalInstances = getTotalArrayInstances(dimensions);
 
-    // If array count is 1 or less, just create a single item
-    if (arrayCount <= 1) {
+    // If no array dimensions or only 1 instance, just create a single item
+    if (totalInstances <= 1) {
       const node = createItemNode(item, xOffset, page.pageNumber, zoomLevel, stage, itemsLayer, transformer, updateTransformerFn);
       if (node) {
         itemNodes.set(item.id, node);
@@ -52,31 +50,30 @@ export function renderPageItems(
     group.setAttr('xOffset', xOffset);
     group.setAttr('isArrayGroup', true);
 
-    // Create all array instances within the group
-    for (let i = 0; i < Math.min(arrayCount, 50); i++) {
-      const instanceConfig = arrayInstances.find(inst => inst.index === i);
-      const instanceNode = createArrayInstanceNode(
-        item, i, 0, arrayOffsetX, arrayOffsetY,
-        instanceConfig, page.pageNumber, zoomLevel, stage, itemsLayer, transformer, updateTransformerFn
-      );
-      if (instanceNode) {
-        // Remove individual event handlers - group handles interactions
-        instanceNode.draggable(false);
-        instanceNode.off('click tap dragstart dragmove dragend transform transformend');
-        instanceNode.setAttr('isArrayMember', true);
-        group.add(instanceNode);
-      }
+    // Create all array instances within the group using multi-dimensional calculation
+    // Add in reverse order so later copies appear below earlier ones (first copy on top)
+    const instanceNodes = createArrayInstanceNodes(
+      item, 0, page.pageNumber, zoomLevel, stage, itemsLayer, transformer, updateTransformerFn
+    );
+
+    for (let i = instanceNodes.length - 1; i >= 0; i--) {
+      const instanceNode = instanceNodes[i];
+      // Remove individual event handlers - group handles interactions
+      instanceNode.draggable(false);
+      instanceNode.off('click tap dragstart dragmove dragend transform transformend');
+      instanceNode.setAttr('isArrayMember', true);
+      group.add(instanceNode);
     }
 
     // Handle group click to select the parent item
-    group.on('click tap', () => {
+    group.on('click tap', (e) => {
       const position = xOffset === 0 ? 'verso' : 'recto';
+      const additive = e.evt?.shiftKey || false;
       appState.updateEditor({
-        selectedItemId: item.id,
-        selectedItemIds: [item.id],
         selectedPageNumber: page.pageNumber,
         selectedPagePosition: position,
       });
+      appState.selectItem(item.id, additive);
       switchToSelectedTab();
     });
 

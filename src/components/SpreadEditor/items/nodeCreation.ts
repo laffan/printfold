@@ -127,9 +127,14 @@ export function createItemNode(
       draggable: true,
     });
 
-    // Apply fill if enabled
+    // Apply fill if enabled (use measured height for gradients if item.height not set)
     if (hasFill) {
-      applyFillToShape(textNode, textItem.fill, textItem.color, item.width, item.height || textNode.height());
+      // Get the actual text height for proper gradient calculation
+      const textHeight = item.height || textNode.height() || textItem.fontSize * 1.2;
+      applyFillToShape(textNode, textItem.fill, textItem.color, item.width, textHeight);
+    } else {
+      // When fill is disabled, make text transparent
+      textNode.fill('transparent');
     }
 
     // Apply stroke if enabled
