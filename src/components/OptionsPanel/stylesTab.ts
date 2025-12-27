@@ -20,6 +20,8 @@ interface DetectedStyles {
   hasList: boolean;
   hasCode: boolean;
   hasBlockquote: boolean;
+  hasHighlight: boolean;
+  hasStrikethrough: boolean;
 }
 
 /**
@@ -40,6 +42,8 @@ function detectUsedStyles(): DetectedStyles {
     hasList: false,
     hasCode: false,
     hasBlockquote: false,
+    hasHighlight: false,
+    hasStrikethrough: false,
   };
 
   // If there are markdown files, we have body text
@@ -93,6 +97,9 @@ function detectUsedStyles(): DetectedStyles {
     if (/^[\*\-\+] /m.test(content) || /^\d+\. /m.test(content)) result.hasList = true;
     if (/```/.test(content) || /^    /m.test(content)) result.hasCode = true;
     if (/^> /m.test(content)) result.hasBlockquote = true;
+    // Detect Obsidian-flavored markdown: highlight (==text==) and strikethrough (~~text~~)
+    if (/==.+?==/.test(content)) result.hasHighlight = true;
+    if (/~~.+?~~/.test(content)) result.hasStrikethrough = true;
   }
 
   return result;
@@ -115,14 +122,14 @@ function createBodySection(): HTMLElement {
         <span>Size</span>
         <div class="input-with-cap">
           <input type="number" id="dyn-font-size-body" min="6" max="24" step="1">
-          <span class="input-cap">pt</span>
+          <span class="input-cap" data-for="dyn-font-size-body">pt</span>
         </div>
       </label>
       <label>
         <span>Line Height</span>
         <div class="input-with-cap">
-          <input type="number" id="dyn-line-height-body" min="1" max="3" step="0.1">
-          <span class="input-cap">×</span>
+          <input type="number" id="dyn-line-height-body" min="0.8" max="3" step="0.05">
+          <span class="input-cap" data-for="dyn-line-height-body">×</span>
         </div>
       </label>
       <label>
@@ -143,12 +150,12 @@ function createHeadingsSection(styles: DetectedStyles): HTMLElement {
 
   // Build size inputs for only detected heading levels
   const sizeInputs: string[] = [];
-  if (styles.hasH1) sizeInputs.push('<label><span>H1</span><div class="input-with-cap"><input type="number" id="dyn-font-size-h1" min="12" max="72"><span class="input-cap">pt</span></div></label>');
-  if (styles.hasH2) sizeInputs.push('<label><span>H2</span><div class="input-with-cap"><input type="number" id="dyn-font-size-h2" min="10" max="48"><span class="input-cap">pt</span></div></label>');
-  if (styles.hasH3) sizeInputs.push('<label><span>H3</span><div class="input-with-cap"><input type="number" id="dyn-font-size-h3" min="8" max="36"><span class="input-cap">pt</span></div></label>');
-  if (styles.hasH4) sizeInputs.push('<label><span>H4</span><div class="input-with-cap"><input type="number" id="dyn-font-size-h4" min="8" max="24"><span class="input-cap">pt</span></div></label>');
-  if (styles.hasH5) sizeInputs.push('<label><span>H5</span><div class="input-with-cap"><input type="number" id="dyn-font-size-h5" min="6" max="18"><span class="input-cap">pt</span></div></label>');
-  if (styles.hasH6) sizeInputs.push('<label><span>H6</span><div class="input-with-cap"><input type="number" id="dyn-font-size-h6" min="6" max="16"><span class="input-cap">pt</span></div></label>');
+  if (styles.hasH1) sizeInputs.push('<label><span>H1</span><div class="input-with-cap"><input type="number" id="dyn-font-size-h1" min="12" max="72" step="1"><span class="input-cap" data-for="dyn-font-size-h1">pt</span></div></label>');
+  if (styles.hasH2) sizeInputs.push('<label><span>H2</span><div class="input-with-cap"><input type="number" id="dyn-font-size-h2" min="10" max="48" step="1"><span class="input-cap" data-for="dyn-font-size-h2">pt</span></div></label>');
+  if (styles.hasH3) sizeInputs.push('<label><span>H3</span><div class="input-with-cap"><input type="number" id="dyn-font-size-h3" min="8" max="36" step="1"><span class="input-cap" data-for="dyn-font-size-h3">pt</span></div></label>');
+  if (styles.hasH4) sizeInputs.push('<label><span>H4</span><div class="input-with-cap"><input type="number" id="dyn-font-size-h4" min="8" max="24" step="1"><span class="input-cap" data-for="dyn-font-size-h4">pt</span></div></label>');
+  if (styles.hasH5) sizeInputs.push('<label><span>H5</span><div class="input-with-cap"><input type="number" id="dyn-font-size-h5" min="6" max="18" step="1"><span class="input-cap" data-for="dyn-font-size-h5">pt</span></div></label>');
+  if (styles.hasH6) sizeInputs.push('<label><span>H6</span><div class="input-with-cap"><input type="number" id="dyn-font-size-h6" min="6" max="16" step="1"><span class="input-cap" data-for="dyn-font-size-h6">pt</span></div></label>');
 
   section.innerHTML = `
     <h4 class="section-header">Headings</h4>
@@ -162,6 +169,96 @@ function createHeadingsSection(styles: DetectedStyles): HTMLElement {
     <div class="form-group">
       <label>Color</label>
       <input type="color" id="dyn-color-headings">
+    </div>
+  `;
+  return section;
+}
+
+/**
+ * Create blockquote style section with full text formatting
+ */
+function createBlockquoteSection(): HTMLElement {
+  const section = document.createElement('div');
+  section.className = 'options-section';
+  section.innerHTML = `
+    <h4 class="section-header">Blockquote</h4>
+    <div class="form-group">
+      <label>Font Family</label>
+      <select id="dyn-font-blockquote"></select>
+    </div>
+    <div class="form-group inline-sizes">
+      <label>
+        <span>Size</span>
+        <div class="input-with-cap">
+          <input type="number" id="dyn-font-size-blockquote" min="6" max="24" step="1">
+          <span class="input-cap" data-for="dyn-font-size-blockquote">pt</span>
+        </div>
+      </label>
+      <label>
+        <span>Line Height</span>
+        <div class="input-with-cap">
+          <input type="number" id="dyn-line-height-blockquote" min="0.8" max="3" step="0.05">
+          <span class="input-cap" data-for="dyn-line-height-blockquote">×</span>
+        </div>
+      </label>
+      <label>
+        <span>Color</span>
+        <input type="color" id="dyn-color-blockquote">
+      </label>
+    </div>
+    <div class="form-group inline-sizes">
+      <label>
+        <input type="checkbox" id="dyn-blockquote-italic">
+        <span>Italic</span>
+      </label>
+      <label>
+        <input type="checkbox" id="dyn-blockquote-bold">
+        <span>Bold</span>
+      </label>
+    </div>
+  `;
+  return section;
+}
+
+/**
+ * Create highlight style section (Obsidian ==text== syntax)
+ */
+function createHighlightSection(): HTMLElement {
+  const section = document.createElement('div');
+  section.className = 'options-section';
+  section.innerHTML = `
+    <h4 class="section-header">Highlight</h4>
+    <div class="form-group inline-sizes">
+      <label>
+        <span>Text Color</span>
+        <input type="color" id="dyn-highlight-text-color">
+      </label>
+      <label>
+        <span>Background</span>
+        <input type="color" id="dyn-highlight-bg-color">
+      </label>
+    </div>
+  `;
+  return section;
+}
+
+/**
+ * Create strikethrough style section (~~text~~ syntax)
+ */
+function createStrikethroughSection(): HTMLElement {
+  const section = document.createElement('div');
+  section.className = 'options-section';
+  section.innerHTML = `
+    <h4 class="section-header">Strikethrough</h4>
+    <div class="form-group inline-sizes">
+      <label>
+        <span>Text Color</span>
+        <input type="color" id="dyn-strikethrough-text-color">
+      </label>
+      <label>
+        <span>Line Color</span>
+        <input type="color" id="dyn-strikethrough-line-color">
+      </label>
     </div>
   `;
   return section;
@@ -185,7 +282,14 @@ function createHeaderFooterSection(type: 'header' | 'footer'): HTMLElement {
         <span>Size</span>
         <div class="input-with-cap">
           <input type="number" id="dyn-${type}-font-size" min="6" max="24" step="1">
-          <span class="input-cap">pt</span>
+          <span class="input-cap" data-for="dyn-${type}-font-size">pt</span>
+        </div>
+      </label>
+      <label>
+        <span>Line Height</span>
+        <div class="input-with-cap">
+          <input type="number" id="dyn-${type}-line-height" min="0.8" max="3" step="0.05">
+          <span class="input-cap" data-for="dyn-${type}-line-height">×</span>
         </div>
       </label>
       <label>
@@ -193,8 +297,84 @@ function createHeaderFooterSection(type: 'header' | 'footer'): HTMLElement {
         <input type="color" id="dyn-${type}-color">
       </label>
     </div>
+    <div class="form-group inline-sizes">
+      <label>
+        <input type="checkbox" id="dyn-${type}-bold">
+        <span>Bold</span>
+      </label>
+    </div>
   `;
   return section;
+}
+
+/**
+ * Set up draggable caps for dynamic inputs
+ * This needs to be called after dynamic sections are created
+ */
+function setupDynamicDraggableCaps(): void {
+  const caps = document.querySelectorAll('#styles-content .input-cap[data-for]');
+
+  caps.forEach(cap => {
+    const capElement = cap as HTMLElement;
+    const inputId = capElement.dataset.for;
+    if (!inputId) return;
+
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    if (!input) return;
+
+    // Check if already has drag listener
+    if (capElement.dataset.dragSetup) return;
+    capElement.dataset.dragSetup = 'true';
+
+    let startX = 0;
+    let startValue = 0;
+    let isDragging = false;
+
+    const onMouseDown = (e: MouseEvent) => {
+      e.preventDefault();
+      isDragging = true;
+      startX = e.clientX;
+      startValue = parseFloat(input.value) || 0;
+      capElement.classList.add('dragging');
+      document.body.style.cursor = 'ew-resize';
+
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return;
+
+      const deltaX = e.clientX - startX;
+      const step = parseFloat(input.step) || 0.1;
+      const sensitivity = step * 2;
+      const deltaValue = deltaX * sensitivity;
+      let newValue = startValue + deltaValue;
+
+      // Apply min/max constraints
+      const min = parseFloat(input.min);
+      const max = parseFloat(input.max);
+      if (!isNaN(min)) newValue = Math.max(min, newValue);
+      if (!isNaN(max)) newValue = Math.min(max, newValue);
+
+      // Round to step precision
+      const precision = step < 1 ? Math.ceil(-Math.log10(step)) : 0;
+      newValue = parseFloat(newValue.toFixed(precision));
+
+      input.value = newValue.toString();
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+
+    const onMouseUp = () => {
+      isDragging = false;
+      capElement.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    capElement.addEventListener('mousedown', onMouseDown);
+  });
 }
 
 /**
@@ -273,56 +453,201 @@ function setupInputHandlers(): void {
     });
   }
 
-  // Header handlers
-  const headerSizeInput = document.getElementById('dyn-header-font-size') as HTMLInputElement;
-  const headerColorInput = document.getElementById('dyn-header-color') as HTMLInputElement;
+  // Blockquote handlers
+  setupBlockquoteHandlers();
 
-  if (headerSizeInput) {
-    headerSizeInput.value = (headerFooter.header.font.fontSize || 10).toString();
-    headerSizeInput.addEventListener('input', () => {
-      const value = parseFloat(headerSizeInput.value);
+  // Highlight handlers
+  setupHighlightHandlers();
+
+  // Strikethrough handlers
+  setupStrikethroughHandlers();
+
+  // Header handlers
+  setupHeaderFooterHandlers('header');
+
+  // Footer handlers
+  setupHeaderFooterHandlers('footer');
+}
+
+/**
+ * Set up blockquote input handlers
+ */
+function setupBlockquoteHandlers(): void {
+  const fontOptions = appState.getProject().fontOptions;
+
+  const sizeInput = document.getElementById('dyn-font-size-blockquote') as HTMLInputElement;
+  const lineHeightInput = document.getElementById('dyn-line-height-blockquote') as HTMLInputElement;
+  const colorInput = document.getElementById('dyn-color-blockquote') as HTMLInputElement;
+  const italicCheckbox = document.getElementById('dyn-blockquote-italic') as HTMLInputElement;
+  const boldCheckbox = document.getElementById('dyn-blockquote-bold') as HTMLInputElement;
+
+  if (sizeInput) {
+    sizeInput.value = fontOptions.blockquote.fontSize.toString();
+    sizeInput.addEventListener('input', () => {
+      const value = parseFloat(sizeInput.value);
       if (!isNaN(value)) {
-        const hf = appState.getProject().headerFooter;
-        appState.updateHeaderFooter({
-          header: { ...hf.header, font: { ...hf.header.font, fontSize: value } }
-        });
+        const fonts = appState.getProject().fontOptions;
+        appState.updateFontOptions({ blockquote: { ...fonts.blockquote, fontSize: value } });
       }
     });
   }
 
-  if (headerColorInput) {
-    headerColorInput.value = headerFooter.header.font.color || '#666666';
-    headerColorInput.addEventListener('input', () => {
-      const hf = appState.getProject().headerFooter;
-      appState.updateHeaderFooter({
-        header: { ...hf.header, font: { ...hf.header.font, color: headerColorInput.value } }
+  if (lineHeightInput) {
+    lineHeightInput.value = (fontOptions.blockquote.lineHeight || appState.getProject().layoutOptions.lineHeight || 1.5).toString();
+    lineHeightInput.addEventListener('input', () => {
+      const value = parseFloat(lineHeightInput.value);
+      if (!isNaN(value)) {
+        const fonts = appState.getProject().fontOptions;
+        appState.updateFontOptions({ blockquote: { ...fonts.blockquote, lineHeight: value } });
+      }
+    });
+  }
+
+  if (colorInput) {
+    colorInput.value = fontOptions.blockquote.color || '#555555';
+    colorInput.addEventListener('input', () => {
+      const fonts = appState.getProject().fontOptions;
+      appState.updateFontOptions({ blockquote: { ...fonts.blockquote, color: colorInput.value } });
+    });
+  }
+
+  if (italicCheckbox) {
+    italicCheckbox.checked = fontOptions.blockquote.fontStyle === 'italic';
+    italicCheckbox.addEventListener('change', () => {
+      const fonts = appState.getProject().fontOptions;
+      appState.updateFontOptions({
+        blockquote: { ...fonts.blockquote, fontStyle: italicCheckbox.checked ? 'italic' : 'normal' }
       });
     });
   }
 
-  // Footer handlers
-  const footerSizeInput = document.getElementById('dyn-footer-font-size') as HTMLInputElement;
-  const footerColorInput = document.getElementById('dyn-footer-color') as HTMLInputElement;
+  if (boldCheckbox) {
+    boldCheckbox.checked = fontOptions.blockquote.fontWeight === 'bold';
+    boldCheckbox.addEventListener('change', () => {
+      const fonts = appState.getProject().fontOptions;
+      appState.updateFontOptions({
+        blockquote: { ...fonts.blockquote, fontWeight: boldCheckbox.checked ? 'bold' : 'normal' }
+      });
+    });
+  }
+}
 
-  if (footerSizeInput) {
-    footerSizeInput.value = (headerFooter.footer.font.fontSize || 10).toString();
-    footerSizeInput.addEventListener('input', () => {
-      const value = parseFloat(footerSizeInput.value);
+/**
+ * Set up highlight input handlers
+ */
+function setupHighlightHandlers(): void {
+  const fontOptions = appState.getProject().fontOptions;
+  const highlight = fontOptions.highlight || { textColor: '#000000', backgroundColor: '#ffff00' };
+
+  const textColorInput = document.getElementById('dyn-highlight-text-color') as HTMLInputElement;
+  const bgColorInput = document.getElementById('dyn-highlight-bg-color') as HTMLInputElement;
+
+  if (textColorInput) {
+    textColorInput.value = highlight.textColor;
+    textColorInput.addEventListener('input', () => {
+      const fonts = appState.getProject().fontOptions;
+      appState.updateFontOptions({
+        highlight: { ...fonts.highlight!, textColor: textColorInput.value }
+      });
+    });
+  }
+
+  if (bgColorInput) {
+    bgColorInput.value = highlight.backgroundColor;
+    bgColorInput.addEventListener('input', () => {
+      const fonts = appState.getProject().fontOptions;
+      appState.updateFontOptions({
+        highlight: { ...fonts.highlight!, backgroundColor: bgColorInput.value }
+      });
+    });
+  }
+}
+
+/**
+ * Set up strikethrough input handlers
+ */
+function setupStrikethroughHandlers(): void {
+  const fontOptions = appState.getProject().fontOptions;
+  const strikethrough = fontOptions.strikethrough || { textColor: '#888888', lineColor: '#888888' };
+
+  const textColorInput = document.getElementById('dyn-strikethrough-text-color') as HTMLInputElement;
+  const lineColorInput = document.getElementById('dyn-strikethrough-line-color') as HTMLInputElement;
+
+  if (textColorInput) {
+    textColorInput.value = strikethrough.textColor;
+    textColorInput.addEventListener('input', () => {
+      const fonts = appState.getProject().fontOptions;
+      appState.updateFontOptions({
+        strikethrough: { ...fonts.strikethrough!, textColor: textColorInput.value }
+      });
+    });
+  }
+
+  if (lineColorInput) {
+    lineColorInput.value = strikethrough.lineColor;
+    lineColorInput.addEventListener('input', () => {
+      const fonts = appState.getProject().fontOptions;
+      appState.updateFontOptions({
+        strikethrough: { ...fonts.strikethrough!, lineColor: lineColorInput.value }
+      });
+    });
+  }
+}
+
+/**
+ * Set up header/footer input handlers
+ */
+function setupHeaderFooterHandlers(type: 'header' | 'footer'): void {
+  const headerFooter = appState.getProject().headerFooter;
+  const config = headerFooter[type];
+
+  const sizeInput = document.getElementById(`dyn-${type}-font-size`) as HTMLInputElement;
+  const lineHeightInput = document.getElementById(`dyn-${type}-line-height`) as HTMLInputElement;
+  const colorInput = document.getElementById(`dyn-${type}-color`) as HTMLInputElement;
+  const boldCheckbox = document.getElementById(`dyn-${type}-bold`) as HTMLInputElement;
+
+  if (sizeInput) {
+    sizeInput.value = (config.font.fontSize || 10).toString();
+    sizeInput.addEventListener('input', () => {
+      const value = parseFloat(sizeInput.value);
       if (!isNaN(value)) {
         const hf = appState.getProject().headerFooter;
         appState.updateHeaderFooter({
-          footer: { ...hf.footer, font: { ...hf.footer.font, fontSize: value } }
+          [type]: { ...hf[type], font: { ...hf[type].font, fontSize: value } }
         });
       }
     });
   }
 
-  if (footerColorInput) {
-    footerColorInput.value = headerFooter.footer.font.color || '#666666';
-    footerColorInput.addEventListener('input', () => {
+  if (lineHeightInput) {
+    lineHeightInput.value = (config.font.lineHeight || 1.2).toString();
+    lineHeightInput.addEventListener('input', () => {
+      const value = parseFloat(lineHeightInput.value);
+      if (!isNaN(value)) {
+        const hf = appState.getProject().headerFooter;
+        appState.updateHeaderFooter({
+          [type]: { ...hf[type], font: { ...hf[type].font, lineHeight: value } }
+        });
+      }
+    });
+  }
+
+  if (colorInput) {
+    colorInput.value = config.font.color || '#666666';
+    colorInput.addEventListener('input', () => {
       const hf = appState.getProject().headerFooter;
       appState.updateHeaderFooter({
-        footer: { ...hf.footer, font: { ...hf.footer.font, color: footerColorInput.value } }
+        [type]: { ...hf[type], font: { ...hf[type].font, color: colorInput.value } }
+      });
+    });
+  }
+
+  if (boldCheckbox) {
+    boldCheckbox.checked = config.font.fontWeight === 'bold';
+    boldCheckbox.addEventListener('change', () => {
+      const hf = appState.getProject().headerFooter;
+      appState.updateHeaderFooter({
+        [type]: { ...hf[type], font: { ...hf[type].font, fontWeight: boldCheckbox.checked ? 'bold' : 'normal' } }
       });
     });
   }
@@ -360,6 +685,16 @@ function setupFontDropdowns(): void {
   if (headingsDropdown) {
     headingsDropdown.setValue(fontOptions.h1.fontFamily);
     dynamicFontDropdowns.set('headings', headingsDropdown);
+  }
+
+  // Blockquote font dropdown
+  const blockquoteDropdown = createFontDropdown('dyn-font-blockquote', (value) => {
+    const fonts = appState.getProject().fontOptions;
+    appState.updateFontOptions({ blockquote: { ...fonts.blockquote, fontFamily: value } });
+  });
+  if (blockquoteDropdown) {
+    blockquoteDropdown.setValue(fontOptions.blockquote.fontFamily);
+    dynamicFontDropdowns.set('blockquote', blockquoteDropdown);
   }
 
   // Header font dropdown
@@ -421,6 +756,7 @@ export function updateStylesTab(): void {
     if (headerFooter.header.enabled || headerFooter.footer.enabled) {
       setupInputHandlers();
       setupFontDropdowns();
+      setupDynamicDraggableCaps();
     }
     return;
   }
@@ -439,6 +775,21 @@ export function updateStylesTab(): void {
     container.appendChild(createHeadingsSection(styles));
   }
 
+  // Add blockquote section if blockquotes are detected
+  if (styles.hasBlockquote) {
+    container.appendChild(createBlockquoteSection());
+  }
+
+  // Add highlight section if highlights are detected
+  if (styles.hasHighlight) {
+    container.appendChild(createHighlightSection());
+  }
+
+  // Add strikethrough section if strikethroughs are detected
+  if (styles.hasStrikethrough) {
+    container.appendChild(createStrikethroughSection());
+  }
+
   // Add header/footer sections if enabled
   if (headerFooter.header.enabled) {
     container.appendChild(createHeaderFooterSection('header'));
@@ -450,4 +801,5 @@ export function updateStylesTab(): void {
   // Set up handlers
   setupInputHandlers();
   setupFontDropdowns();
+  setupDynamicDraggableCaps();
 }
