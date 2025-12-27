@@ -109,15 +109,9 @@ export function drawPageItemsClipped(
           opacity,
         });
       } else if (shapeItem.shapeType === 'ellipse' || shapeItem.shapeType === 'circle') {
-        // For circles/ellipses, only draw if the CENTER is within the visible region
-        // Since pdf-lib doesn't support clipping paths, circles cannot be split across pages
-        // They will appear on whichever page contains their center
-        const centerLocalX = adjustedX + item.width / 2;
-
-        // Skip if center is outside the clip region - the circle belongs to the other page
-        if (centerLocalX < 0 || centerLocalX > clipWidth) continue;
-
-        const centerX = pageX + centerLocalX;
+        // Draw circles/ellipses - pdf-lib clipping in PDFGenerator handles partial visibility
+        // No need for center-based skip since clipping is now applied at the page level
+        const centerX = pageX + adjustedX + item.width / 2;
         const centerY = itemPdfY + item.height / 2;
 
         if (shapeItem.shapeType === 'circle') {
