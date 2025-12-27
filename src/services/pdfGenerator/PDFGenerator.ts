@@ -3,7 +3,7 @@
  * Generates print-ready PDFs using pdf-lib with booklet imposition
  */
 
-import { PDFDocument, PDFPage, PDFImage, rgb, StandardFonts } from 'pdf-lib';
+import { PDFDocument, PDFPage, PDFImage, rgb, StandardFonts, pushGraphicsState, popGraphicsState, moveTo, lineTo, closePath, clip, endPath } from 'pdf-lib';
 import { appState } from '../state';
 import { textFlowEngine } from '../textFlow';
 import type { Signature, Spread, PageContent, PageItem, SpanningItem } from '../../types';
@@ -61,9 +61,23 @@ export class PDFGenerator {
       pageHeight = sheetSize.height;
     }
 
+    // Build a GLOBAL page map across all signatures for reading-order adjacency
+    // This allows crossing items to work between pages in different signatures
+    const globalPageMap: Map<number, PageContent> = new Map();
+    for (const sig of project.signatures) {
+      for (const spread of sig.spreads) {
+        if (spread.verso) {
+          globalPageMap.set(spread.verso.pageNumber, spread.verso);
+        }
+        if (spread.recto) {
+          globalPageMap.set(spread.recto.pageNumber, spread.recto);
+        }
+      }
+    }
+
     // Generate imposed pages for each signature
     for (const signature of project.signatures) {
-      await this.generateSignatureSheets(pdfDoc, signature, sheetSize, pageWidth, pageHeight);
+      await this.generateSignatureSheets(pdfDoc, signature, sheetSize, pageWidth, pageHeight, globalPageMap);
     }
 
     // Calculate rows per sheet for cut marks
@@ -89,14 +103,14 @@ export class PDFGenerator {
     signature: Signature,
     sheetSize: { width: number; height: number },
     pageWidth: number,
-    pageHeight: number
+    pageHeight: number,
+    globalPageMap: Map<number, PageContent>
   ): Promise<void> {
     const project = appState.getProject();
     const imposition = textFlowEngine.calculateImposition(signature);
     const staticSpreads = project.staticSpreads || [];
 
-    // Get all pages from spreads with their spread info
-    const pages: (PageContent | null)[] = [];
+    // Build maps for looking up spread info by page number
     const spreadForPage: Map<number, { spread: Spread; staticSpread?: import('../../types').StaticSpread }> = new Map();
 
     for (const spread of signature.spreads) {
@@ -108,24 +122,31 @@ export class PDFGenerator {
       if (spread.recto) {
         spreadForPage.set(spread.recto.pageNumber, { spread, staticSpread });
       }
-      pages.push(spread.verso);
-      pages.push(spread.recto);
     }
+
+    // Helper to get reading-order adjacent page
+    // For a verso (left page), adjacent is pageNumber + 1 (the recto to its right)
+    // For a recto (right page), adjacent is pageNumber - 1 (the verso to its left)
+    const getReadingOrderAdjacent = (page: PageContent): PageContent | null => {
+      const adjacentPageNum = page.isRecto ? page.pageNumber - 1 : page.pageNumber + 1;
+      return globalPageMap.get(adjacentPageNum) || null;
+    };
+
+    // DEBUG: Log spread structure
+    console.log('[CROSSING DEBUG] Signature', signature.signatureNumber, 'spreads:',
+      signature.spreads.map(sp => ({
+        verso: sp.verso?.pageNumber,
+        recto: sp.recto?.pageNumber,
+        versoIsRecto: sp.verso?.isRecto,
+        rectoIsRecto: sp.recto?.isRecto,
+      }))
+    );
 
     const rowsPerSheet = calculateSpreadRowsPerSheet(
       sheetSize,
       pageHeight,
       project.outputOptions.fillAvailableSpace
     );
-
-    const basePageOffset = (signature.signatureNumber - 1) * signature.pageCount;
-    const pageNumberToIndex = (impositionPageNum: number): number => {
-      const localPageNum = impositionPageNum - basePageOffset;
-      if (localPageNum === signature.pageCount) {
-        return 0;
-      }
-      return localPageNum;
-    };
 
     // Group imposition sheets for multi-row layout
     for (let i = 0; i < imposition.length; i += rowsPerSheet) {
@@ -137,23 +158,23 @@ export class PDFGenerator {
       sheetsInGroup.forEach((sheet, rowIndex) => {
         const rowY = sheetSize.height - (rowIndex + 1) * pageHeight;
 
-        const leftPageIndex = pageNumberToIndex(sheet.front.left);
-        const rightPageIndex = pageNumberToIndex(sheet.front.right);
+        // Look up pages by their page number from global map
+        const leftPage = globalPageMap.get(sheet.front.left) || null;
+        const rightPage = globalPageMap.get(sheet.front.right) || null;
 
-        const leftPage = leftPageIndex >= 0 && leftPageIndex < pages.length ? pages[leftPageIndex] : null;
-        const rightPage = rightPageIndex >= 0 && rightPageIndex < pages.length ? pages[rightPageIndex] : null;
-
+        // Use reading-order adjacency for crossing items:
+        // Page N's adjacent is N-1 (if recto) or N+1 (if verso) in reading order
         if (leftPage) {
           const info = spreadForPage.get(leftPage.pageNumber);
-          const adjacentPage = leftPage.isRecto ? info?.spread.verso : info?.spread.recto;
           const spanningItems = info?.staticSpread?.spanningItems;
+          const adjacentPage = getReadingOrderAdjacent(leftPage);
           this.drawPage(frontPage, leftPage, 0, rowY, pageWidth, pageHeight, project, leftPage.isRecto, adjacentPage, spanningItems);
         }
 
         if (rightPage) {
           const info = spreadForPage.get(rightPage.pageNumber);
-          const adjacentPage = rightPage.isRecto ? info?.spread.verso : info?.spread.recto;
           const spanningItems = info?.staticSpread?.spanningItems;
+          const adjacentPage = getReadingOrderAdjacent(rightPage);
           this.drawPage(frontPage, rightPage, pageWidth, rowY, pageWidth, pageHeight, project, rightPage.isRecto, adjacentPage, spanningItems);
         }
       });
@@ -164,23 +185,22 @@ export class PDFGenerator {
       sheetsInGroup.forEach((sheet, rowIndex) => {
         const rowY = sheetSize.height - (rowIndex + 1) * pageHeight;
 
-        const backLeftIndex = pageNumberToIndex(sheet.back.left);
-        const backRightIndex = pageNumberToIndex(sheet.back.right);
+        // Look up pages by their page number from global map
+        const leftPage = globalPageMap.get(sheet.back.left) || null;
+        const rightPage = globalPageMap.get(sheet.back.right) || null;
 
-        const leftPage = backLeftIndex >= 0 && backLeftIndex < pages.length ? pages[backLeftIndex] : null;
-        const rightPage = backRightIndex >= 0 && backRightIndex < pages.length ? pages[backRightIndex] : null;
-
+        // Use reading-order adjacency for crossing items
         if (leftPage) {
           const info = spreadForPage.get(leftPage.pageNumber);
-          const adjacentPage = leftPage.isRecto ? info?.spread.verso : info?.spread.recto;
           const spanningItems = info?.staticSpread?.spanningItems;
+          const adjacentPage = getReadingOrderAdjacent(leftPage);
           this.drawPage(backPage, leftPage, 0, rowY, pageWidth, pageHeight, project, leftPage.isRecto, adjacentPage, spanningItems);
         }
 
         if (rightPage) {
           const info = spreadForPage.get(rightPage.pageNumber);
-          const adjacentPage = rightPage.isRecto ? info?.spread.verso : info?.spread.recto;
           const spanningItems = info?.staticSpread?.spanningItems;
+          const adjacentPage = getReadingOrderAdjacent(rightPage);
           this.drawPage(backPage, rightPage, pageWidth, rowY, pageWidth, pageHeight, project, rightPage.isRecto, adjacentPage, spanningItems);
         }
       });
@@ -219,46 +239,74 @@ export class PDFGenerator {
 
     const hasItems = pageContent.items && pageContent.items.length > 0;
     const hasBackground = !!pageContent.backgroundFill;
+    // A page is a text page if its pageState is 'text' - these pages need text content rendered
+    const isTextPage = pageContent.pageState === 'text';
+    // Check for static/available pages using pageState (prefer) or deprecated flags (fallback)
+    const isStaticOrAvailable = pageContent.pageState === 'static' ||
+                                 pageContent.pageState === 'available' ||
+                                 pageContent.isBlank || pageContent.isStatic;
 
-    if (hasItems || hasBackground || pageContent.isBlank || pageContent.isStatic) {
+    // DEBUG: Log page being drawn and its adjacent page
+    const adjCrossingItems = adjacentPage?.items?.filter(item => {
+      if (isRecto) {
+        return item.x + item.width > width;
+      } else {
+        return item.x < 0;
+      }
+    }) || [];
+    if (hasItems || adjCrossingItems.length > 0) {
+      console.log('[CROSSING DEBUG] Drawing page', pageContent.pageNumber, {
+        physicalIsRecto: isRecto,
+        readingOrderIsRecto: pageContent.isRecto,
+        pageState: pageContent.pageState,
+        hasItems,
+        itemCount: pageContent.items?.length || 0,
+        adjacentPageNum: adjacentPage?.pageNumber,
+        adjacentPageState: adjacentPage?.pageState,
+        adjacentItemCount: adjacentPage?.items?.length || 0,
+        crossingItemsFromAdjacent: adjCrossingItems.length,
+        hasPreRendered: this.renderedPageCache.has(pageContent.pageNumber),
+      });
+    }
+
+    // For static/blank pages with items or background, use pre-rendered image if available
+    if (!isTextPage && (hasItems || hasBackground || isStaticOrAvailable)) {
       const preRenderedImage = this.renderedPageCache.get(pageContent.pageNumber);
       if (preRenderedImage) {
         pdfPage.drawImage(preRenderedImage, { x, y, width, height });
+        // Pre-rendered image already includes crossing items from adjacent pages (rendered via Konva)
+        // Only need to render spanning items which are separate
+        this.drawSpanningItems(pdfPage, spreadSpanningItems, x, y, width, height, isRecto);
         return;
       }
 
-      if (pageContent.items && pageContent.items.length > 0) {
-        drawPageItemsClipped(pdfPage, pageContent.items, x, y, width, height, 0, width, this.fontCache, this.imageCache);
-      }
+      // Fallback: draw items directly for static/blank pages (when pre-render failed or wasn't done)
+      // Use clipping to prevent items from extending past page boundaries
+      const hasItemsToClip = (pageContent.items && pageContent.items.length > 0) ||
+                              (adjacentPage?.items && adjacentPage.items.length > 0);
+      if (hasItemsToClip) {
+        // Set up clipping rectangle for the page bounds
+        pdfPage.pushOperators(
+          pushGraphicsState(),
+          moveTo(x, y),
+          lineTo(x + width, y),
+          lineTo(x + width, y + height),
+          lineTo(x, y + height),
+          closePath(),
+          clip(),
+          endPath()
+        );
 
-      if (adjacentPage?.items && adjacentPage.items.length > 0) {
-        const crossingItems = adjacentPage.items.filter(item => {
-          if (isRecto) {
-            return item.x + item.width > width;
-          } else {
-            return item.x < 0;
-          }
-        });
-
-        if (crossingItems.length > 0) {
-          const offsetX = isRecto ? -width : width;
-          drawPageItemsClipped(pdfPage, crossingItems, x, y, width, height, offsetX, width, this.fontCache, this.imageCache);
+        if (pageContent.items && pageContent.items.length > 0) {
+          drawPageItemsClipped(pdfPage, pageContent.items, x, y, width, height, 0, width, this.fontCache, this.imageCache);
         }
-      }
+        // Use reading-order position (pageContent.isRecto) not physical sheet position for crossing items
+        this.drawCrossingItems(pdfPage, adjacentPage, x, y, width, height, pageContent.isRecto);
 
-      if (spreadSpanningItems && spreadSpanningItems.length > 0) {
-        const spanningPageItems = spreadSpanningItems.map(item => spanningItemToPageItem(item)).filter(Boolean) as PageItem[];
-        const offsetX = isRecto ? -width : 0;
-        const visibleItems = spanningPageItems.filter(item => {
-          const itemLeft = item.x + offsetX;
-          const itemRight = itemLeft + item.width;
-          return itemRight > 0 && itemLeft < width;
-        });
-        if (visibleItems.length > 0) {
-          drawPageItemsClipped(pdfPage, visibleItems, x, y, width, height, offsetX, width, this.fontCache, this.imageCache);
-        }
+        // Restore graphics state to remove clipping
+        pdfPage.pushOperators(popGraphicsState());
       }
-
+      this.drawSpanningItems(pdfPage, spreadSpanningItems, x, y, width, height, isRecto);
       return;
     }
 
@@ -370,6 +418,121 @@ export class PDFGenerator {
         const textWidth = headerFont.widthOfTextAtSize(text, headerSize);
         pdfPage.drawText(text, { x: x + width - outerMargin - textWidth, y: headerY, size: headerSize, font: headerFont, color: rgb(0, 0, 0) });
       }
+    }
+
+    // Draw items on top of text content (for text pages with items)
+    // Check for pre-rendered image first (preserves gradients, custom fonts, etc.)
+    const preRenderedItemsImage = this.renderedPageCache.get(pageContent.pageNumber);
+    if (preRenderedItemsImage) {
+      console.log('[TEXT PAGE DEBUG] Using pre-rendered items overlay for text page', pageContent.pageNumber);
+      pdfPage.drawImage(preRenderedItemsImage, { x, y, width, height });
+    } else if (hasItems || (adjacentPage?.items && adjacentPage.items.length > 0)) {
+      // Fallback: use clipping to prevent items from extending past page boundaries
+      pdfPage.pushOperators(
+        pushGraphicsState(),
+        moveTo(x, y),
+        lineTo(x + width, y),
+        lineTo(x + width, y + height),
+        lineTo(x, y + height),
+        closePath(),
+        clip(),
+        endPath()
+      );
+
+      if (hasItems) {
+        console.log('[TEXT PAGE DEBUG] Drawing items on text page (fallback)', pageContent.pageNumber, {
+          itemCount: pageContent.items!.length,
+          items: pageContent.items!.map(item => ({
+            id: item.id,
+            type: item.type,
+            x: item.x,
+            y: item.y,
+            width: item.width,
+            height: item.height,
+          })),
+        });
+        drawPageItemsClipped(pdfPage, pageContent.items!, x, y, width, height, 0, width, this.fontCache, this.imageCache);
+      }
+
+      // Draw crossing items from adjacent pages (within the clipping region)
+      // Use reading-order position (pageContent.isRecto) not physical sheet position
+      this.drawCrossingItems(pdfPage, adjacentPage, x, y, width, height, pageContent.isRecto);
+
+      // Restore graphics state to remove clipping
+      pdfPage.pushOperators(popGraphicsState());
+    }
+
+    // Draw spanning items
+    this.drawSpanningItems(pdfPage, spreadSpanningItems, x, y, width, height, isRecto);
+  }
+
+  /**
+   * Draw items from adjacent page that cross into this page
+   */
+  private drawCrossingItems(
+    pdfPage: PDFPage,
+    adjacentPage: PageContent | null | undefined,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    isRecto: boolean
+  ): void {
+    if (!adjacentPage?.items || adjacentPage.items.length === 0 || !this.fontCache) return;
+
+    const crossingItems = adjacentPage.items.filter(item => {
+      if (isRecto) {
+        // This is recto, adjacent is verso - items extending right past verso boundary
+        return item.x + item.width > width;
+      } else {
+        // This is verso, adjacent is recto - items with negative x extending left
+        return item.x < 0;
+      }
+    });
+
+    if (crossingItems.length > 0) {
+      console.log('[CROSSING DEBUG] drawCrossingItems:', {
+        adjacentPageNum: adjacentPage.pageNumber,
+        isRectoReadingOrder: isRecto,
+        offsetX: isRecto ? -width : width,
+        crossingItemsCount: crossingItems.length,
+        crossingItems: crossingItems.map(item => ({
+          id: item.id,
+          x: item.x,
+          width: item.width,
+          xPlusWidth: item.x + item.width,
+          pageWidth: width,
+        })),
+      });
+      const offsetX = isRecto ? -width : width;
+      drawPageItemsClipped(pdfPage, crossingItems, x, y, width, height, offsetX, width, this.fontCache, this.imageCache);
+    }
+  }
+
+  /**
+   * Draw spanning items that bridge across the spread
+   */
+  private drawSpanningItems(
+    pdfPage: PDFPage,
+    spreadSpanningItems: SpanningItem[] | undefined,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    isRecto: boolean
+  ): void {
+    if (!spreadSpanningItems || spreadSpanningItems.length === 0 || !this.fontCache) return;
+
+    const spanningPageItems = spreadSpanningItems.map(item => spanningItemToPageItem(item)).filter(Boolean) as PageItem[];
+    const offsetX = isRecto ? -width : 0;
+    const visibleItems = spanningPageItems.filter(item => {
+      const itemLeft = item.x + offsetX;
+      const itemRight = itemLeft + item.width;
+      return itemRight > 0 && itemLeft < width;
+    });
+
+    if (visibleItems.length > 0) {
+      drawPageItemsClipped(pdfPage, visibleItems, x, y, width, height, offsetX, width, this.fontCache, this.imageCache);
     }
   }
 }

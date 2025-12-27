@@ -107,7 +107,24 @@ export async function preRenderStaticPages(
     pageHeight = sheetSize.height;
   }
 
+  // Build a global page map for reading-order adjacency lookup
+  const globalPageMap: Map<number, import('../../types').PageContent> = new Map();
+  for (const sig of project.signatures) {
+    for (const spread of sig.spreads) {
+      if (spread.verso) globalPageMap.set(spread.verso.pageNumber, spread.verso);
+      if (spread.recto) globalPageMap.set(spread.recto.pageNumber, spread.recto);
+    }
+  }
+
+  // Helper to get reading-order adjacent page
+  const getReadingOrderAdjacent = (page: import('../../types').PageContent): import('../../types').PageContent | null => {
+    const adjacentPageNum = page.isRecto ? page.pageNumber - 1 : page.pageNumber + 1;
+    return globalPageMap.get(adjacentPageNum) || null;
+  };
+
   // Collect static/blank pages that need rendering
+  // Note: Text pages (pages with sections/text content) are NOT pre-rendered
+  // because the PDF generator handles text content differently (using pdf-lib text rendering)
   const pagesToRender: Array<{
     page: import('../../types').PageContent;
     adjacentPage: import('../../types').PageContent | null;
@@ -117,12 +134,17 @@ export async function preRenderStaticPages(
     for (const spread of sig.spreads) {
       const pages = [spread.verso, spread.recto].filter(Boolean) as import('../../types').PageContent[];
       for (const page of pages) {
+        const isTextPage = page.pageState === 'text';
         const hasOwnItems = page.items && page.items.length > 0;
         const hasBackgroundFill = !!page.backgroundFill;
-        if (!(hasOwnItems || hasBackgroundFill || page.isBlank || page.isStatic)) continue;
+        const isStaticOrAvailable = page.pageState === 'static' ||
+                                     page.pageState === 'available' ||
+                                     page.isBlank || page.isStatic;
 
-        const adjacentPage = page.isRecto ? spread.verso : spread.recto;
-        const hasOwnContent = page.items?.length || page.backgroundFill;
+        // Get reading-order adjacent page for crossing items
+        const adjacentPage = getReadingOrderAdjacent(page);
+
+        // Check for crossing items from adjacent page
         const hasCrossingItems = adjacentPage?.items?.some(item => {
           if (page.isRecto) {
             return item.x + item.width > pageWidth;
@@ -131,8 +153,38 @@ export async function preRenderStaticPages(
           }
         });
 
+        // For text pages: only pre-render if they have items or crossing items
+        // (the pre-rendered image will be overlaid on top of text content)
+        if (isTextPage) {
+          if (hasOwnItems || hasCrossingItems) {
+            console.log('[PRERENDER DEBUG] Adding TEXT page to render (items overlay):', {
+              pageNum: page.pageNumber,
+              pageState: page.pageState,
+              isRecto: page.isRecto,
+              hasOwnItems,
+              hasCrossingItems,
+              adjacentPageNum: adjacentPage?.pageNumber,
+            });
+            pagesToRender.push({ page, adjacentPage });
+          }
+          continue;
+        }
+
+        // For static/available pages: pre-render if they have content
+        if (!(hasOwnItems || hasBackgroundFill || isStaticOrAvailable)) continue;
+
+        const hasOwnContent = page.items?.length || page.backgroundFill;
+
         if (hasOwnContent || hasCrossingItems) {
-          pagesToRender.push({ page, adjacentPage: adjacentPage || null });
+          console.log('[PRERENDER DEBUG] Adding page to render:', {
+            pageNum: page.pageNumber,
+            pageState: page.pageState,
+            isRecto: page.isRecto,
+            hasOwnContent,
+            hasCrossingItems,
+            adjacentPageNum: adjacentPage?.pageNumber,
+          });
+          pagesToRender.push({ page, adjacentPage });
         }
       }
     }

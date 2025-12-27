@@ -109,6 +109,8 @@ export function drawPageItemsClipped(
           opacity,
         });
       } else if (shapeItem.shapeType === 'ellipse' || shapeItem.shapeType === 'circle') {
+        // Draw circles/ellipses - pdf-lib clipping in PDFGenerator handles partial visibility
+        // No need for center-based skip since clipping is now applied at the page level
         const centerX = pageX + adjustedX + item.width / 2;
         const centerY = itemPdfY + item.height / 2;
 

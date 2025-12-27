@@ -241,6 +241,9 @@ function createRenderNode(
 /**
  * Render a page's items to a high-resolution image
  * Returns a data URL of the rendered image
+ *
+ * This renders both the page's own items AND crossing items from the adjacent page.
+ * Konva's canvas automatically clips at boundaries, so all shapes are properly clipped.
  */
 export async function renderPageToImage(
   page: PageContent,
@@ -249,15 +252,15 @@ export async function renderPageToImage(
   adjacentPage?: PageContent | null
 ): Promise<string | null> {
   // Check if page has items worth rendering
-  const hasItems = (page.items && page.items.length > 0) ||
-                   (adjacentPage?.items && adjacentPage.items.some(item => {
-                     // Check for crossing items
-                     if (page.isRecto) {
-                       return item.x + item.width > pageWidth;
-                     } else {
-                       return item.x < 0;
-                     }
-                   }));
+  const hasOwnItems = page.items && page.items.length > 0;
+  const hasCrossingItems = adjacentPage?.items?.some(item => {
+    if (page.isRecto) {
+      return item.x + item.width > pageWidth;
+    } else {
+      return item.x < 0;
+    }
+  });
+  const hasItems = hasOwnItems || hasCrossingItems;
 
   if (!hasItems && !page.backgroundFill) {
     return null;
@@ -318,6 +321,7 @@ export async function renderPageToImage(
     }
 
     // Render crossing items from adjacent page
+    // Konva's canvas automatically clips at boundaries, so circles etc. will be properly clipped
     if (adjacentPage?.items) {
       const crossingItems = adjacentPage.items.filter(item => {
         if (page.isRecto) {
