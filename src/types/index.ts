@@ -279,6 +279,22 @@ export interface StrikethroughStyle {
   lineColor: string;
 }
 
+// Rich text span - represents a portion of text with consistent styling
+export interface TextSpan {
+  text: string;
+  bold?: boolean;
+  italic?: boolean;
+  code?: boolean;
+  strikethrough?: boolean;
+  highlight?: boolean;
+  link?: string;  // For future hyperlink support
+}
+
+// Rich text line - a line composed of multiple styled spans
+export interface RichTextLine {
+  spans: TextSpan[];
+}
+
 export interface FontOptions {
   body: FontStyle;
   h1: FontStyle;

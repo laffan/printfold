@@ -2,11 +2,12 @@
  * Types for the text flow engine
  */
 
-import type { DocumentSection, PageContent, Spread, Signature } from '../../types';
+import type { DocumentSection, PageContent, Spread, Signature, RichTextLine } from '../../types';
 
 export interface MeasuredSection extends DocumentSection {
   measuredHeight: number;
-  lines: string[];
+  lines: string[];           // Plain text lines (for backwards compatibility)
+  richLines?: RichTextLine[]; // Rich text lines with inline styling
   lineHeights: number[];
 }
 

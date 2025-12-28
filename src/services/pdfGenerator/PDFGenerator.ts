@@ -8,12 +8,13 @@ import fontkit from '@pdf-lib/fontkit';
 import { appState } from '../state';
 import { textFlowEngine } from '../textFlow';
 import { fontService, FontFileData } from '../fontService';
-import type { Signature, Spread, PageContent, PageItem, SpanningItem, StaticSpread } from '../../types';
+import type { Signature, Spread, PageContent, PageItem, SpanningItem, StaticSpread, RichTextLine } from '../../types';
 import { SHEET_SIZES, getOrientedSheetSize, calculateSpreadRowsPerSheet } from '../../types';
 import type { FontCache, FontVariants, ImageCacheType, RenderedPageCacheType, ImpositionSheet } from './types';
-import { sanitizeText } from './textUtils';
+import { sanitizeText, drawRichLine } from './textUtils';
 import { parseColor } from './colors';
 import { getFontStyleForSection, getFont } from './fonts';
+import type { MeasuredSection } from '../textFlow/types';
 import { embedImages, preRenderStaticPages } from './images';
 import { addPrintMarks } from './printMarks';
 import { drawPageItemsClipped, spanningItemToPageItem } from './itemDrawing';
@@ -332,67 +333,92 @@ export class PDFGenerator {
         continue;
       }
 
-      const lines = (section as { lines?: string[] }).lines || [section.content];
+      const measuredSection = section as MeasuredSection;
+      const lines = measuredSection.lines || [section.content];
+      const richLines = measuredSection.richLines;
       // Use per-element textAlign if set, otherwise fall back to layoutOptions
       const textAlign = fontStyle.textAlign || layoutOptions.textAlign || 'left';
 
-      for (const line of lines) {
-        if (currentY < contentY) break;
+      // Use rich lines if available (for paragraphs and blockquotes with inline styling)
+      if (richLines && richLines.length > 0) {
+        for (const richLine of richLines) {
+          if (currentY < contentY) break;
 
-        const sanitizedLine = sanitizeText(line);
-        const textWidth = font.widthOfTextAtSize(sanitizedLine, fontStyle.fontSize);
+          // Draw the rich line with all its styled spans
+          drawRichLine(
+            pdfPage,
+            richLine,
+            contentX,
+            currentY - fontStyle.fontSize,
+            fontStyle,
+            fontOptions,
+            this.fontCache,
+            contentWidth,
+            textAlign
+          );
 
-        // Calculate x position based on alignment
-        let lineX = contentX;
-        if (textAlign === 'center') {
-          lineX = contentX + (contentWidth - textWidth) / 2;
-        } else if (textAlign === 'right') {
-          lineX = contentX + contentWidth - textWidth;
+          currentY -= lineHeight;
         }
+      } else {
+        // Fallback to plain text rendering
+        for (const line of lines) {
+          if (currentY < contentY) break;
 
-        // Draw inline background color (highlight) if set
-        if (fontStyle.backgroundColor && fontStyle.backgroundColor !== '#ffffff') {
-          pdfPage.drawRectangle({
+          const sanitizedLine = sanitizeText(line);
+          const textWidth = font.widthOfTextAtSize(sanitizedLine, fontStyle.fontSize);
+
+          // Calculate x position based on alignment
+          let lineX = contentX;
+          if (textAlign === 'center') {
+            lineX = contentX + (contentWidth - textWidth) / 2;
+          } else if (textAlign === 'right') {
+            lineX = contentX + contentWidth - textWidth;
+          }
+
+          // Draw inline background color (highlight) if set
+          if (fontStyle.backgroundColor && fontStyle.backgroundColor !== '#ffffff') {
+            pdfPage.drawRectangle({
+              x: lineX,
+              y: currentY - fontStyle.fontSize,
+              width: textWidth,
+              height: lineHeight,
+              color: parseColor(fontStyle.backgroundColor),
+            });
+          }
+
+          pdfPage.drawText(sanitizedLine, {
             x: lineX,
             y: currentY - fontStyle.fontSize,
-            width: textWidth,
-            height: lineHeight,
-            color: parseColor(fontStyle.backgroundColor),
-          });
-        }
-
-        pdfPage.drawText(sanitizedLine, {
-          x: lineX,
-          y: currentY - fontStyle.fontSize,
-          size: fontStyle.fontSize,
-          font,
-          color: parseColor(fontStyle.color),
-        });
-
-        // Draw underline if set
-        const textDeco = fontStyle.textDecoration || 'none';
-        if (textDeco.includes('underline')) {
-          const underlineY = currentY - fontStyle.fontSize - 1;
-          pdfPage.drawLine({
-            start: { x: lineX, y: underlineY },
-            end: { x: lineX + textWidth, y: underlineY },
-            thickness: fontStyle.fontSize / 15,
+            size: fontStyle.fontSize,
+            font,
             color: parseColor(fontStyle.color),
           });
-        }
 
-        // Draw strikethrough if set
-        if (textDeco.includes('line-through')) {
-          const strikeY = currentY - fontStyle.fontSize * 0.6;
-          pdfPage.drawLine({
-            start: { x: lineX, y: strikeY },
-            end: { x: lineX + textWidth, y: strikeY },
-            thickness: fontStyle.fontSize / 15,
-            color: parseColor(fontStyle.color),
-          });
-        }
+          // Draw underline if set
+          const textDeco = fontStyle.textDecoration || 'none';
+          if (textDeco.includes('underline')) {
+            const underlineY = currentY - fontStyle.fontSize - 1;
+            pdfPage.drawLine({
+              start: { x: lineX, y: underlineY },
+              end: { x: lineX + textWidth, y: underlineY },
+              thickness: fontStyle.fontSize / 15,
+              color: parseColor(fontStyle.color),
+            });
+          }
 
-        currentY -= lineHeight;
+          // Draw strikethrough if set
+          if (textDeco.includes('line-through')) {
+            const strikeY = currentY - fontStyle.fontSize * 0.6;
+            pdfPage.drawLine({
+              start: { x: lineX, y: strikeY },
+              end: { x: lineX + textWidth, y: strikeY },
+              thickness: fontStyle.fontSize / 15,
+              color: parseColor(fontStyle.color),
+            });
+          }
+
+          currentY -= lineHeight;
+        }
       }
 
       currentY -= layoutOptions.paragraphSpacing;
