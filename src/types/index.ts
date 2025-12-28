@@ -223,6 +223,8 @@ export interface OutputOptions {
   // Creep compensation - narrows inner pages to prevent outer edges from extending
   creepEnabled?: boolean;
   creepPerSheet?: number; // Amount to reduce each successive sheet (in points), default 0.0625 * 72 for bond paper
+  // Render all pages as images instead of embedding fonts - larger file size but preserves all styling
+  renderTextAsImages?: boolean;
 }
 
 /**

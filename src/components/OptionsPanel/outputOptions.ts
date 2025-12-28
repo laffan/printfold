@@ -76,6 +76,18 @@ export function setupOutputOptions(debounce: (fn: DebounceCallback) => void): vo
     appState.updateOutputOptions({ showFoldMarks: checked });
   });
 
+  // Render text as images
+  const textAsImagesCheckbox = document.getElementById('opt-render-text-as-images') as HTMLInputElement;
+  const textAsImagesWarning = document.querySelector('.text-as-images-warning') as HTMLElement;
+  if (textAsImagesCheckbox) {
+    textAsImagesCheckbox.addEventListener('change', () => {
+      appState.updateOutputOptions({ renderTextAsImages: textAsImagesCheckbox.checked });
+      if (textAsImagesWarning) {
+        textAsImagesWarning.style.display = textAsImagesCheckbox.checked ? 'block' : 'none';
+      }
+    });
+  }
+
   // Pages per signature
   bindSelect('opt-pages-per-sig', (value) => {
     appState.updateOutputOptions({ pagesPerSignature: parseInt(value) as OutputOptions['pagesPerSignature'] });

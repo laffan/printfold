@@ -31,16 +31,26 @@ export class PDFGenerator {
     const project = appState.getProject();
     const pdfDoc = await PDFDocument.create();
 
-    // Register fontkit for custom font embedding
-    pdfDoc.registerFontkit(fontkit);
+    // Check if we're rendering text as images (no font embedding needed)
+    const renderTextAsImages = project.outputOptions.renderTextAsImages === true;
 
-    // Build font cache with embedded fonts
-    this.fontCache = await this.buildFontCache(pdfDoc, project);
+    if (!renderTextAsImages) {
+      // Register fontkit for custom font embedding
+      pdfDoc.registerFontkit(fontkit);
+
+      // Build font cache with embedded fonts
+      this.fontCache = await this.buildFontCache(pdfDoc, project);
+    } else {
+      // When rendering text as images, only use fallback fonts for headers/footers
+      // that aren't part of the page image
+      this.fontCache = await this.buildFallbackFontCache(pdfDoc);
+    }
 
     // Embed images used in static pages
     await embedImages(pdfDoc, project, this.imageCache);
 
-    // Pre-render static/blank pages as high-res images for gradient/pattern/font support
+    // Pre-render pages as high-res images
+    // When renderTextAsImages is true, ALL pages (including text) are pre-rendered
     await preRenderStaticPages(pdfDoc, project, this.renderedPageCache);
 
     // Get sheet dimensions (with orientation applied)
@@ -252,6 +262,20 @@ export class PDFGenerator {
     const isStaticOrAvailable = pageContent.pageState === 'static' ||
                                  pageContent.pageState === 'available' ||
                                  pageContent.isBlank || pageContent.isStatic;
+    // Check if "render text as images" mode is enabled
+    const renderTextAsImages = project.outputOptions.renderTextAsImages === true;
+
+    // When renderTextAsImages is enabled, ALL pages (including text) use pre-rendered images
+    if (renderTextAsImages) {
+      const preRenderedImage = this.renderedPageCache.get(pageContent.pageNumber);
+      if (preRenderedImage) {
+        pdfPage.drawImage(preRenderedImage, { x, y, width, height });
+        this.drawSpanningItems(pdfPage, spreadSpanningItems, x, y, width, height, isRecto);
+        return;
+      }
+      // If pre-rendered image is missing, fall through to normal rendering
+      // (this shouldn't happen, but provides a safety net)
+    }
 
     // For static/blank pages with items or background, use pre-rendered image if available
     if (!isTextPage && (hasItems || hasBackground || isStaticOrAvailable)) {
@@ -635,6 +659,35 @@ export class PDFGenerator {
     }
 
     return { embedded, fallback };
+  }
+
+  /**
+   * Build a minimal font cache with only fallback fonts (for "render text as images" mode)
+   * Since all text is rendered as images, we only need standard fonts for any edge cases
+   */
+  private async buildFallbackFontCache(pdfDoc: PDFDocument): Promise<FontCache> {
+    const fallback = {
+      serif: {
+        regular: await pdfDoc.embedFont(StandardFonts.TimesRoman),
+        bold: await pdfDoc.embedFont(StandardFonts.TimesRomanBold),
+        italic: await pdfDoc.embedFont(StandardFonts.TimesRomanItalic),
+        boldItalic: await pdfDoc.embedFont(StandardFonts.TimesRomanBoldItalic),
+      },
+      sans: {
+        regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
+        bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
+        italic: await pdfDoc.embedFont(StandardFonts.HelveticaOblique),
+        boldItalic: await pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique),
+      },
+      mono: {
+        regular: await pdfDoc.embedFont(StandardFonts.Courier),
+        bold: await pdfDoc.embedFont(StandardFonts.CourierBold),
+        italic: await pdfDoc.embedFont(StandardFonts.CourierOblique),
+        boldItalic: await pdfDoc.embedFont(StandardFonts.CourierBoldOblique),
+      },
+    };
+
+    return { embedded: new Map(), fallback };
   }
 
   /**
