@@ -302,7 +302,10 @@ function isRegularVariant(fontName: string, fontFamily: string): boolean {
 function parseSystemProfiler(output: string): string[] {
   // Extract font entries from plist XML
   // Each font entry has _name, family, and path keys
-  const fontNames: string[] = [];
+  // Only include fonts that can be embedded in PDFs (exclude .ttc files)
+
+  // Track which families have usable font files
+  const usableFamilies: Set<string> = new Set();
 
   // Split into individual dict entries
   const dictRegex = /<dict>([\s\S]*?)<\/dict>/g;
@@ -325,11 +328,10 @@ function parseSystemProfiler(output: string): string[] {
     // Skip hidden fonts
     if (fontName?.startsWith('.') || fontFamily?.startsWith('.')) continue;
 
-    // Store font names
-    if (fontName) fontNames.push(fontName);
-    if (fontFamily && fontFamily !== fontName) fontNames.push(fontFamily);
+    // Check if this is a usable font file (not .ttc)
+    const isUsable = fontPath && !fontPath.toLowerCase().endsWith('.ttc');
 
-    // Store path mappings
+    // Store path mappings only for usable fonts
     if (fontPath && fontName) {
       // Always store the specific font name -> path mapping
       systemFontPaths.set(fontName, fontPath);
@@ -342,12 +344,18 @@ function parseSystemProfiler(output: string): string[] {
         systemFontPaths.set(fontFamily.toLowerCase().replace(/\s+/g, ''), fontPath);
         console.log(`Mapping family "${fontFamily}" -> ${fontPath} (regular variant: "${fontName}")`);
       }
+
+      // Track usable families (those with at least one non-.ttc file)
+      if (isUsable && fontFamily) {
+        usableFamilies.add(fontFamily);
+      }
     }
   }
 
-  console.log(`Parsed ${fontNames.length} font names, ${systemFontPaths.size} font paths from system_profiler`);
+  console.log(`Parsed ${usableFamilies.size} usable font families from system_profiler`);
 
-  const uniqueFonts = [...new Set(fontNames)].sort((a, b) => a.localeCompare(b));
+  // Only return font families that have usable files
+  const uniqueFonts = [...usableFamilies].sort((a, b) => a.localeCompare(b));
   return uniqueFonts;
 }
 
