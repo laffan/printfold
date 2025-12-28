@@ -563,8 +563,16 @@ async function findFontFile(
     await ensureSystemFontPathsLoaded();
   }
 
+  // Determine the variant we're looking for
+  let variantDesc = 'regular';
+  if (weight === 'bold' && style === 'italic') variantDesc = 'boldItalic';
+  else if (weight === 'bold') variantDesc = 'bold';
+  else if (style === 'italic') variantDesc = 'italic';
+
+  console.log(`[findFontFile] Looking for: "${fontFamily}" (${variantDesc})`);
+
   // Build variant-specific font names to try
-  // e.g., for "Georgia" with bold+italic, try "Georgia Bold Italic", "Georgia BoldItalic", etc.
+  // Include variations with/without spaces, dashes, and file extensions
   const variantNames: string[] = [];
 
   if (weight === 'bold' && style === 'italic') {
@@ -573,6 +581,7 @@ async function findFontFile(
       `${fontFamily} BoldItalic`,
       `${fontFamily}-BoldItalic`,
       `${fontFamily} Bold Oblique`,
+      `${fontFamily}-Bold-Italic`,
     );
   } else if (weight === 'bold') {
     variantNames.push(
@@ -586,10 +595,11 @@ async function findFontFile(
       `${fontFamily}-Italic`,
       `${fontFamily}Italic`,
       `${fontFamily} Oblique`,
+      `${fontFamily}-Oblique`,
     );
   }
 
-  // Always add the base family name as a fallback
+  // Always add the base family name as a fallback (for regular variant or if specific variant not found)
   variantNames.push(fontFamily);
 
   // Try each variant name in systemFontPaths
@@ -598,15 +608,22 @@ async function findFontFile(
     const systemPath = systemFontPaths.get(name) || systemFontPaths.get(normalizedName);
 
     if (systemPath) {
+      // Skip .ttc files - they're not supported by pdf-lib
+      if (systemPath.toLowerCase().endsWith('.ttc')) {
+        console.log(`[findFontFile] Skipping .ttc file: "${name}" -> ${systemPath}`);
+        continue;
+      }
       try {
         await fs.promises.access(systemPath, fs.constants.R_OK);
-        console.log(`Found font via system_profiler: "${name}" -> ${systemPath}`);
+        console.log(`[findFontFile] Found: "${name}" -> ${systemPath}`);
         return systemPath;
       } catch {
-        console.log(`System font path not accessible: ${systemPath}`);
+        console.log(`[findFontFile] Path not accessible: ${systemPath}`);
       }
     }
   }
+
+  console.log(`[findFontFile] Not found in systemFontPaths, trying fontFileCache...`);
 
   // Fall back to directory-based cache
   await buildFontFileCache();
@@ -704,34 +721,38 @@ ipcMain.handle('fonts:getFontFile', async (
 });
 
 // IPC handler to get available font variants for a family
+// Returns an object with boolean flags for each variant
 ipcMain.handle('fonts:getFontVariants', async (
   _event,
   fontFamily: string
-): Promise<string[]> => {
-  await buildFontFileCache();
+): Promise<{ regular: boolean; bold: boolean; italic: boolean; boldItalic: boolean }> => {
+  // Check which variants are actually available by trying to find each one
+  const variants = {
+    regular: false,
+    bold: false,
+    italic: false,
+    boldItalic: false,
+  };
 
-  const normalizedFamily = fontFamily.toLowerCase().replace(/\s+/g, '');
+  // Check regular
+  const regularPath = await findFontFile(fontFamily, 'normal', 'normal');
+  variants.regular = !!regularPath && !regularPath.toLowerCase().endsWith('.ttc');
 
-  // Check exact match
-  let familyMap = fontFileCache.get(fontFamily);
-  if (!familyMap) {
-    familyMap = fontFileCache.get(normalizedFamily);
-  }
+  // Check bold
+  const boldPath = await findFontFile(fontFamily, 'bold', 'normal');
+  // Bold is available if we found a different file than regular (not just falling back)
+  variants.bold = !!boldPath && !boldPath.toLowerCase().endsWith('.ttc') &&
+    boldPath !== regularPath;
 
-  // Try partial match
-  if (!familyMap) {
-    for (const [cachedFamily, variantMap] of fontFileCache) {
-      const cachedNormalized = cachedFamily.toLowerCase().replace(/\s+/g, '');
-      if (cachedNormalized.includes(normalizedFamily) || normalizedFamily.includes(cachedNormalized)) {
-        familyMap = variantMap;
-        break;
-      }
-    }
-  }
+  // Check italic
+  const italicPath = await findFontFile(fontFamily, 'normal', 'italic');
+  variants.italic = !!italicPath && !italicPath.toLowerCase().endsWith('.ttc') &&
+    italicPath !== regularPath;
 
-  if (!familyMap) {
-    return [];
-  }
+  // Check boldItalic
+  const boldItalicPath = await findFontFile(fontFamily, 'bold', 'italic');
+  variants.boldItalic = !!boldItalicPath && !boldItalicPath.toLowerCase().endsWith('.ttc') &&
+    boldItalicPath !== regularPath && boldItalicPath !== boldPath && boldItalicPath !== italicPath;
 
-  return Array.from(familyMap.keys());
+  return variants;
 });

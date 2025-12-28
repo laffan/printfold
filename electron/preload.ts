@@ -70,7 +70,12 @@ declare global {
         weight?: 'normal' | 'bold',
         style?: 'normal' | 'italic'
       ) => Promise<{ success: boolean; data?: string; path?: string; error?: string }>;
-      getFontVariants: (fontFamily: string) => Promise<string[]>;
+      getFontVariants: (fontFamily: string) => Promise<{
+        regular: boolean;
+        bold: boolean;
+        italic: boolean;
+        boldItalic: boolean;
+      }>;
     };
   }
 }
