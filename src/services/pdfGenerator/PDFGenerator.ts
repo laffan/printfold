@@ -28,13 +28,23 @@ export class PDFGenerator {
     const project = appState.getProject();
     const pdfDoc = await PDFDocument.create();
 
-    // Embed fonts
+    // Embed fonts for all three categories: serif, sans-serif, monospace
     this.fontCache = {
-      regular: await pdfDoc.embedFont(StandardFonts.TimesRoman),
-      bold: await pdfDoc.embedFont(StandardFonts.TimesRomanBold),
-      italic: await pdfDoc.embedFont(StandardFonts.TimesRomanItalic),
-      boldItalic: await pdfDoc.embedFont(StandardFonts.TimesRomanBoldItalic),
-      mono: await pdfDoc.embedFont(StandardFonts.Courier),
+      // Serif fonts (for Georgia, Times New Roman, Palatino, etc.)
+      serifRegular: await pdfDoc.embedFont(StandardFonts.TimesRoman),
+      serifBold: await pdfDoc.embedFont(StandardFonts.TimesRomanBold),
+      serifItalic: await pdfDoc.embedFont(StandardFonts.TimesRomanItalic),
+      serifBoldItalic: await pdfDoc.embedFont(StandardFonts.TimesRomanBoldItalic),
+      // Sans-serif fonts (for Arial, Helvetica, Verdana, etc.)
+      sansRegular: await pdfDoc.embedFont(StandardFonts.Helvetica),
+      sansBold: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
+      sansItalic: await pdfDoc.embedFont(StandardFonts.HelveticaOblique),
+      sansBoldItalic: await pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique),
+      // Monospace fonts (for Courier, Monaco, Consolas, etc.)
+      monoRegular: await pdfDoc.embedFont(StandardFonts.Courier),
+      monoBold: await pdfDoc.embedFont(StandardFonts.CourierBold),
+      monoItalic: await pdfDoc.embedFont(StandardFonts.CourierOblique),
+      monoBoldItalic: await pdfDoc.embedFont(StandardFonts.CourierBoldOblique),
     };
 
     // Embed images used in static pages
@@ -325,7 +335,7 @@ export class PDFGenerator {
           x: contentX + 10,
           y: currentY - placeholderHeight / 2,
           size: 10,
-          font: this.fontCache.regular,
+          font: this.fontCache.sansRegular,
           color: rgb(0.6, 0.6, 0.6),
         });
 
@@ -408,7 +418,7 @@ export class PDFGenerator {
       const footerHeight = headerFooter.footer.height;
       const footerY = y + margins.bottom - footerHeight;
       const footerContent = isRecto ? headerFooter.footer.recto : headerFooter.footer.verso;
-      const footerFont = this.fontCache.regular;
+      const footerFont = getFont(headerFooter.footer.font, this.fontCache);
       const footerSize = headerFooter.footer.font.fontSize;
       const pageNumStr = pageContent.pageNumber.toString();
 
@@ -439,7 +449,7 @@ export class PDFGenerator {
       const headerHeight = headerFooter.header.height;
       const headerY = y + height - margins.top + headerHeight;
       const headerContent = isRecto ? headerFooter.header.recto : headerFooter.header.verso;
-      const headerFont = this.fontCache.regular;
+      const headerFont = getFont(headerFooter.header.font, this.fontCache);
       const headerSize = headerFooter.header.font.fontSize;
       const pageNumStr = pageContent.pageNumber.toString();
 
