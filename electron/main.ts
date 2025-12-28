@@ -329,8 +329,9 @@ async function findFontFiles(dir: string): Promise<string[]> {
         }
       }
     }
-  } catch {
-    // Directory doesn't exist or isn't readable
+  } catch (error) {
+    // Log directory read failures for debugging
+    console.log(`Font directory not accessible: ${dir}`, (error as Error).message);
   }
 
   return fontFiles;
@@ -389,12 +390,19 @@ async function buildFontFileCache(): Promise<void> {
   if (fontFileCache.size > 0) return; // Already built
 
   const dirs = getFontDirectories();
+  console.log('Building font file cache from directories:', dirs);
+
   const allFontFiles: string[] = [];
 
   for (const dir of dirs) {
     const files = await findFontFiles(dir);
+    if (files.length > 0) {
+      console.log(`Found ${files.length} font files in ${dir}`);
+    }
     allFontFiles.push(...files);
   }
+
+  console.log(`Total font files found: ${allFontFiles.length}`);
 
   // Group by family
   for (const filePath of allFontFiles) {
@@ -425,6 +433,8 @@ async function buildFontFileCache(): Promise<void> {
     }
     fontFileCache.get(normalizedFamily)!.set(variant, filePath);
   }
+
+  console.log(`Font cache built with ${fontFileCache.size} families`);
 }
 
 /**
@@ -447,9 +457,12 @@ async function findFontFile(
     variant = 'italic';
   }
 
+  console.log(`Looking for font: "${fontFamily}" (${variant}), cache size: ${fontFileCache.size}`);
+
   // Try exact match first
   const familyMap = fontFileCache.get(fontFamily);
   if (familyMap?.has(variant)) {
+    console.log(`Found exact match for "${fontFamily}"`);
     return familyMap.get(variant)!;
   }
 
@@ -457,6 +470,7 @@ async function findFontFile(
   const normalizedFamily = fontFamily.toLowerCase().replace(/\s+/g, '');
   const normalizedMap = fontFileCache.get(normalizedFamily);
   if (normalizedMap?.has(variant)) {
+    console.log(`Found normalized match for "${fontFamily}"`);
     return normalizedMap.get(variant)!;
   }
 
@@ -465,6 +479,7 @@ async function findFontFile(
     const cachedNormalized = cachedFamily.toLowerCase().replace(/\s+/g, '');
     if (cachedNormalized.includes(normalizedFamily) || normalizedFamily.includes(cachedNormalized)) {
       if (variantMap.has(variant)) {
+        console.log(`Found partial match: "${cachedFamily}" for "${fontFamily}"`);
         return variantMap.get(variant)!;
       }
     }
@@ -478,6 +493,7 @@ async function findFontFile(
     }
   }
 
+  console.log(`No font file found for "${fontFamily}" (${variant})`);
   return null;
 }
 
