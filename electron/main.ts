@@ -159,13 +159,25 @@ async function getSystemFonts(): Promise<string[]> {
   return new Promise((resolve) => {
     const platform = process.platform;
 
+    // Use explicit shell and PATH for packaged apps
+    // Packaged Electron apps don't inherit the terminal's environment
+    const execOptions = {
+      shell: platform === 'win32' ? 'powershell.exe' : '/bin/bash',
+      env: {
+        ...process.env,
+        PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin',
+      },
+      maxBuffer: 1024 * 1024 * 10,
+    };
+
     if (platform === 'darwin') {
-      // macOS: Use system_profiler or fc-list
-      exec('system_profiler SPFontsDataType -xml', (error: Error | null, stdout: string) => {
+      // macOS: Use system_profiler with full path
+      exec('/usr/sbin/system_profiler SPFontsDataType -xml', execOptions, (error: Error | null, stdout: string) => {
         if (error) {
-          // Fallback to fc-list if available
-          exec('fc-list : family', (err: Error | null, output: string) => {
-            if (err) {
+          // Fallback to fc-list if available (e.g., via Homebrew)
+          exec('/usr/local/bin/fc-list : family 2>/dev/null || /opt/homebrew/bin/fc-list : family 2>/dev/null', execOptions, (err: Error | null, output: string) => {
+            if (err || !output.trim()) {
+              console.log('Font discovery failed, using web-safe fonts');
               resolve([]);
               return;
             }
@@ -180,12 +192,13 @@ async function getSystemFonts(): Promise<string[]> {
         resolve(fonts);
       });
     } else if (platform === 'win32') {
-      // Windows: Read from registry or use PowerShell
+      // Windows: Use PowerShell to get installed fonts
       exec(
-        'powershell -command "[System.Reflection.Assembly]::LoadWithPartialName(\'System.Drawing\') | Out-Null; (New-Object System.Drawing.Text.InstalledFontCollection).Families | ForEach-Object { $_.Name }"',
-        { maxBuffer: 1024 * 1024 * 10 },
+        '[System.Reflection.Assembly]::LoadWithPartialName(\'System.Drawing\') | Out-Null; (New-Object System.Drawing.Text.InstalledFontCollection).Families | ForEach-Object { $_.Name }',
+        execOptions,
         (error: Error | null, stdout: string) => {
           if (error) {
+            console.log('Font discovery failed on Windows:', error.message);
             resolve([]);
             return;
           }
@@ -197,9 +210,10 @@ async function getSystemFonts(): Promise<string[]> {
         }
       );
     } else {
-      // Linux: Use fc-list
-      exec('fc-list : family', (error: Error | null, stdout: string) => {
+      // Linux: Use fc-list with common paths
+      exec('fc-list : family', execOptions, (error: Error | null, stdout: string) => {
         if (error) {
+          console.log('Font discovery failed on Linux:', error.message);
           resolve([]);
           return;
         }
