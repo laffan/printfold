@@ -641,7 +641,7 @@ export class PDFGenerator {
   }
 
   /**
-   * Embed font data into PDF
+   * Embed font data into PDF with subsetting to reduce file size
    */
   private async embedFontData(
     pdfDoc: PDFDocument,
@@ -654,7 +654,8 @@ export class PDFGenerator {
     }
 
     try {
-      const regular = await pdfDoc.embedFont(fontData.regular);
+      // Use subset: true to only include glyphs that are actually used
+      const regular = await pdfDoc.embedFont(fontData.regular, { subset: true });
 
       // Try to embed other variants, fall back to regular if not available
       let bold: PDFFont | undefined;
@@ -663,7 +664,7 @@ export class PDFGenerator {
 
       if (fontData.bold) {
         try {
-          bold = await pdfDoc.embedFont(fontData.bold);
+          bold = await pdfDoc.embedFont(fontData.bold, { subset: true });
         } catch {
           // Use regular for bold
         }
@@ -671,7 +672,7 @@ export class PDFGenerator {
 
       if (fontData.italic) {
         try {
-          italic = await pdfDoc.embedFont(fontData.italic);
+          italic = await pdfDoc.embedFont(fontData.italic, { subset: true });
         } catch {
           // Use regular for italic
         }
@@ -679,7 +680,7 @@ export class PDFGenerator {
 
       if (fontData.boldItalic) {
         try {
-          boldItalic = await pdfDoc.embedFont(fontData.boldItalic);
+          boldItalic = await pdfDoc.embedFont(fontData.boldItalic, { subset: true });
         } catch {
           // Use bold or italic or regular
         }
