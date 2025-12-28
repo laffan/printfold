@@ -2,7 +2,7 @@
  * Shared state and utilities for the Edit Page module
  */
 
-import { createFontDropdown, FontDropdown } from '../../FontDropdown';
+import { FontDropdown } from '../../FontDropdown';
 import { FillPicker } from '../../FillPicker';
 
 // Module-level instances
