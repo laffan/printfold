@@ -169,6 +169,8 @@ declare module './AppStateCore' {
     insertStaticPageAtSelection(): void;
     moveStaticPage(fromPageNumber: number, toPageNumber: number): void;
     deleteStaticPage(pageNumber: number): void;
+    setPageState(pageNumber: number, state: 'static' | 'available' | 'text'): void;
+    setPageBackgroundFill(pageNumber: number, fill: FillConfig | undefined): void;
 
     // Signatures and spreads
     addAvailableSignature(): void;

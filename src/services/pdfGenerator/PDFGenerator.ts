@@ -400,8 +400,13 @@ export class PDFGenerator {
     }
 
     // Draw footer
+    // The footer is positioned inside the bottom margin area, offset from the margin boundary by footerHeight
+    // In the editor: marginBoundaryY = y + height - margins.bottom, footerLineY = marginBoundaryY + footerHeight
+    // In PDF coords (y=0 at bottom): marginBoundary = y + margins.bottom
+    // footerY = marginBoundary - footerHeight (moving toward page edge)
     if (headerFooter.footer.enabled) {
-      const footerY = y + margins.bottom;
+      const footerHeight = headerFooter.footer.height;
+      const footerY = y + margins.bottom - footerHeight;
       const footerContent = isRecto ? headerFooter.footer.recto : headerFooter.footer.verso;
       const footerFont = this.fontCache.regular;
       const footerSize = headerFooter.footer.font.fontSize;
@@ -426,8 +431,13 @@ export class PDFGenerator {
     }
 
     // Draw header
+    // The header is positioned inside the top margin area, offset from the margin boundary by headerHeight
+    // In the editor: marginBoundaryY = y + margins.top, headerLineY = marginBoundaryY - headerHeight
+    // In PDF coords (y=0 at bottom): marginBoundary = y + height - margins.top
+    // headerY = marginBoundary + headerHeight (moving toward page edge/top)
     if (headerFooter.header.enabled) {
-      const headerY = y + height - margins.top;
+      const headerHeight = headerFooter.header.height;
+      const headerY = y + height - margins.top + headerHeight;
       const headerContent = isRecto ? headerFooter.header.recto : headerFooter.header.verso;
       const headerFont = this.fontCache.regular;
       const headerSize = headerFooter.header.font.fontSize;
