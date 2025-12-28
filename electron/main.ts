@@ -337,6 +337,11 @@ function parseSystemProfiler(output: string): string[] {
       systemFontPaths.set(fontName, fontPath);
       systemFontPaths.set(fontName.toLowerCase().replace(/\s+/g, ''), fontPath);
 
+      // Log all font name -> path mappings for debugging
+      if (fontFamily === 'Georgia' || fontFamily === 'Arial' || fontFamily === 'Courier New') {
+        console.log(`[parseSystemProfiler] Storing: "${fontName}" -> ${fontPath}`);
+      }
+
       // Only store family name -> path if this is the regular variant
       // This prevents italic/bold variants from overwriting the regular variant's path
       if (fontFamily && isRegularVariant(fontName, fontFamily)) {
@@ -599,8 +604,14 @@ async function findFontFile(
     );
   }
 
-  // Always add the base family name as a fallback (for regular variant or if specific variant not found)
-  variantNames.push(fontFamily);
+  // For regular variant, add the base family name
+  // For other variants, only add as fallback after trying variant-specific names
+  if (weight === 'normal' && style === 'normal') {
+    variantNames.push(fontFamily);
+  }
+
+  // Debug: Log what we're searching for
+  console.log(`[findFontFile] Trying variant names for "${fontFamily}" (${variantDesc}):`, variantNames);
 
   // Try each variant name in systemFontPaths
   for (const name of variantNames) {
@@ -622,6 +633,15 @@ async function findFontFile(
       }
     }
   }
+
+  // Debug: Show what's in systemFontPaths for this family
+  const matchingEntries: string[] = [];
+  for (const [key] of systemFontPaths) {
+    if (key.toLowerCase().includes(normalizedFamily) || normalizedFamily.includes(key.toLowerCase().replace(/\s+/g, ''))) {
+      matchingEntries.push(key);
+    }
+  }
+  console.log(`[findFontFile] Matching entries in systemFontPaths for "${fontFamily}":`, matchingEntries);
 
   console.log(`[findFontFile] Not found in systemFontPaths, trying fontFileCache...`);
 
@@ -726,6 +746,8 @@ ipcMain.handle('fonts:getFontVariants', async (
   _event,
   fontFamily: string
 ): Promise<{ regular: boolean; bold: boolean; italic: boolean; boldItalic: boolean }> => {
+  console.log(`[getFontVariants] Checking variants for: "${fontFamily}"`);
+
   // Check which variants are actually available by trying to find each one
   const variants = {
     regular: false,
@@ -737,22 +759,27 @@ ipcMain.handle('fonts:getFontVariants', async (
   // Check regular
   const regularPath = await findFontFile(fontFamily, 'normal', 'normal');
   variants.regular = !!regularPath && !regularPath.toLowerCase().endsWith('.ttc');
+  console.log(`[getFontVariants] Regular: ${regularPath || 'not found'}`);
 
   // Check bold
   const boldPath = await findFontFile(fontFamily, 'bold', 'normal');
   // Bold is available if we found a different file than regular (not just falling back)
   variants.bold = !!boldPath && !boldPath.toLowerCase().endsWith('.ttc') &&
     boldPath !== regularPath;
+  console.log(`[getFontVariants] Bold: ${boldPath || 'not found'} (available: ${variants.bold})`);
 
   // Check italic
   const italicPath = await findFontFile(fontFamily, 'normal', 'italic');
   variants.italic = !!italicPath && !italicPath.toLowerCase().endsWith('.ttc') &&
     italicPath !== regularPath;
+  console.log(`[getFontVariants] Italic: ${italicPath || 'not found'} (available: ${variants.italic})`);
 
   // Check boldItalic
   const boldItalicPath = await findFontFile(fontFamily, 'bold', 'italic');
   variants.boldItalic = !!boldItalicPath && !boldItalicPath.toLowerCase().endsWith('.ttc') &&
     boldItalicPath !== regularPath && boldItalicPath !== boldPath && boldItalicPath !== italicPath;
+  console.log(`[getFontVariants] BoldItalic: ${boldItalicPath || 'not found'} (available: ${variants.boldItalic})`);
 
+  console.log(`[getFontVariants] Result for "${fontFamily}":`, variants);
   return variants;
 });

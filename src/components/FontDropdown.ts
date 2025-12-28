@@ -225,6 +225,12 @@ export class FontDropdown {
 
     // Start async font preview loading
     this.startFontPreviewLoading();
+
+    // Start variant checking separately (for Electron styles mode)
+    // This is separate from font preview loading because system fonts don't need preview loading
+    if (env.isElectron && this.mode === 'styles') {
+      this.startVariantChecking();
+    }
   }
 
   private createFontOption(font: FontDefinition, isGoogleFont: boolean): HTMLElement {
@@ -313,17 +319,13 @@ export class FontDropdown {
     };
 
     requestAnimationFrame(() => loadBatch());
-
-    // Also start variant checking for Electron styles mode
-    if (env.isElectron && this.mode === 'styles') {
-      this.startVariantChecking();
-    }
   }
 
   /**
    * Check font variants asynchronously and update indicators
    */
   private async startVariantChecking(): Promise<void> {
+    console.log(`[FontDropdown] Starting variant checking, queue size: ${this.variantCheckQueue.size}`);
     if (this.variantCheckQueue.size === 0) return;
 
     // Process variant checks in small batches to avoid blocking
@@ -341,7 +343,9 @@ export class FontDropdown {
           let variantInfo = variantInfoCache.get(fontFamily);
 
           if (!variantInfo && window.electronAPI?.getFontVariants) {
+            console.log(`[FontDropdown] Checking variants for: ${fontFamily}`);
             variantInfo = await window.electronAPI.getFontVariants(fontFamily);
+            console.log(`[FontDropdown] Got variants for ${fontFamily}:`, variantInfo);
             if (variantInfo) {
               variantInfoCache.set(fontFamily, variantInfo);
             }
@@ -377,6 +381,7 @@ export class FontDropdown {
       badge.textContent = 'B';
       badge.title = 'Bold variant not available';
       container.appendChild(badge);
+      console.log(`[FontDropdown] Added missing Bold indicator`);
     }
 
     if (!info.italic) {
@@ -385,6 +390,7 @@ export class FontDropdown {
       badge.textContent = 'I';
       badge.title = 'Italic variant not available';
       container.appendChild(badge);
+      console.log(`[FontDropdown] Added missing Italic indicator`);
     }
   }
 
