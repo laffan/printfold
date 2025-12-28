@@ -371,11 +371,25 @@ function renderTextContent(
       for (const richLine of richLines) {
         if (currentY > contentY + contentHeight) break;
 
-        // Calculate line width for alignment
+        // Pre-calculate line width for alignment by measuring each span
         let lineWidth = 0;
         for (const span of richLine.spans) {
-          // Approximate width calculation
-          lineWidth += span.text.length * fontSize * 0.5;
+          // Build span-specific style for accurate measurement
+          let spanFontStyle = '';
+          if (span.italic || fontStyle.fontStyle === 'italic') spanFontStyle += 'italic ';
+          if (span.bold || fontStyle.fontWeight === 'bold') spanFontStyle += 'bold';
+          spanFontStyle = spanFontStyle.trim() || 'normal';
+          const spanFontFamily = span.code ? fontOptions.code.fontFamily : fontStyle.fontFamily;
+
+          // Create temporary text node just for measurement
+          const measureNode = new Konva.Text({
+            text: span.text,
+            fontSize: fontSize,
+            fontFamily: spanFontFamily,
+            fontStyle: spanFontStyle,
+          });
+          lineWidth += measureNode.width();
+          measureNode.destroy();
         }
 
         let spanX = contentX;
@@ -395,19 +409,7 @@ function renderTextContent(
           const spanFontFamily = span.code ? fontOptions.code.fontFamily : fontStyle.fontFamily;
           const spanColor = span.code ? fontOptions.code.color : fontStyle.color;
 
-          // Draw highlight background if needed
-          if (span.highlight) {
-            const highlightColor = fontOptions.highlight?.backgroundColor || '#ffff00';
-            const bgRect = new Konva.Rect({
-              x: spanX,
-              y: currentY,
-              width: span.text.length * fontSize * 0.5,
-              height: lineHeight,
-              fill: highlightColor,
-            });
-            layer.add(bgRect);
-          }
-
+          // Create text node first to get accurate width
           const textNode = new Konva.Text({
             x: spanX,
             y: currentY,
@@ -417,11 +419,27 @@ function renderTextContent(
             fontStyle: spanFontStyle,
             fill: spanColor,
           });
+
+          const textWidth = textNode.width();
+
+          // Draw highlight background if needed (using actual text width)
+          if (span.highlight) {
+            const highlightColor = fontOptions.highlight?.backgroundColor || '#ffff00';
+            const bgRect = new Konva.Rect({
+              x: spanX,
+              y: currentY,
+              width: textWidth,
+              height: lineHeight,
+              fill: highlightColor,
+            });
+            layer.add(bgRect);
+          }
+
+          // Add text node after highlight so text appears on top
           layer.add(textNode);
 
           // Draw strikethrough if needed
           if (span.strikethrough) {
-            const textWidth = textNode.width();
             const strikeY = currentY + fontSize * 0.6;
             const line = new Konva.Line({
               points: [spanX, strikeY, spanX + textWidth, strikeY],
@@ -431,7 +449,7 @@ function renderTextContent(
             layer.add(line);
           }
 
-          spanX += textNode.width();
+          spanX += textWidth;
         }
 
         currentY += lineHeight;
