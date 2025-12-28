@@ -242,28 +242,53 @@ const systemFontPaths: Map<string, string> = new Map();
 
 /**
  * Determine if a font name represents a "regular" variant (not bold/italic)
+ * This checks the FULL font name for variant indicators, not just a suffix,
+ * because font names may have different spacing than family names.
  */
 function isRegularVariant(fontName: string, fontFamily: string): boolean {
-  // If name equals family, it's likely the regular variant
+  // If name equals family, it's the regular variant
   if (fontName === fontFamily) return true;
 
   const lower = fontName.toLowerCase();
   const familyLower = fontFamily.toLowerCase();
 
+  // Normalize by removing spaces for comparison
+  const lowerNormalized = lower.replace(/\s+/g, '');
+  const familyNormalized = familyLower.replace(/\s+/g, '');
+
+  // If normalized versions are equal, it's the regular variant
+  if (lowerNormalized === familyNormalized) return true;
+
   // Check if the name is just family + "Regular"
   if (lower === familyLower + ' regular' || lower === familyLower + '-regular') return true;
+  if (lowerNormalized === familyNormalized + 'regular') return true;
 
-  // If name contains Bold, Italic, Oblique, Light, Medium, etc., it's not regular
+  // Non-regular variant indicators to check in the FULL font name
+  // We need to check these appear AFTER the family name portion
   const nonRegularIndicators = [
     'bold', 'italic', 'oblique', 'light', 'thin', 'medium', 'semibold', 'semi-bold',
     'extrabold', 'extra-bold', 'black', 'heavy', 'condensed', 'narrow', 'wide',
-    'expanded', 'compressed', 'bd', 'it', 'obl'
+    'expanded', 'compressed'
   ];
 
-  // Get the part of the name after the family name
-  let suffix = lower.slice(familyLower.length).trim().replace(/^[-_]/, '');
+  // Get the part after the family name (normalized)
+  // This handles cases like "IBMPlexMono-Italic" where family is "IBM Plex Mono"
+  let suffix = '';
+  if (lowerNormalized.startsWith(familyNormalized)) {
+    suffix = lowerNormalized.slice(familyNormalized.length);
+  } else {
+    // If font name doesn't start with family, check full name
+    // But exclude the family portion if it appears somewhere
+    suffix = lowerNormalized;
+  }
 
-  // If there's no suffix, or suffix is just "regular", it's regular
+  // Remove file extension if present
+  suffix = suffix.replace(/\.(ttf|otf|ttc)$/i, '');
+
+  // Remove leading separator
+  suffix = suffix.replace(/^[-_]/, '');
+
+  // If there's no meaningful suffix, it's regular
   if (!suffix || suffix === 'regular') return true;
 
   // Check if suffix contains any non-regular indicators
