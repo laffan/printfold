@@ -111,17 +111,33 @@ The Electron main process discovers system fonts using platform-specific methods
 
 | Platform | Method |
 |----------|--------|
-| macOS | `system_profiler SPFontsDataType` or `fc-list` |
+| macOS | `/usr/sbin/system_profiler SPFontsDataType -xml` (with fallback to `fc-list`) |
 | Windows | PowerShell with `System.Drawing.Text.InstalledFontCollection` |
 | Linux | `fc-list : family` |
 
+**Packaged App Considerations:**
+Packaged Electron apps don't inherit the terminal's shell environment, so the main process uses:
+- Explicit shell specification (`/bin/bash` on macOS/Linux, `powershell.exe` on Windows)
+- Full paths to executables (e.g., `/usr/sbin/system_profiler`)
+- Fallback PATH environment (`/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin`)
+
+**Fallback Behavior:**
+If system font discovery fails or returns no fonts, the app falls back to web-safe fonts to ensure the UI remains functional.
+
 ### Font File Reading
 
-For PDF embedding, font files are located from system font directories:
+For PDF embedding, font file paths are obtained in two ways:
+
+**Primary (macOS):** Extract paths directly from `system_profiler` output
+- The `system_profiler` XML output includes `<key>path</key>` entries with full file paths
+- These are stored in a `systemFontPaths` map for reliable lookup
+- This is more reliable than directory scanning because it uses the actual system font database
+
+**Fallback:** Scan system font directories
 
 | Platform | Directories |
 |----------|-------------|
-| macOS | `/Library/Fonts`, `/System/Library/Fonts`, `~/Library/Fonts` |
+| macOS | `/Library/Fonts`, `/System/Library/Fonts`, `/System/Library/Fonts/Supplemental`, `~/Library/Fonts` |
 | Windows | `C:\Windows\Fonts`, `%LOCALAPPDATA%\Microsoft\Windows\Fonts` |
 | Linux | `/usr/share/fonts`, `/usr/local/share/fonts`, `~/.fonts`, `~/.local/share/fonts` |
 
@@ -239,10 +255,12 @@ googleFonts.getFontFamily('Roboto');
 
 ## Error Handling
 
-- System font discovery failures fall back to web-safe fonts
-- Missing font files log warnings and fall back to standard PDF fonts
-- Unsupported font formats (TTC collections) are skipped with warning
-- Google Font loading failures are caught and logged
+- **System font discovery failures**: Falls back to web-safe fonts (ensures UI is always usable)
+- **Empty system fonts**: If discovery succeeds but returns empty results, falls back to web-safe fonts
+- **Font file not found**: Logs warning and falls back to standard PDF fonts (Times/Helvetica/Courier)
+- **Font path not accessible**: If a path from `system_profiler` is not readable, falls back to directory scanning
+- **Unsupported font formats**: TTC (TrueType Collection) files are skipped with warning (pdf-lib limitation)
+- **Google Font loading failures**: Caught and logged, font remains in default style
 
 ## Key Differences from Web-Only Approach
 

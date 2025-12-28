@@ -130,7 +130,9 @@ class FontService {
    * Uses web-safe fonts for web, system fonts for Electron
    */
   getStyleFonts(): FontDefinition[] {
-    if (env.isElectron && this.systemFontsLoaded) {
+    // In Electron, use system fonts if they loaded successfully with actual fonts
+    // Fall back to web-safe fonts if system fonts are empty (e.g., shell commands failed in packaged app)
+    if (env.isElectron && this.systemFontsLoaded && this.systemFonts.length > 0) {
       return this.systemFonts;
     }
     return WEB_SAFE_FONTS;
@@ -153,9 +155,10 @@ class FontService {
 
   /**
    * Check if system fonts are available (Electron only)
+   * Returns true only if fonts were actually loaded (not empty)
    */
   hasSystemFonts(): boolean {
-    return this.systemFontsLoaded;
+    return this.systemFontsLoaded && this.systemFonts.length > 0;
   }
 
   /**

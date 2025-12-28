@@ -159,13 +159,25 @@ async function getSystemFonts(): Promise<string[]> {
   return new Promise((resolve) => {
     const platform = process.platform;
 
+    // Use explicit shell and PATH for packaged apps
+    // Packaged Electron apps don't inherit the terminal's environment
+    const execOptions = {
+      shell: platform === 'win32' ? 'powershell.exe' : '/bin/bash',
+      env: {
+        ...process.env,
+        PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin',
+      },
+      maxBuffer: 1024 * 1024 * 10,
+    };
+
     if (platform === 'darwin') {
-      // macOS: Use system_profiler or fc-list
-      exec('system_profiler SPFontsDataType -xml', (error: Error | null, stdout: string) => {
+      // macOS: Use system_profiler with full path
+      exec('/usr/sbin/system_profiler SPFontsDataType -xml', execOptions, (error: Error | null, stdout: string) => {
         if (error) {
-          // Fallback to fc-list if available
-          exec('fc-list : family', (err: Error | null, output: string) => {
-            if (err) {
+          // Fallback to fc-list if available (e.g., via Homebrew)
+          exec('/usr/local/bin/fc-list : family 2>/dev/null || /opt/homebrew/bin/fc-list : family 2>/dev/null', execOptions, (err: Error | null, output: string) => {
+            if (err || !output.trim()) {
+              console.log('Font discovery failed, using web-safe fonts');
               resolve([]);
               return;
             }
@@ -180,12 +192,13 @@ async function getSystemFonts(): Promise<string[]> {
         resolve(fonts);
       });
     } else if (platform === 'win32') {
-      // Windows: Read from registry or use PowerShell
+      // Windows: Use PowerShell to get installed fonts
       exec(
-        'powershell -command "[System.Reflection.Assembly]::LoadWithPartialName(\'System.Drawing\') | Out-Null; (New-Object System.Drawing.Text.InstalledFontCollection).Families | ForEach-Object { $_.Name }"',
-        { maxBuffer: 1024 * 1024 * 10 },
+        '[System.Reflection.Assembly]::LoadWithPartialName(\'System.Drawing\') | Out-Null; (New-Object System.Drawing.Text.InstalledFontCollection).Families | ForEach-Object { $_.Name }',
+        execOptions,
         (error: Error | null, stdout: string) => {
           if (error) {
+            console.log('Font discovery failed on Windows:', error.message);
             resolve([]);
             return;
           }
@@ -197,9 +210,10 @@ async function getSystemFonts(): Promise<string[]> {
         }
       );
     } else {
-      // Linux: Use fc-list
-      exec('fc-list : family', (error: Error | null, stdout: string) => {
+      // Linux: Use fc-list with common paths
+      exec('fc-list : family', execOptions, (error: Error | null, stdout: string) => {
         if (error) {
+          console.log('Font discovery failed on Linux:', error.message);
           resolve([]);
           return;
         }
@@ -223,27 +237,50 @@ function parseFcList(output: string): string[] {
   return [...new Set(fonts)] as string[];
 }
 
+// Cache for font paths extracted from system_profiler (maps font name -> file path)
+const systemFontPaths: Map<string, string> = new Map();
+
 function parseSystemProfiler(output: string): string[] {
-  // Extract font names from plist XML
+  // Extract font entries from plist XML
+  // Each font entry has _name, family, and path keys
   const fontNames: string[] = [];
-  const nameRegex = /<key>_name<\/key>\s*<string>([^<]+)<\/string>/g;
-  let match;
 
-  while ((match = nameRegex.exec(output)) !== null) {
-    const fontName = match[1].trim();
-    if (fontName && !fontName.startsWith('.')) {
-      fontNames.push(fontName);
+  // Split into individual dict entries
+  const dictRegex = /<dict>([\s\S]*?)<\/dict>/g;
+  let dictMatch;
+
+  while ((dictMatch = dictRegex.exec(output)) !== null) {
+    const dictContent = dictMatch[1];
+
+    // Extract _name (font face name like "Helvetica Neue Bold")
+    const nameMatch = /<key>_name<\/key>\s*<string>([^<]+)<\/string>/.exec(dictContent);
+    // Extract family (font family name like "Helvetica Neue")
+    const familyMatch = /<key>family<\/key>\s*<string>([^<]+)<\/string>/.exec(dictContent);
+    // Extract path (font file path)
+    const pathMatch = /<key>path<\/key>\s*<string>([^<]+)<\/string>/.exec(dictContent);
+
+    const fontName = nameMatch?.[1]?.trim();
+    const fontFamily = familyMatch?.[1]?.trim();
+    const fontPath = pathMatch?.[1]?.trim();
+
+    // Skip hidden fonts
+    if (fontName?.startsWith('.') || fontFamily?.startsWith('.')) continue;
+
+    // Store font names
+    if (fontName) fontNames.push(fontName);
+    if (fontFamily && fontFamily !== fontName) fontNames.push(fontFamily);
+
+    // Store path mappings for both name and family (for font file lookup)
+    if (fontPath) {
+      if (fontName) systemFontPaths.set(fontName, fontPath);
+      if (fontFamily) systemFontPaths.set(fontFamily, fontPath);
+      // Also store normalized versions
+      if (fontName) systemFontPaths.set(fontName.toLowerCase().replace(/\s+/g, ''), fontPath);
+      if (fontFamily) systemFontPaths.set(fontFamily.toLowerCase().replace(/\s+/g, ''), fontPath);
     }
   }
 
-  // Also try to extract family names
-  const familyRegex = /<key>family<\/key>\s*<string>([^<]+)<\/string>/g;
-  while ((match = familyRegex.exec(output)) !== null) {
-    const fontName = match[1].trim();
-    if (fontName && !fontName.startsWith('.')) {
-      fontNames.push(fontName);
-    }
-  }
+  console.log(`Parsed ${fontNames.length} font names, ${systemFontPaths.size} font paths from system_profiler`);
 
   const uniqueFonts = [...new Set(fontNames)].sort((a, b) => a.localeCompare(b));
   return uniqueFonts;
@@ -315,8 +352,9 @@ async function findFontFiles(dir: string): Promise<string[]> {
         }
       }
     }
-  } catch {
-    // Directory doesn't exist or isn't readable
+  } catch (error) {
+    // Log directory read failures for debugging
+    console.log(`Font directory not accessible: ${dir}`, (error as Error).message);
   }
 
   return fontFiles;
@@ -375,12 +413,19 @@ async function buildFontFileCache(): Promise<void> {
   if (fontFileCache.size > 0) return; // Already built
 
   const dirs = getFontDirectories();
+  console.log('Building font file cache from directories:', dirs);
+
   const allFontFiles: string[] = [];
 
   for (const dir of dirs) {
     const files = await findFontFiles(dir);
+    if (files.length > 0) {
+      console.log(`Found ${files.length} font files in ${dir}`);
+    }
     allFontFiles.push(...files);
   }
+
+  console.log(`Total font files found: ${allFontFiles.length}`);
 
   // Group by family
   for (const filePath of allFontFiles) {
@@ -411,6 +456,23 @@ async function buildFontFileCache(): Promise<void> {
     }
     fontFileCache.get(normalizedFamily)!.set(variant, filePath);
   }
+
+  console.log(`Font cache built with ${fontFileCache.size} families`);
+}
+
+// Ensure system font paths are loaded (call getSystemFonts if not already done)
+let systemFontsLoadPromise: Promise<void> | null = null;
+async function ensureSystemFontPathsLoaded(): Promise<void> {
+  if (systemFontPaths.size > 0) return;
+  if (systemFontsLoadPromise) return systemFontsLoadPromise;
+
+  systemFontsLoadPromise = (async () => {
+    console.log('Loading system font paths...');
+    await getSystemFonts(); // This populates systemFontPaths as a side effect
+    console.log(`System font paths loaded: ${systemFontPaths.size} entries`);
+  })();
+
+  return systemFontsLoadPromise;
 }
 
 /**
@@ -421,6 +483,29 @@ async function findFontFile(
   weight: 'normal' | 'bold' = 'normal',
   style: 'normal' | 'italic' = 'normal'
 ): Promise<string | null> {
+  const normalizedFamily = fontFamily.toLowerCase().replace(/\s+/g, '');
+
+  // Ensure system font paths are loaded (on macOS, this populates the systemFontPaths map)
+  if (process.platform === 'darwin') {
+    await ensureSystemFontPathsLoaded();
+  }
+
+  // First, check the systemFontPaths map (populated from system_profiler on macOS)
+  // This is more reliable than directory scanning because it uses the actual system font database
+  let systemPath = systemFontPaths.get(fontFamily) || systemFontPaths.get(normalizedFamily);
+
+  if (systemPath) {
+    // Check if the file exists and is readable
+    try {
+      await fs.promises.access(systemPath, fs.constants.R_OK);
+      console.log(`Found font via system_profiler: "${fontFamily}" -> ${systemPath}`);
+      return systemPath;
+    } catch {
+      console.log(`System font path not accessible: ${systemPath}`);
+    }
+  }
+
+  // Fall back to directory-based cache
   await buildFontFileCache();
 
   // Determine variant key
@@ -433,16 +518,19 @@ async function findFontFile(
     variant = 'italic';
   }
 
+  console.log(`Looking for font: "${fontFamily}" (${variant}), cache size: ${fontFileCache.size}, systemFontPaths: ${systemFontPaths.size}`);
+
   // Try exact match first
   const familyMap = fontFileCache.get(fontFamily);
   if (familyMap?.has(variant)) {
+    console.log(`Found exact match for "${fontFamily}"`);
     return familyMap.get(variant)!;
   }
 
   // Try normalized match
-  const normalizedFamily = fontFamily.toLowerCase().replace(/\s+/g, '');
   const normalizedMap = fontFileCache.get(normalizedFamily);
   if (normalizedMap?.has(variant)) {
+    console.log(`Found normalized match for "${fontFamily}"`);
     return normalizedMap.get(variant)!;
   }
 
@@ -451,6 +539,7 @@ async function findFontFile(
     const cachedNormalized = cachedFamily.toLowerCase().replace(/\s+/g, '');
     if (cachedNormalized.includes(normalizedFamily) || normalizedFamily.includes(cachedNormalized)) {
       if (variantMap.has(variant)) {
+        console.log(`Found partial match: "${cachedFamily}" for "${fontFamily}"`);
         return variantMap.get(variant)!;
       }
     }
@@ -464,6 +553,7 @@ async function findFontFile(
     }
   }
 
+  console.log(`No font file found for "${fontFamily}" (${variant})`);
   return null;
 }
 
