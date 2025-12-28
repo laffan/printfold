@@ -590,13 +590,16 @@ export class PDFGenerator {
       // Load and embed each font
       for (const family of fontFamilies) {
         try {
+          console.log(`Loading font file for: "${family}"`);
           const fontData = await fontService.loadFontFileData(family);
           if (fontData) {
             const variants = await this.embedFontData(pdfDoc, fontData, fallback);
             if (variants) {
               embedded.set(family, variants);
-              console.log(`Embedded font: ${family}`);
+              console.log(`Embedded font: "${family}" (has: ${Object.keys(fontData).filter(k => fontData[k as keyof typeof fontData]).join(', ')})`);
             }
+          } else {
+            console.log(`No font file found for: "${family}"`);
           }
         } catch (error) {
           console.warn(`Failed to embed font "${family}":`, error);

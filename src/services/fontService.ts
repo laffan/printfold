@@ -426,10 +426,42 @@ class FontService {
     this.fontFileCache.clear();
   }
 
+  /**
+   * Extract the primary font name from a CSS font-family value
+   * e.g., '"Georgia", serif' -> 'Georgia'
+   * e.g., 'Palatino Linotype, Palatino, serif' -> 'Palatino Linotype'
+   */
+  private extractPrimaryFontName(fontFamily: string): string {
+    // Split by comma and take the first font
+    const parts = fontFamily.split(',');
+    let primary = parts[0].trim();
+
+    // Remove surrounding quotes
+    primary = primary.replace(/^["']|["']$/g, '');
+
+    // Skip generic fallbacks if they're the only thing left
+    const genericFallbacks = ['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy'];
+    if (genericFallbacks.includes(primary.toLowerCase())) {
+      // Try the next part if available
+      for (let i = 1; i < parts.length; i++) {
+        const next = parts[i].trim().replace(/^["']|["']$/g, '');
+        if (!genericFallbacks.includes(next.toLowerCase())) {
+          return next;
+        }
+      }
+    }
+
+    return primary;
+  }
+
   private async doLoadFontFileData(fontFamily: string): Promise<FontFileData | null> {
     if (!window.electronAPI?.getFontFile) {
       return null;
     }
+
+    // Extract primary font name from CSS font-family value
+    const primaryFont = this.extractPrimaryFontName(fontFamily);
+    console.log(`Font lookup: "${fontFamily}" -> primary: "${primaryFont}"`);
 
     const data: FontFileData = {};
     const variants: Array<{ key: keyof FontFileData; weight: 'normal' | 'bold'; style: 'normal' | 'italic' }> = [
@@ -443,7 +475,7 @@ class FontService {
     await Promise.all(
       variants.map(async ({ key, weight, style }) => {
         try {
-          const result = await window.electronAPI!.getFontFile(fontFamily, weight, style);
+          const result = await window.electronAPI!.getFontFile(primaryFont, weight, style);
           if (result.success && result.data) {
             // Convert base64 to Uint8Array
             const binaryString = atob(result.data);
@@ -454,7 +486,7 @@ class FontService {
             data[key] = bytes;
           }
         } catch (error) {
-          console.warn(`Failed to load ${key} variant of ${fontFamily}:`, error);
+          console.warn(`Failed to load ${key} variant of ${primaryFont}:`, error);
         }
       })
     );
