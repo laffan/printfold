@@ -240,6 +240,40 @@ function parseFcList(output: string): string[] {
 // Cache for font paths extracted from system_profiler (maps font name -> file path)
 const systemFontPaths: Map<string, string> = new Map();
 
+/**
+ * Determine if a font name represents a "regular" variant (not bold/italic)
+ */
+function isRegularVariant(fontName: string, fontFamily: string): boolean {
+  // If name equals family, it's likely the regular variant
+  if (fontName === fontFamily) return true;
+
+  const lower = fontName.toLowerCase();
+  const familyLower = fontFamily.toLowerCase();
+
+  // Check if the name is just family + "Regular"
+  if (lower === familyLower + ' regular' || lower === familyLower + '-regular') return true;
+
+  // If name contains Bold, Italic, Oblique, Light, Medium, etc., it's not regular
+  const nonRegularIndicators = [
+    'bold', 'italic', 'oblique', 'light', 'thin', 'medium', 'semibold', 'semi-bold',
+    'extrabold', 'extra-bold', 'black', 'heavy', 'condensed', 'narrow', 'wide',
+    'expanded', 'compressed', 'bd', 'it', 'obl'
+  ];
+
+  // Get the part of the name after the family name
+  let suffix = lower.slice(familyLower.length).trim().replace(/^[-_]/, '');
+
+  // If there's no suffix, or suffix is just "regular", it's regular
+  if (!suffix || suffix === 'regular') return true;
+
+  // Check if suffix contains any non-regular indicators
+  for (const indicator of nonRegularIndicators) {
+    if (suffix.includes(indicator)) return false;
+  }
+
+  return true;
+}
+
 function parseSystemProfiler(output: string): string[] {
   // Extract font entries from plist XML
   // Each font entry has _name, family, and path keys
@@ -270,13 +304,19 @@ function parseSystemProfiler(output: string): string[] {
     if (fontName) fontNames.push(fontName);
     if (fontFamily && fontFamily !== fontName) fontNames.push(fontFamily);
 
-    // Store path mappings for both name and family (for font file lookup)
-    if (fontPath) {
-      if (fontName) systemFontPaths.set(fontName, fontPath);
-      if (fontFamily) systemFontPaths.set(fontFamily, fontPath);
-      // Also store normalized versions
-      if (fontName) systemFontPaths.set(fontName.toLowerCase().replace(/\s+/g, ''), fontPath);
-      if (fontFamily) systemFontPaths.set(fontFamily.toLowerCase().replace(/\s+/g, ''), fontPath);
+    // Store path mappings
+    if (fontPath && fontName) {
+      // Always store the specific font name -> path mapping
+      systemFontPaths.set(fontName, fontPath);
+      systemFontPaths.set(fontName.toLowerCase().replace(/\s+/g, ''), fontPath);
+
+      // Only store family name -> path if this is the regular variant
+      // This prevents italic/bold variants from overwriting the regular variant's path
+      if (fontFamily && isRegularVariant(fontName, fontFamily)) {
+        systemFontPaths.set(fontFamily, fontPath);
+        systemFontPaths.set(fontFamily.toLowerCase().replace(/\s+/g, ''), fontPath);
+        console.log(`Mapping family "${fontFamily}" -> ${fontPath} (regular variant: "${fontName}")`);
+      }
     }
   }
 
@@ -490,18 +530,48 @@ async function findFontFile(
     await ensureSystemFontPathsLoaded();
   }
 
-  // First, check the systemFontPaths map (populated from system_profiler on macOS)
-  // This is more reliable than directory scanning because it uses the actual system font database
-  let systemPath = systemFontPaths.get(fontFamily) || systemFontPaths.get(normalizedFamily);
+  // Build variant-specific font names to try
+  // e.g., for "Georgia" with bold+italic, try "Georgia Bold Italic", "Georgia BoldItalic", etc.
+  const variantNames: string[] = [];
 
-  if (systemPath) {
-    // Check if the file exists and is readable
-    try {
-      await fs.promises.access(systemPath, fs.constants.R_OK);
-      console.log(`Found font via system_profiler: "${fontFamily}" -> ${systemPath}`);
-      return systemPath;
-    } catch {
-      console.log(`System font path not accessible: ${systemPath}`);
+  if (weight === 'bold' && style === 'italic') {
+    variantNames.push(
+      `${fontFamily} Bold Italic`,
+      `${fontFamily} BoldItalic`,
+      `${fontFamily}-BoldItalic`,
+      `${fontFamily} Bold Oblique`,
+    );
+  } else if (weight === 'bold') {
+    variantNames.push(
+      `${fontFamily} Bold`,
+      `${fontFamily}-Bold`,
+      `${fontFamily}Bold`,
+    );
+  } else if (style === 'italic') {
+    variantNames.push(
+      `${fontFamily} Italic`,
+      `${fontFamily}-Italic`,
+      `${fontFamily}Italic`,
+      `${fontFamily} Oblique`,
+    );
+  }
+
+  // Always add the base family name as a fallback
+  variantNames.push(fontFamily);
+
+  // Try each variant name in systemFontPaths
+  for (const name of variantNames) {
+    const normalizedName = name.toLowerCase().replace(/\s+/g, '');
+    const systemPath = systemFontPaths.get(name) || systemFontPaths.get(normalizedName);
+
+    if (systemPath) {
+      try {
+        await fs.promises.access(systemPath, fs.constants.R_OK);
+        console.log(`Found font via system_profiler: "${name}" -> ${systemPath}`);
+        return systemPath;
+      } catch {
+        console.log(`System font path not accessible: ${systemPath}`);
+      }
     }
   }
 

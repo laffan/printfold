@@ -125,7 +125,6 @@ export function getFont(style: FontStyle, fontCache: FontCache): PDFFont {
   // First, try to find an embedded font for this exact family
   for (const [family, variants] of fontCache.embedded) {
     if (normalizeFontFamily(family) === normalizedFamily) {
-      console.log(`Font match (exact): "${style.fontFamily}" -> embedded "${family}"`);
       return getFontVariant(variants, isBold, isItalic);
     }
   }
@@ -134,14 +133,12 @@ export function getFont(style: FontStyle, fontCache: FontCache): PDFFont {
   for (const [family, variants] of fontCache.embedded) {
     const normalizedCached = normalizeFontFamily(family);
     if (normalizedFamily.includes(normalizedCached) || normalizedCached.includes(normalizedFamily)) {
-      console.log(`Font match (partial): "${style.fontFamily}" -> embedded "${family}"`);
       return getFontVariant(variants, isBold, isItalic);
     }
   }
 
   // Fall back to category-based standard fonts
   const category = getFontCategory(style.fontFamily);
-  console.log(`Font fallback: "${style.fontFamily}" -> category "${category}" (embedded fonts: ${Array.from(fontCache.embedded.keys()).join(', ')})`);
   const fallbackVariants = fontCache.fallback[category];
   return getFontVariant(fallbackVariants, isBold, isItalic);
 }
@@ -194,11 +191,6 @@ export function getFontForSpan(
   // Use strict equality to avoid truthy issues
   const isBold = baseStyle.fontWeight === 'bold' || span.bold === true;
   const isItalic = baseStyle.fontStyle === 'italic' || span.italic === true;
-
-  // DEBUG: Log what we're computing
-  console.log('[getFontForSpan] span.bold:', span.bold, 'span.italic:', span.italic,
-    'baseStyle.fontWeight:', baseStyle.fontWeight, 'baseStyle.fontStyle:', baseStyle.fontStyle,
-    '=> isBold:', isBold, 'isItalic:', isItalic);
 
   // Build a computed style and use the existing getFont function
   // This ensures consistent font lookup with the rest of the PDF generation

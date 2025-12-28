@@ -43,21 +43,6 @@ export function drawRichLine(
   contentWidth: number,
   textAlign: 'left' | 'center' | 'right' | 'justify' = 'left'
 ): void {
-  // DEBUG: Log the first line's spans to see what we're getting
-  if (line.spans.length > 0) {
-    console.log('[PDF Debug] Drawing line with spans:', line.spans.map(s => ({
-      text: s.text.substring(0, 20),
-      bold: s.bold,
-      italic: s.italic,
-      code: s.code
-    })));
-    console.log('[PDF Debug] baseStyle:', {
-      fontFamily: baseStyle.fontFamily,
-      fontWeight: baseStyle.fontWeight,
-      fontStyle: baseStyle.fontStyle
-    });
-  }
-
   // Calculate total line width for alignment
   let totalWidth = 0;
   const spanWidths: number[] = [];
