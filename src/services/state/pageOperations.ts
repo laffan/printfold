@@ -2,7 +2,7 @@
  * Static page operations for AppState
  */
 
-import type { PageContent, Spread, Signature } from '../../types';
+import type { PageContent, Spread, Signature, PageState, FillConfig } from '../../types';
 import { AppState } from './AppStateCore';
 
 /**
@@ -384,4 +384,52 @@ AppState.prototype.deleteStaticPage = function(pageNumber: number): void {
 
   // Trigger reflow to fill the gap with text content
   this.requestReflow();
+};
+
+/**
+ * Set the page state for a specific page
+ * Used when restoring saved projects
+ */
+AppState.prototype.setPageState = function(pageNumber: number, state: PageState): void {
+  const prevState = this.getProject();
+
+  const signatures = prevState.signatures.map(sig => ({
+    ...sig,
+    spreads: sig.spreads.map(spread => ({
+      ...spread,
+      verso: spread.verso?.pageNumber === pageNumber
+        ? { ...spread.verso, pageState: state, isBlank: state === 'available', isStatic: state === 'static' }
+        : spread.verso,
+      recto: spread.recto?.pageNumber === pageNumber
+        ? { ...spread.recto, pageState: state, isBlank: state === 'available', isStatic: state === 'static' }
+        : spread.recto,
+    })),
+  }));
+
+  this.setProject({ ...prevState, signatures });
+  this.notifyProjectListeners(prevState);
+};
+
+/**
+ * Set the background fill for a specific page
+ * Used when restoring saved projects and by the UI
+ */
+AppState.prototype.setPageBackgroundFill = function(pageNumber: number, fill: FillConfig | undefined): void {
+  const prevState = this.getProject();
+
+  const signatures = prevState.signatures.map(sig => ({
+    ...sig,
+    spreads: sig.spreads.map(spread => ({
+      ...spread,
+      verso: spread.verso?.pageNumber === pageNumber
+        ? { ...spread.verso, backgroundFill: fill }
+        : spread.verso,
+      recto: spread.recto?.pageNumber === pageNumber
+        ? { ...spread.recto, backgroundFill: fill }
+        : spread.recto,
+    })),
+  }));
+
+  this.setProject({ ...prevState, signatures });
+  this.notifyProjectListeners(prevState);
 };

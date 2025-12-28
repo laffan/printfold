@@ -33,6 +33,16 @@ interface StaticPageContent {
 }
 
 /**
+ * Static page data stored in the zip
+ */
+interface StaticPageData {
+  pageNumber: number;
+  pageState: 'static' | 'available' | 'text';
+  items: PageItem[];
+  backgroundFill?: import('../types').FillConfig;
+}
+
+/**
  * Project manifest stored as project.json
  */
 interface ProjectManifest {
@@ -40,6 +50,7 @@ interface ProjectManifest {
   name: string;
   projectId: string;
   mainDocument: string | null;
+  measurementUnit?: import('../types').MarginUnit; // Added in v2.1
   outputOptions: BookletProject['outputOptions'];
   layoutOptions: BookletProject['layoutOptions'];
   fontOptions: BookletProject['fontOptions'];
@@ -51,13 +62,13 @@ interface ProjectManifest {
 
 export class ZipHandler {
   private static readonly MANIFEST_FILENAME = 'project.json';
-  private static readonly VERSION = '2.0.0';
+  private static readonly VERSION = '2.1.0';
   private static readonly TEXT_FOLDER = 'text';
   private static readonly IMAGES_FOLDER = 'images';
   private static readonly STATIC_FOLDER = 'static';
 
-  // Store pending static page items to apply after reflow
-  private pendingStaticItems: Map<number, PageItem[]> = new Map();
+  // Store pending static page data to apply after reflow
+  private pendingStaticPages: Map<number, StaticPageData> = new Map();
 
   /**
    * Export current project to ZIP
@@ -103,13 +114,13 @@ export class ZipHandler {
       }
     }
 
-    // Export static page content (items on blank/static pages)
-    const staticPages = this.collectStaticPageItems(project);
-    for (const [pageNumber, items] of staticPages) {
-      if (items.length > 0) {
-        const content: StaticPageContent = { pageNumber, items };
+    // Export static page data (state, items, and background for static/available pages)
+    const staticPages = this.collectStaticPageData(project);
+    for (const [pageNumber, pageData] of staticPages) {
+      // Save any page that has state info, items, or background fill
+      if (pageData.pageState !== 'text' || pageData.items.length > 0 || pageData.backgroundFill) {
         const hash = this.generateHash(pageNumber);
-        staticFolder.file(`${hash}.json`, JSON.stringify(content, null, 2));
+        staticFolder.file(`${hash}.json`, JSON.stringify(pageData, null, 2));
       }
     }
 
@@ -119,6 +130,7 @@ export class ZipHandler {
       name: project.name,
       projectId: project.id,
       mainDocument: project.mainDocument,
+      measurementUnit: project.measurementUnit,
       outputOptions: project.outputOptions,
       layoutOptions: project.layoutOptions,
       fontOptions: project.fontOptions,
@@ -163,7 +175,7 @@ export class ZipHandler {
     // Load files from folders or root (legacy support)
     const files: ProjectFile[] = [];
     const filePromises: Promise<void>[] = [];
-    const staticItems: Map<number, PageItem[]> = new Map();
+    const staticPages: Map<number, StaticPageData> = new Map();
 
     zip.forEach((relativePath, zipEntry) => {
       // Skip manifest files and directories
@@ -178,12 +190,19 @@ export class ZipHandler {
       const fileName = pathParts[pathParts.length - 1];
       const ext = fileName.split('.').pop()?.toLowerCase() || '';
 
-      // Handle static page content
+      // Handle static page content (supports both new StaticPageData and legacy StaticPageContent format)
       if (folder === ZipHandler.STATIC_FOLDER && ext === 'json') {
         const promise = (async () => {
           const jsonContent = await zipEntry.async('string');
-          const staticContent: StaticPageContent = JSON.parse(jsonContent);
-          staticItems.set(staticContent.pageNumber, staticContent.items);
+          const parsed = JSON.parse(jsonContent);
+          // Convert legacy format (only items) to new format (with pageState, backgroundFill)
+          const pageData: StaticPageData = {
+            pageNumber: parsed.pageNumber,
+            pageState: parsed.pageState || 'static', // Default to 'static' for legacy files
+            items: parsed.items || [],
+            backgroundFill: parsed.backgroundFill,
+          };
+          staticPages.set(pageData.pageNumber, pageData);
         })();
         filePromises.push(promise);
         return;
@@ -236,14 +255,15 @@ export class ZipHandler {
       });
     }
 
-    // Store static items to apply after reflow
-    this.pendingStaticItems = staticItems;
+    // Store static page data to apply after reflow
+    this.pendingStaticPages = staticPages;
 
     // Update project settings from manifest
     if (manifest) {
       appState.updateProject({
         id: manifest.projectId || crypto.randomUUID(),
         name: manifest.name,
+        measurementUnit: manifest.measurementUnit || 'in', // Default to inches for legacy files
         outputOptions: manifest.outputOptions,
         layoutOptions: manifest.layoutOptions,
         fontOptions: manifest.fontOptions,
@@ -263,10 +283,10 @@ export class ZipHandler {
       }
     }
 
-    // Apply static page items after a short delay to allow reflow to complete
-    if (this.pendingStaticItems.size > 0) {
+    // Apply static page data after a short delay to allow reflow to complete
+    if (this.pendingStaticPages.size > 0) {
       setTimeout(() => {
-        this.applyStaticItems();
+        this.applyStaticPageData();
       }, 100);
     }
   }
@@ -280,37 +300,60 @@ export class ZipHandler {
   }
 
   /**
-   * Apply pending static page items after reflow
+   * Apply pending static page data after reflow
    */
-  private applyStaticItems(): void {
-    for (const [pageNumber, items] of this.pendingStaticItems) {
-      for (const item of items) {
+  private applyStaticPageData(): void {
+    for (const [pageNumber, pageData] of this.pendingStaticPages) {
+      // Apply page state if not 'text' (static or available)
+      if (pageData.pageState !== 'text') {
+        appState.setPageState(pageNumber, pageData.pageState);
+      }
+
+      // Apply background fill if present
+      if (pageData.backgroundFill) {
+        appState.setPageBackgroundFill(pageNumber, pageData.backgroundFill);
+      }
+
+      // Apply items
+      for (const item of pageData.items) {
         appState.addItemToPage(pageNumber, item);
       }
     }
-    this.pendingStaticItems.clear();
+    this.pendingStaticPages.clear();
   }
 
   /**
-   * Collect all items from static/blank pages in the project
+   * Collect page data from all pages that have state, items, or background fills
    */
-  private collectStaticPageItems(project: BookletProject): Map<number, PageItem[]> {
-    const result = new Map<number, PageItem[]>();
+  private collectStaticPageData(project: BookletProject): Map<number, StaticPageData> {
+    const result = new Map<number, StaticPageData>();
 
     for (const sig of project.signatures) {
       for (const spread of sig.spreads) {
         // Check verso page
-        if (spread.verso && (spread.verso.isBlank || spread.verso.isStatic)) {
-          const items = spread.verso.items || [];
-          if (items.length > 0) {
-            result.set(spread.verso.pageNumber, items);
+        if (spread.verso) {
+          const page = spread.verso;
+          // Save page data if it has non-text state, items, or background fill
+          if (page.pageState !== 'text' || (page.items && page.items.length > 0) || page.backgroundFill) {
+            result.set(page.pageNumber, {
+              pageNumber: page.pageNumber,
+              pageState: page.pageState,
+              items: page.items || [],
+              backgroundFill: page.backgroundFill,
+            });
           }
         }
         // Check recto page
-        if (spread.recto && (spread.recto.isBlank || spread.recto.isStatic)) {
-          const items = spread.recto.items || [];
-          if (items.length > 0) {
-            result.set(spread.recto.pageNumber, items);
+        if (spread.recto) {
+          const page = spread.recto;
+          // Save page data if it has non-text state, items, or background fill
+          if (page.pageState !== 'text' || (page.items && page.items.length > 0) || page.backgroundFill) {
+            result.set(page.pageNumber, {
+              pageNumber: page.pageNumber,
+              pageState: page.pageState,
+              items: page.items || [],
+              backgroundFill: page.backgroundFill,
+            });
           }
         }
       }
