@@ -45,6 +45,6 @@ module.exports = {
     },
     port: 3000,
     hot: true,
-    open: true,
+    open: process.env.ELECTRON_DEV !== 'true',
   },
 };

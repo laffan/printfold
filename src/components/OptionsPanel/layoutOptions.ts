@@ -27,13 +27,10 @@ export function setupLayoutOptions(debounce: (fn: DebounceCallback) => void): vo
     appState.updateLayoutOptions({ spacingAboveH1: value });
   }, debounce);
 
-  // Line height
-  bindNumberInput('opt-line-height', (value) => {
-    appState.updateLayoutOptions({ lineHeight: value });
-  }, debounce);
-
   // Paragraph spacing
   bindNumberInput('opt-paragraph-spacing', (value) => {
     appState.updateLayoutOptions({ paragraphSpacing: value });
   }, debounce);
+
+  // Note: Line Height is now controlled per-element in the Styles tab
 }

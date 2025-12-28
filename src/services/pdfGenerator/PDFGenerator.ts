@@ -3,12 +3,14 @@
  * Generates print-ready PDFs using pdf-lib with booklet imposition
  */
 
-import { PDFDocument, PDFPage, PDFImage, rgb, StandardFonts, pushGraphicsState, popGraphicsState, moveTo, lineTo, closePath, clip, endPath } from 'pdf-lib';
+import { PDFDocument, PDFPage, PDFImage, PDFFont, rgb, StandardFonts, pushGraphicsState, popGraphicsState, moveTo, lineTo, closePath, clip, endPath } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
 import { appState } from '../state';
 import { textFlowEngine } from '../textFlow';
+import { fontService, FontFileData } from '../fontService';
 import type { Signature, Spread, PageContent, PageItem, SpanningItem, StaticSpread } from '../../types';
 import { SHEET_SIZES, getOrientedSheetSize, calculateSpreadRowsPerSheet } from '../../types';
-import type { FontCache, ImageCacheType, RenderedPageCacheType, ImpositionSheet } from './types';
+import type { FontCache, FontVariants, ImageCacheType, RenderedPageCacheType, ImpositionSheet } from './types';
 import { sanitizeText } from './textUtils';
 import { parseColor } from './colors';
 import { getFontStyleForSection, getFont } from './fonts';
@@ -28,14 +30,11 @@ export class PDFGenerator {
     const project = appState.getProject();
     const pdfDoc = await PDFDocument.create();
 
-    // Embed fonts
-    this.fontCache = {
-      regular: await pdfDoc.embedFont(StandardFonts.TimesRoman),
-      bold: await pdfDoc.embedFont(StandardFonts.TimesRomanBold),
-      italic: await pdfDoc.embedFont(StandardFonts.TimesRomanItalic),
-      boldItalic: await pdfDoc.embedFont(StandardFonts.TimesRomanBoldItalic),
-      mono: await pdfDoc.embedFont(StandardFonts.Courier),
-    };
+    // Register fontkit for custom font embedding
+    pdfDoc.registerFontkit(fontkit);
+
+    // Build font cache with embedded fonts
+    this.fontCache = await this.buildFontCache(pdfDoc, project);
 
     // Embed images used in static pages
     await embedImages(pdfDoc, project, this.imageCache);
@@ -325,7 +324,7 @@ export class PDFGenerator {
           x: contentX + 10,
           y: currentY - placeholderHeight / 2,
           size: 10,
-          font: this.fontCache.regular,
+          font: this.fontCache.fallback.sans.regular,
           color: rgb(0.6, 0.6, 0.6),
         });
 
@@ -408,7 +407,7 @@ export class PDFGenerator {
       const footerHeight = headerFooter.footer.height;
       const footerY = y + margins.bottom - footerHeight;
       const footerContent = isRecto ? headerFooter.footer.recto : headerFooter.footer.verso;
-      const footerFont = this.fontCache.regular;
+      const footerFont = getFont(headerFooter.footer.font, this.fontCache);
       const footerSize = headerFooter.footer.font.fontSize;
       const pageNumStr = pageContent.pageNumber.toString();
 
@@ -439,7 +438,7 @@ export class PDFGenerator {
       const headerHeight = headerFooter.header.height;
       const headerY = y + height - margins.top + headerHeight;
       const headerContent = isRecto ? headerFooter.header.recto : headerFooter.header.verso;
-      const headerFont = this.fontCache.regular;
+      const headerFont = getFont(headerFooter.header.font, this.fontCache);
       const headerSize = headerFooter.header.font.fontSize;
       const pageNumStr = pageContent.pageNumber.toString();
 
@@ -549,6 +548,156 @@ export class PDFGenerator {
 
     if (visibleItems.length > 0) {
       drawPageItemsClipped(pdfPage, visibleItems, x, y, width, height, offsetX, width, this.fontCache, this.imageCache);
+    }
+  }
+
+  /**
+   * Build font cache - embed actual fonts in Electron, use standard fonts as fallback
+   */
+  private async buildFontCache(
+    pdfDoc: PDFDocument,
+    project: { fontOptions: import('../../types').FontOptions; headerFooter: import('../../types').HeaderFooterOptions }
+  ): Promise<FontCache> {
+    // Create fallback fonts (standard PDF fonts)
+    const fallback = {
+      serif: {
+        regular: await pdfDoc.embedFont(StandardFonts.TimesRoman),
+        bold: await pdfDoc.embedFont(StandardFonts.TimesRomanBold),
+        italic: await pdfDoc.embedFont(StandardFonts.TimesRomanItalic),
+        boldItalic: await pdfDoc.embedFont(StandardFonts.TimesRomanBoldItalic),
+      },
+      sans: {
+        regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
+        bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
+        italic: await pdfDoc.embedFont(StandardFonts.HelveticaOblique),
+        boldItalic: await pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique),
+      },
+      mono: {
+        regular: await pdfDoc.embedFont(StandardFonts.Courier),
+        bold: await pdfDoc.embedFont(StandardFonts.CourierBold),
+        italic: await pdfDoc.embedFont(StandardFonts.CourierOblique),
+        boldItalic: await pdfDoc.embedFont(StandardFonts.CourierBoldOblique),
+      },
+    };
+
+    const embedded = new Map<string, FontVariants>();
+
+    // Try to embed actual fonts (Electron only)
+    if (fontService.canEmbedFonts()) {
+      // Collect all unique font families used in the document
+      const fontFamilies = this.collectFontFamilies(project);
+
+      // Load and embed each font
+      for (const family of fontFamilies) {
+        try {
+          console.log(`Loading font file for: "${family}"`);
+          const fontData = await fontService.loadFontFileData(family);
+          if (fontData) {
+            const variants = await this.embedFontData(pdfDoc, fontData, fallback);
+            if (variants) {
+              embedded.set(family, variants);
+              console.log(`Embedded font: "${family}" (has: ${Object.keys(fontData).filter(k => fontData[k as keyof typeof fontData]).join(', ')})`);
+            }
+          } else {
+            console.log(`No font file found for: "${family}"`);
+          }
+        } catch (error) {
+          console.warn(`Failed to embed font "${family}":`, error);
+          // Will fall back to standard fonts
+        }
+      }
+    }
+
+    return { embedded, fallback };
+  }
+
+  /**
+   * Collect all unique font families used in the document
+   */
+  private collectFontFamilies(
+    project: { fontOptions: import('../../types').FontOptions; headerFooter: import('../../types').HeaderFooterOptions }
+  ): Set<string> {
+    const families = new Set<string>();
+
+    // Font options (body, headings, code, blockquote)
+    const { fontOptions, headerFooter } = project;
+
+    families.add(fontOptions.body.fontFamily);
+    families.add(fontOptions.h1.fontFamily);
+    families.add(fontOptions.h2.fontFamily);
+    families.add(fontOptions.h3.fontFamily);
+    families.add(fontOptions.h4.fontFamily);
+    families.add(fontOptions.h5.fontFamily);
+    families.add(fontOptions.h6.fontFamily);
+    families.add(fontOptions.code.fontFamily);
+    families.add(fontOptions.blockquote.fontFamily);
+
+    // Header/footer fonts
+    if (headerFooter.header.enabled) {
+      families.add(headerFooter.header.font.fontFamily);
+    }
+    if (headerFooter.footer.enabled) {
+      families.add(headerFooter.footer.font.fontFamily);
+    }
+
+    return families;
+  }
+
+  /**
+   * Embed font data into PDF with subsetting to reduce file size
+   */
+  private async embedFontData(
+    pdfDoc: PDFDocument,
+    fontData: FontFileData,
+    fallback: { serif: FontVariants; sans: FontVariants; mono: FontVariants }
+  ): Promise<FontVariants | null> {
+    // We need at least the regular variant
+    if (!fontData.regular) {
+      return null;
+    }
+
+    try {
+      // Use subset: true to only include glyphs that are actually used
+      const regular = await pdfDoc.embedFont(fontData.regular, { subset: true });
+
+      // Try to embed other variants, fall back to regular if not available
+      let bold: PDFFont | undefined;
+      let italic: PDFFont | undefined;
+      let boldItalic: PDFFont | undefined;
+
+      if (fontData.bold) {
+        try {
+          bold = await pdfDoc.embedFont(fontData.bold, { subset: true });
+        } catch {
+          // Use regular for bold
+        }
+      }
+
+      if (fontData.italic) {
+        try {
+          italic = await pdfDoc.embedFont(fontData.italic, { subset: true });
+        } catch {
+          // Use regular for italic
+        }
+      }
+
+      if (fontData.boldItalic) {
+        try {
+          boldItalic = await pdfDoc.embedFont(fontData.boldItalic, { subset: true });
+        } catch {
+          // Use bold or italic or regular
+        }
+      }
+
+      return {
+        regular,
+        bold,
+        italic,
+        boldItalic,
+      };
+    } catch (error) {
+      console.warn('Failed to embed font:', error);
+      return null;
     }
   }
 }

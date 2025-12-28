@@ -25,6 +25,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Printing
   print: (options?: Electron.PrintToPDFOptions) => ipcRenderer.invoke('app:print', options),
+
+  // System fonts
+  getSystemFonts: () => ipcRenderer.invoke('fonts:getSystemFonts'),
+
+  // Font file access (for PDF embedding)
+  getFontFile: (fontFamily: string, weight?: 'normal' | 'bold', style?: 'normal' | 'italic') =>
+    ipcRenderer.invoke('fonts:getFontFile', fontFamily, weight || 'normal', style || 'normal'),
+  getFontVariants: (fontFamily: string) =>
+    ipcRenderer.invoke('fonts:getFontVariants', fontFamily),
 });
 
 // Type declarations for the exposed API
@@ -55,6 +64,13 @@ declare global {
       }>;
       openExternal: (url: string) => Promise<void>;
       print: (options?: Electron.PrintToPDFOptions) => Promise<string | null>;
+      getSystemFonts: () => Promise<string[]>;
+      getFontFile: (
+        fontFamily: string,
+        weight?: 'normal' | 'bold',
+        style?: 'normal' | 'italic'
+      ) => Promise<{ success: boolean; data?: string; path?: string; error?: string }>;
+      getFontVariants: (fontFamily: string) => Promise<string[]>;
     };
   }
 }

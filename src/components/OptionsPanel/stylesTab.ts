@@ -4,7 +4,7 @@
  */
 
 import { appState } from '../../services/state';
-import { createFontDropdown, FontDropdown } from '../FontDropdown';
+import { createStylesFontDropdown, FontDropdown } from '../FontDropdown';
 
 // Track dynamically created font dropdowns
 const dynamicFontDropdowns: Map<string, FontDropdown> = new Map();
@@ -780,14 +780,14 @@ function setupHeaderFooterHandlers(type: 'header' | 'footer'): void {
 }
 
 /**
- * Set up font dropdowns
+ * Set up font dropdowns - uses 'styles' mode for web-safe/system fonts
  */
 function setupFontDropdowns(): void {
   const fontOptions = appState.getProject().fontOptions;
   const headerFooter = appState.getProject().headerFooter;
 
-  // Body
-  const bodyDropdown = createFontDropdown('dyn-body-font', (value) => {
+  // Body - uses styles mode (web-safe for web, system fonts for Electron)
+  const bodyDropdown = createStylesFontDropdown('dyn-body-font', (value) => {
     const fonts = appState.getProject().fontOptions;
     appState.updateFontOptions({ body: { ...fonts.body, fontFamily: value } });
   });
@@ -796,8 +796,8 @@ function setupFontDropdowns(): void {
     dynamicFontDropdowns.set('body', bodyDropdown);
   }
 
-  // Headings
-  const headingsDropdown = createFontDropdown('dyn-heading-font', (value) => {
+  // Headings - uses styles mode
+  const headingsDropdown = createStylesFontDropdown('dyn-heading-font', (value) => {
     const fonts = appState.getProject().fontOptions;
     appState.updateFontOptions({
       h1: { ...fonts.h1, fontFamily: value },
@@ -813,8 +813,8 @@ function setupFontDropdowns(): void {
     dynamicFontDropdowns.set('headings', headingsDropdown);
   }
 
-  // Blockquote
-  const blockquoteDropdown = createFontDropdown('dyn-blockquote-font', (value) => {
+  // Blockquote - uses styles mode
+  const blockquoteDropdown = createStylesFontDropdown('dyn-blockquote-font', (value) => {
     const fonts = appState.getProject().fontOptions;
     appState.updateFontOptions({ blockquote: { ...fonts.blockquote, fontFamily: value } });
   });
@@ -823,8 +823,8 @@ function setupFontDropdowns(): void {
     dynamicFontDropdowns.set('blockquote', blockquoteDropdown);
   }
 
-  // Header
-  const headerDropdown = createFontDropdown('dyn-header-font', (value) => {
+  // Header - uses styles mode
+  const headerDropdown = createStylesFontDropdown('dyn-header-font', (value) => {
     const hf = appState.getProject().headerFooter;
     appState.updateHeaderFooter({ header: { ...hf.header, font: { ...hf.header.font, fontFamily: value } } });
   });
@@ -833,8 +833,8 @@ function setupFontDropdowns(): void {
     dynamicFontDropdowns.set('header', headerDropdown);
   }
 
-  // Footer
-  const footerDropdown = createFontDropdown('dyn-footer-font', (value) => {
+  // Footer - uses styles mode
+  const footerDropdown = createStylesFontDropdown('dyn-footer-font', (value) => {
     const hf = appState.getProject().headerFooter;
     appState.updateHeaderFooter({ footer: { ...hf.footer, font: { ...hf.footer.font, fontFamily: value } } });
   });
