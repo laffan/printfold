@@ -4,6 +4,7 @@
  */
 
 import { PDFDocument, PDFPage, PDFImage, PDFFont, rgb, StandardFonts, pushGraphicsState, popGraphicsState, moveTo, lineTo, closePath, clip, endPath } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
 import { appState } from '../state';
 import { textFlowEngine } from '../textFlow';
 import { fontService, FontFileData } from '../fontService';
@@ -28,6 +29,9 @@ export class PDFGenerator {
   async generate(): Promise<Uint8Array> {
     const project = appState.getProject();
     const pdfDoc = await PDFDocument.create();
+
+    // Register fontkit for custom font embedding
+    pdfDoc.registerFontkit(fontkit);
 
     // Build font cache with embedded fonts
     this.fontCache = await this.buildFontCache(pdfDoc, project);
