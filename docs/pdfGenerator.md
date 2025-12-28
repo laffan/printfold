@@ -15,7 +15,16 @@ Project State
 PDFGenerator.generate()
       │
       ├──▶ Create PDFDocument
-      ├──▶ Embed fonts (StandardFonts)
+      ├──▶ Register fontkit (for custom font embedding)
+      ├──▶ Build font cache
+      │         │
+      │         ├──▶ Embed fallback fonts (StandardFonts)
+      │         │
+      │         └──▶ If Electron: Embed actual system fonts
+      │                   ├──▶ Collect font families from project
+      │                   ├──▶ Load font files via fontService
+      │                   └──▶ Embed with subsetting
+      │
       ├──▶ Build global page map (for cross-signature adjacency)
       ├──▶ Pre-render pages with items (via Konva/pageRenderer)
       ├──▶ Embed images
@@ -72,13 +81,16 @@ Generates the complete PDF document.
 
 **Process:**
 1. Creates PDFDocument instance
-2. Embeds standard fonts (Times Roman family + Courier)
-3. Builds global page map for cross-signature adjacency lookup
-4. Pre-renders pages with items via Konva (preserves gradients, fonts, shadows)
-5. Embeds images used in static pages
-6. Generates signature sheets with imposition
-7. Adds print marks (cut marks, fold indicators)
-8. Returns PDF as Uint8Array
+2. Registers fontkit for custom font embedding
+3. Builds font cache:
+   - Embeds standard fallback fonts (Times Roman, Helvetica, Courier families)
+   - In Electron: Embeds actual system fonts with subsetting
+4. Builds global page map for cross-signature adjacency lookup
+5. Pre-renders pages with items via Konva (preserves gradients, fonts, shadows)
+6. Embeds images used in static pages
+7. Generates signature sheets with imposition
+8. Adds print marks (cut marks, fold indicators)
+9. Returns PDF as Uint8Array
 
 ### Signature Generation
 
@@ -153,22 +165,66 @@ Adds production marks to all pages.
 
 ### Font Handling
 
-#### `getFont(style: FontStyle): PDFFont`
+The PDF generator supports two font embedding modes:
 
-Maps FontStyle to embedded PDF fonts.
+#### Electron: Actual Font Embedding
+
+In Electron, actual system fonts are embedded into PDFs for exact visual fidelity:
+
+1. **Font Collection**: `collectFontFamilies()` gathers all fonts used in:
+   - Body text, headings (h1-h6), code blocks, blockquotes
+   - Headers and footers
+
+2. **Font Loading**: For each family, `fontService.loadFontFileData()` loads TTF/OTF files from the system
+
+3. **Font Embedding**: Fonts are embedded using pdf-lib with fontkit:
+   ```typescript
+   pdfDoc.registerFontkit(fontkit);
+   const font = await pdfDoc.embedFont(fontData, { subset: true });
+   ```
+
+4. **Subsetting**: The `{ subset: true }` option includes only used glyphs, reducing file size from ~30MB to ~50-200KB
+
+#### Web: Standard PDF Fonts
+
+In web environments, standard PDF fonts provide reliable fallback:
 
 **Font Mapping:**
-| Style | PDF Font |
-|-------|----------|
-| Normal | TimesRoman |
-| Bold | TimesRomanBold |
-| Italic | TimesRomanItalic |
-| Bold Italic | TimesRomanBoldItalic |
-| Monospace | Courier |
+| Category | PDF Font Family |
+|----------|-----------------|
+| Serif | TimesRoman, TimesRomanBold, TimesRomanItalic, TimesRomanBoldItalic |
+| Sans-serif | Helvetica, HelveticaBold, HelveticaOblique, HelveticaBoldOblique |
+| Monospace | Courier, CourierBold, CourierOblique, CourierBoldOblique |
+
+#### Font Cache Structure
+
+```typescript
+interface FontCache {
+  embedded: Map<string, FontVariants>;  // Actual embedded fonts (Electron)
+  fallback: {
+    serif: FontVariants;    // TimesRoman family
+    sans: FontVariants;     // Helvetica family
+    mono: FontVariants;     // Courier family
+  };
+}
+
+interface FontVariants {
+  regular: PDFFont;
+  bold?: PDFFont;
+  italic?: PDFFont;
+  boldItalic?: PDFFont;
+}
+```
+
+#### `getFont(style: FontStyle, fontCache: FontCache): PDFFont`
+
+Looks up the appropriate font:
+1. First checks `embedded` map for exact match (Electron)
+2. Falls back to category-based standard fonts
 
 #### `getTextItemFont(textItem: TextPageItem): PDFFont`
 
-Similar mapping for text page items.
+Similar lookup for text page items.
 
 ### Text Sanitization
 
@@ -333,16 +389,17 @@ When creep is enabled with "Fill available space" mode, crop marks are positione
 
 ## Limitations
 
-1. **Fonts**: Body text uses standard PDF fonts; custom fonts on items are pre-rendered as images
-2. **Rich Text**: No inline formatting (bold within paragraphs) for body text
-3. **Images**: Only PNG and JPEG formats supported
+1. **Rich Text**: No inline formatting (bold within paragraphs) for body text
+2. **Images**: Only PNG and JPEG formats supported
+3. **Web Font Embedding**: In web environments, body text uses standard PDF fonts (Times, Helvetica, Courier) as fallback
 
 ## Resolved Limitations
 
-The following were previously limitations but are now fully supported via Konva pre-rendering:
+The following were previously limitations but are now fully supported:
 
-- **Gradients**: Linear and radial gradients render correctly on page items
-- **Patterns**: Pattern fills render correctly on shapes
-- **Custom Fonts**: Custom fonts on text items render correctly
-- **Shadows**: Drop shadows render correctly
+- **Gradients**: Linear and radial gradients render correctly on page items (via Konva pre-rendering)
+- **Patterns**: Pattern fills render correctly on shapes (via Konva pre-rendering)
+- **Custom Fonts on Items**: Custom fonts on text items render correctly (via Konva pre-rendering)
+- **Shadows**: Drop shadows render correctly (via Konva pre-rendering)
 - **Cross-page Items**: Items spanning page boundaries render correctly with proper clipping
+- **Body Text Fonts (Electron)**: Actual system fonts are now embedded into PDFs with subsetting, ensuring exact visual fidelity between editor and PDF output

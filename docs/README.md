@@ -47,10 +47,10 @@ PrintFold is an Electron/Web application for creating printable booklets from Ma
 | Component | Technology |
 |-----------|------------|
 | Canvas Editor | Konva.js |
-| PDF Generation | pdf-lib |
+| PDF Generation | pdf-lib + fontkit |
 | Markdown Parsing | marked |
 | ZIP Handling | JSZip |
-| Fonts | Google Fonts API |
+| Fonts | System fonts (Electron) / Web-safe fonts (Web) + Google Fonts for items |
 | Build | Vite + TypeScript |
 | Runtime | Electron / Web |
 
@@ -123,6 +123,8 @@ Creates print-ready PDFs with booklet imposition.
 - Print marks (cut lines, fold indicators)
 - Cross-page item rendering with proper clipping
 - Pre-rendering items via Konva for gradient/font support
+- **Font embedding** (Electron): Actual system fonts embedded with subsetting
+- **Font fallback** (Web): Standard PDF fonts (Times, Helvetica, Courier)
 
 **Quick Reference:**
 ```typescript
@@ -134,23 +136,34 @@ const pdfBytes = await generator.generate();
 
 ---
 
-### [Google Fonts Service (`googleFonts.ts`)](./googleFonts.md)
+### [Font Service (`fontService.ts`)](./fontService.md)
 
-Manages web font loading from Google Fonts.
+Manages fonts for both web and Electron environments with separate font lists for different use cases.
 
 **Key Responsibilities:**
-- Font catalog (40+ Google Fonts + system fonts)
-- Async font loading with caching
+- **Style fonts** (body, headings): Web-safe fonts (web) or system fonts (Electron)
+- **Item fonts** (text objects on static pages): Google Fonts + web-safe fonts
+- System font discovery (Electron via IPC)
+- Google Font loading with caching
+- **Font file embedding** for PDFs (Electron only)
 - Font availability checking
-- Load event notifications
 
 **Quick Reference:**
 ```typescript
-import { googleFonts } from '../services/googleFonts';
+import { fontService } from '../services/fontService';
 
-await googleFonts.loadFont('Playfair Display');
-const fonts = googleFonts.getAllFonts();
-googleFonts.onFontLoaded(() => { /* re-render */ });
+// Get fonts for different contexts
+const styleFonts = fontService.getStyleFonts();   // For body/headings
+const itemFonts = fontService.getItemFonts();     // For text items on static pages
+
+// Load Google fonts for items
+await fontService.loadGoogleFont('Playfair Display');
+
+// Font file embedding (Electron only)
+if (fontService.canEmbedFonts()) {
+  const fontData = await fontService.loadFontFileData('Georgia');
+  // Returns { regular?: Uint8Array, bold?: Uint8Array, italic?: Uint8Array, boldItalic?: Uint8Array }
+}
 ```
 
 ---
@@ -508,7 +521,7 @@ src/
 │   │   ├── images.ts         # Pre-rendering orchestration
 │   │   ├── printMarks.ts
 │   │   └── itemDrawing.ts
-│   ├── googleFonts.ts
+│   ├── fontService.ts        # Font management (system, web-safe, Google Fonts)
 │   ├── zipHandler.ts
 │   └── environment.ts
 ├── styles/
@@ -585,7 +598,7 @@ npm run build       # Production build
 | Page Items | `SpreadEditor/items/`, `OptionsPanel/editPage/` |
 | Fills/Gradients | `FillPicker/` (colorTab, gradientTab, patternTab) |
 | Cross-page Items | `pageRenderer.ts`, `pdfGenerator/images.ts`, `pdfGenerator/itemDrawing.ts` |
-| Fonts | `googleFonts.ts`, `OptionsPanel/fontOptions.ts` |
+| Fonts | `fontService.ts`, `OptionsPanel/fontOptions.ts`, `pdfGenerator/fonts.ts` |
 | Project I/O | `zipHandler.ts` |
 | Settings UI | `OptionsPanel/` |
 | Styles | `styles/modules/` (12 modular CSS files) |
