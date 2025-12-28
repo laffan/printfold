@@ -143,10 +143,13 @@ Manages fonts for both web and Electron environments with separate font lists fo
 **Key Responsibilities:**
 - **Style fonts** (body, headings): Web-safe fonts (web) or system fonts (Electron)
 - **Item fonts** (text objects on static pages): Google Fonts + web-safe fonts
-- System font discovery (Electron via IPC)
+- System font discovery (Electron via IPC with fallback to web-safe fonts)
 - Google Font loading with caching
-- **Font file embedding** for PDFs (Electron only)
+- **Font file embedding** for PDFs (Electron only, using paths from system database)
 - Font availability checking
+
+**Packaged App Notes:**
+Packaged Electron apps use explicit shell/PATH configuration for reliable font discovery. On macOS, font file paths are extracted directly from `system_profiler` output for accurate font-to-file matching.
 
 **Quick Reference:**
 ```typescript
