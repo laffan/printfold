@@ -60,10 +60,7 @@ export function setupFontOptions(debounce: (fn: DebounceCallback) => void): void
     });
   }, debounce);
 
-  // Line height (in fonts section)
-  bindNumberInput('opt-line-height-fonts', (value) => {
-    appState.updateLayoutOptions({ lineHeight: value });
-  }, debounce);
+  // Note: Line Height is now controlled per-element in the Styles tab
 
   // Justify
   bindCheckbox('opt-justify', (checked) => {
