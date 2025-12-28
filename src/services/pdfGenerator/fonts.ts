@@ -4,14 +4,13 @@
 
 import type { PDFFont } from 'pdf-lib';
 import type { FontStyle, TextPageItem, FontOptions } from '../../types';
-import type { FontCache } from './types';
+import type { FontCache, FontVariants } from './types';
 
-// Sans-serif font names (maps to Helvetica in PDF)
+// Sans-serif font names (for category detection)
 const SANS_SERIF_FONTS = [
   'arial', 'helvetica', 'verdana', 'tahoma', 'trebuchet',
   'lucida sans', 'segoe ui', 'calibri', 'candara', 'optima',
   'futura', 'gill sans', 'century gothic', 'sans-serif',
-  // Google Fonts that are sans-serif
   'dm sans', 'inter', 'work sans', 'space grotesk', 'syne',
   'libre franklin', 'fira sans', 'alegreya sans', 'source sans',
   'roboto', 'poppins', 'archivo narrow', 'karla', 'proza libre',
@@ -19,19 +18,17 @@ const SANS_SERIF_FONTS = [
   'chivo', 'rubik', 'open sans', 'raleway',
 ];
 
-// Monospace font names (maps to Courier in PDF)
+// Monospace font names (for category detection)
 const MONOSPACE_FONTS = [
   'courier', 'monaco', 'consolas', 'menlo', 'lucida console',
   'monospace', 'mono', 'code',
-  // Google Fonts that are monospace
   'space mono', 'inconsolata', 'fira code', 'jetbrains mono',
 ];
 
-// Serif font names (maps to Times in PDF) - default fallback
+// Serif font names (for category detection)
 const SERIF_FONTS = [
   'georgia', 'times', 'palatino', 'garamond', 'baskerville',
   'book antiqua', 'cambria', 'serif',
-  // Google Fonts that are serif
   'cormorant', 'eczar', 'alegreya', 'source serif', 'fraunces',
   'inknut antiqua', 'biorhyme', 'libre baskerville', 'playfair display',
   'lora', 'spectral', 'pt serif', 'cardo', 'neuton', 'merriweather',
@@ -40,7 +37,7 @@ const SERIF_FONTS = [
 /**
  * Determine font category from font family name
  */
-function getFontCategory(fontFamily: string): 'serif' | 'sans' | 'mono' {
+export function getFontCategory(fontFamily: string): 'serif' | 'sans' | 'mono' {
   const lower = fontFamily.toLowerCase();
 
   // Check monospace first (more specific)
@@ -89,63 +86,88 @@ export function getFontStyleForSection(
 }
 
 /**
- * Get the appropriate font from cache based on font style
- * Maps web-safe fonts to their PDF standard equivalents:
- * - Serif fonts → TimesRoman
- * - Sans-serif fonts → Helvetica
- * - Monospace fonts → Courier
+ * Get font variant from FontVariants based on weight/style
  */
-export function getFont(style: FontStyle, fontCache: FontCache): PDFFont {
-  const category = getFontCategory(style.fontFamily);
-  const isBold = style.fontWeight === 'bold';
-  const isItalic = style.fontStyle === 'italic';
-
-  if (category === 'mono') {
-    if (isBold && isItalic) return fontCache.monoBoldItalic;
-    if (isBold) return fontCache.monoBold;
-    if (isItalic) return fontCache.monoItalic;
-    return fontCache.monoRegular;
+function getFontVariant(
+  variants: FontVariants,
+  isBold: boolean,
+  isItalic: boolean
+): PDFFont {
+  if (isBold && isItalic && variants.boldItalic) {
+    return variants.boldItalic;
   }
-
-  if (category === 'sans') {
-    if (isBold && isItalic) return fontCache.sansBoldItalic;
-    if (isBold) return fontCache.sansBold;
-    if (isItalic) return fontCache.sansItalic;
-    return fontCache.sansRegular;
+  if (isBold && variants.bold) {
+    return variants.bold;
   }
-
-  // Serif (default)
-  if (isBold && isItalic) return fontCache.serifBoldItalic;
-  if (isBold) return fontCache.serifBold;
-  if (isItalic) return fontCache.serifItalic;
-  return fontCache.serifRegular;
+  if (isItalic && variants.italic) {
+    return variants.italic;
+  }
+  return variants.regular;
 }
 
 /**
- * Get font for text item - maps to appropriate PDF font category
+ * Normalize font family name for cache lookup
+ */
+function normalizeFontFamily(fontFamily: string): string {
+  // Remove quotes and extra whitespace
+  return fontFamily.replace(/["']/g, '').trim().toLowerCase();
+}
+
+/**
+ * Get the appropriate font from cache based on font style
+ * First checks for embedded fonts, then falls back to standard PDF fonts
+ */
+export function getFont(style: FontStyle, fontCache: FontCache): PDFFont {
+  const isBold = style.fontWeight === 'bold';
+  const isItalic = style.fontStyle === 'italic';
+  const normalizedFamily = normalizeFontFamily(style.fontFamily);
+
+  // First, try to find an embedded font for this exact family
+  for (const [family, variants] of fontCache.embedded) {
+    if (normalizeFontFamily(family) === normalizedFamily) {
+      return getFontVariant(variants, isBold, isItalic);
+    }
+  }
+
+  // Also try partial matches (e.g., "Georgia" matches "Georgia, serif")
+  for (const [family, variants] of fontCache.embedded) {
+    const normalizedCached = normalizeFontFamily(family);
+    if (normalizedFamily.includes(normalizedCached) || normalizedCached.includes(normalizedFamily)) {
+      return getFontVariant(variants, isBold, isItalic);
+    }
+  }
+
+  // Fall back to category-based standard fonts
+  const category = getFontCategory(style.fontFamily);
+  const fallbackVariants = fontCache.fallback[category];
+  return getFontVariant(fallbackVariants, isBold, isItalic);
+}
+
+/**
+ * Get font for text item
  */
 export function getTextItemFont(textItem: TextPageItem, fontCache: FontCache): PDFFont {
-  const category = getFontCategory(textItem.fontFamily);
   const isBold = textItem.fontWeight === 'bold';
   const isItalic = textItem.fontStyle === 'italic';
+  const normalizedFamily = normalizeFontFamily(textItem.fontFamily);
 
-  if (category === 'mono') {
-    if (isBold && isItalic) return fontCache.monoBoldItalic;
-    if (isBold) return fontCache.monoBold;
-    if (isItalic) return fontCache.monoItalic;
-    return fontCache.monoRegular;
+  // First, try to find an embedded font
+  for (const [family, variants] of fontCache.embedded) {
+    if (normalizeFontFamily(family) === normalizedFamily) {
+      return getFontVariant(variants, isBold, isItalic);
+    }
   }
 
-  if (category === 'sans') {
-    if (isBold && isItalic) return fontCache.sansBoldItalic;
-    if (isBold) return fontCache.sansBold;
-    if (isItalic) return fontCache.sansItalic;
-    return fontCache.sansRegular;
+  // Partial match
+  for (const [family, variants] of fontCache.embedded) {
+    const normalizedCached = normalizeFontFamily(family);
+    if (normalizedFamily.includes(normalizedCached) || normalizedCached.includes(normalizedFamily)) {
+      return getFontVariant(variants, isBold, isItalic);
+    }
   }
 
-  // Serif (default)
-  if (isBold && isItalic) return fontCache.serifBoldItalic;
-  if (isBold) return fontCache.serifBold;
-  if (isItalic) return fontCache.serifItalic;
-  return fontCache.serifRegular;
+  // Fall back to category-based standard fonts
+  const category = getFontCategory(textItem.fontFamily);
+  const fallbackVariants = fontCache.fallback[category];
+  return getFontVariant(fallbackVariants, isBold, isItalic);
 }

@@ -3,12 +3,13 @@
  * Generates print-ready PDFs using pdf-lib with booklet imposition
  */
 
-import { PDFDocument, PDFPage, PDFImage, rgb, StandardFonts, pushGraphicsState, popGraphicsState, moveTo, lineTo, closePath, clip, endPath } from 'pdf-lib';
+import { PDFDocument, PDFPage, PDFImage, PDFFont, rgb, StandardFonts, pushGraphicsState, popGraphicsState, moveTo, lineTo, closePath, clip, endPath } from 'pdf-lib';
 import { appState } from '../state';
 import { textFlowEngine } from '../textFlow';
+import { fontService, FontFileData } from '../fontService';
 import type { Signature, Spread, PageContent, PageItem, SpanningItem, StaticSpread } from '../../types';
 import { SHEET_SIZES, getOrientedSheetSize, calculateSpreadRowsPerSheet } from '../../types';
-import type { FontCache, ImageCacheType, RenderedPageCacheType, ImpositionSheet } from './types';
+import type { FontCache, FontVariants, ImageCacheType, RenderedPageCacheType, ImpositionSheet } from './types';
 import { sanitizeText } from './textUtils';
 import { parseColor } from './colors';
 import { getFontStyleForSection, getFont } from './fonts';
@@ -28,24 +29,8 @@ export class PDFGenerator {
     const project = appState.getProject();
     const pdfDoc = await PDFDocument.create();
 
-    // Embed fonts for all three categories: serif, sans-serif, monospace
-    this.fontCache = {
-      // Serif fonts (for Georgia, Times New Roman, Palatino, etc.)
-      serifRegular: await pdfDoc.embedFont(StandardFonts.TimesRoman),
-      serifBold: await pdfDoc.embedFont(StandardFonts.TimesRomanBold),
-      serifItalic: await pdfDoc.embedFont(StandardFonts.TimesRomanItalic),
-      serifBoldItalic: await pdfDoc.embedFont(StandardFonts.TimesRomanBoldItalic),
-      // Sans-serif fonts (for Arial, Helvetica, Verdana, etc.)
-      sansRegular: await pdfDoc.embedFont(StandardFonts.Helvetica),
-      sansBold: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
-      sansItalic: await pdfDoc.embedFont(StandardFonts.HelveticaOblique),
-      sansBoldItalic: await pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique),
-      // Monospace fonts (for Courier, Monaco, Consolas, etc.)
-      monoRegular: await pdfDoc.embedFont(StandardFonts.Courier),
-      monoBold: await pdfDoc.embedFont(StandardFonts.CourierBold),
-      monoItalic: await pdfDoc.embedFont(StandardFonts.CourierOblique),
-      monoBoldItalic: await pdfDoc.embedFont(StandardFonts.CourierBoldOblique),
-    };
+    // Build font cache with embedded fonts
+    this.fontCache = await this.buildFontCache(pdfDoc, project);
 
     // Embed images used in static pages
     await embedImages(pdfDoc, project, this.imageCache);
@@ -335,7 +320,7 @@ export class PDFGenerator {
           x: contentX + 10,
           y: currentY - placeholderHeight / 2,
           size: 10,
-          font: this.fontCache.sansRegular,
+          font: this.fontCache.fallback.sans.regular,
           color: rgb(0.6, 0.6, 0.6),
         });
 
@@ -559,6 +544,152 @@ export class PDFGenerator {
 
     if (visibleItems.length > 0) {
       drawPageItemsClipped(pdfPage, visibleItems, x, y, width, height, offsetX, width, this.fontCache, this.imageCache);
+    }
+  }
+
+  /**
+   * Build font cache - embed actual fonts in Electron, use standard fonts as fallback
+   */
+  private async buildFontCache(
+    pdfDoc: PDFDocument,
+    project: { fontOptions: import('../../types').FontOptions; headerFooter: import('../../types').HeaderFooterOptions }
+  ): Promise<FontCache> {
+    // Create fallback fonts (standard PDF fonts)
+    const fallback = {
+      serif: {
+        regular: await pdfDoc.embedFont(StandardFonts.TimesRoman),
+        bold: await pdfDoc.embedFont(StandardFonts.TimesRomanBold),
+        italic: await pdfDoc.embedFont(StandardFonts.TimesRomanItalic),
+        boldItalic: await pdfDoc.embedFont(StandardFonts.TimesRomanBoldItalic),
+      },
+      sans: {
+        regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
+        bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
+        italic: await pdfDoc.embedFont(StandardFonts.HelveticaOblique),
+        boldItalic: await pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique),
+      },
+      mono: {
+        regular: await pdfDoc.embedFont(StandardFonts.Courier),
+        bold: await pdfDoc.embedFont(StandardFonts.CourierBold),
+        italic: await pdfDoc.embedFont(StandardFonts.CourierOblique),
+        boldItalic: await pdfDoc.embedFont(StandardFonts.CourierBoldOblique),
+      },
+    };
+
+    const embedded = new Map<string, FontVariants>();
+
+    // Try to embed actual fonts (Electron only)
+    if (fontService.canEmbedFonts()) {
+      // Collect all unique font families used in the document
+      const fontFamilies = this.collectFontFamilies(project);
+
+      // Load and embed each font
+      for (const family of fontFamilies) {
+        try {
+          const fontData = await fontService.loadFontFileData(family);
+          if (fontData) {
+            const variants = await this.embedFontData(pdfDoc, fontData, fallback);
+            if (variants) {
+              embedded.set(family, variants);
+              console.log(`Embedded font: ${family}`);
+            }
+          }
+        } catch (error) {
+          console.warn(`Failed to embed font "${family}":`, error);
+          // Will fall back to standard fonts
+        }
+      }
+    }
+
+    return { embedded, fallback };
+  }
+
+  /**
+   * Collect all unique font families used in the document
+   */
+  private collectFontFamilies(
+    project: { fontOptions: import('../../types').FontOptions; headerFooter: import('../../types').HeaderFooterOptions }
+  ): Set<string> {
+    const families = new Set<string>();
+
+    // Font options (body, headings, code, blockquote)
+    const { fontOptions, headerFooter } = project;
+
+    families.add(fontOptions.body.fontFamily);
+    families.add(fontOptions.h1.fontFamily);
+    families.add(fontOptions.h2.fontFamily);
+    families.add(fontOptions.h3.fontFamily);
+    families.add(fontOptions.h4.fontFamily);
+    families.add(fontOptions.h5.fontFamily);
+    families.add(fontOptions.h6.fontFamily);
+    families.add(fontOptions.code.fontFamily);
+    families.add(fontOptions.blockquote.fontFamily);
+
+    // Header/footer fonts
+    if (headerFooter.header.enabled) {
+      families.add(headerFooter.header.font.fontFamily);
+    }
+    if (headerFooter.footer.enabled) {
+      families.add(headerFooter.footer.font.fontFamily);
+    }
+
+    return families;
+  }
+
+  /**
+   * Embed font data into PDF
+   */
+  private async embedFontData(
+    pdfDoc: PDFDocument,
+    fontData: FontFileData,
+    fallback: { serif: FontVariants; sans: FontVariants; mono: FontVariants }
+  ): Promise<FontVariants | null> {
+    // We need at least the regular variant
+    if (!fontData.regular) {
+      return null;
+    }
+
+    try {
+      const regular = await pdfDoc.embedFont(fontData.regular);
+
+      // Try to embed other variants, fall back to regular if not available
+      let bold: PDFFont | undefined;
+      let italic: PDFFont | undefined;
+      let boldItalic: PDFFont | undefined;
+
+      if (fontData.bold) {
+        try {
+          bold = await pdfDoc.embedFont(fontData.bold);
+        } catch {
+          // Use regular for bold
+        }
+      }
+
+      if (fontData.italic) {
+        try {
+          italic = await pdfDoc.embedFont(fontData.italic);
+        } catch {
+          // Use regular for italic
+        }
+      }
+
+      if (fontData.boldItalic) {
+        try {
+          boldItalic = await pdfDoc.embedFont(fontData.boldItalic);
+        } catch {
+          // Use bold or italic or regular
+        }
+      }
+
+      return {
+        regular,
+        bold,
+        italic,
+        boldItalic,
+      };
+    } catch (error) {
+      console.warn('Failed to embed font:', error);
+      return null;
     }
   }
 }

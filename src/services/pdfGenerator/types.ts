@@ -4,22 +4,30 @@
 
 import type { PDFFont, PDFImage } from 'pdf-lib';
 
+/**
+ * Font variants for a single font family
+ */
+export interface FontVariants {
+  regular: PDFFont;
+  bold?: PDFFont;
+  italic?: PDFFont;
+  boldItalic?: PDFFont;
+}
+
+/**
+ * Font cache - stores embedded fonts by family name
+ * Also includes fallback fonts for each category
+ */
 export interface FontCache {
-  // Serif fonts (for Georgia, Times New Roman, Palatino, etc.)
-  serifRegular: PDFFont;
-  serifBold: PDFFont;
-  serifItalic: PDFFont;
-  serifBoldItalic: PDFFont;
-  // Sans-serif fonts (for Arial, Helvetica, Verdana, etc.)
-  sansRegular: PDFFont;
-  sansBold: PDFFont;
-  sansItalic: PDFFont;
-  sansBoldItalic: PDFFont;
-  // Monospace fonts (for Courier, Monaco, Consolas, etc.)
-  monoRegular: PDFFont;
-  monoBold: PDFFont;
-  monoItalic: PDFFont;
-  monoBoldItalic: PDFFont;
+  // Dynamically embedded fonts (by family name)
+  embedded: Map<string, FontVariants>;
+
+  // Fallback fonts (standard PDF fonts)
+  fallback: {
+    serif: FontVariants;
+    sans: FontVariants;
+    mono: FontVariants;
+  };
 }
 
 export type ImageCacheType = Map<string, PDFImage>;

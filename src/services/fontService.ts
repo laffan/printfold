@@ -99,6 +99,14 @@ export const GOOGLE_FONTS: FontDefinition[] = [
   { name: 'Inconsolata', family: 'Inconsolata', category: 'monospace', weights: [400, 700] },
 ];
 
+// Font file data for PDF embedding
+export interface FontFileData {
+  regular?: Uint8Array;
+  bold?: Uint8Array;
+  italic?: Uint8Array;
+  boldItalic?: Uint8Array;
+}
+
 class FontService {
   private loadedGoogleFonts = new Set<string>();
   private loadingGoogleFonts = new Map<string, Promise<void>>();
@@ -112,6 +120,10 @@ class FontService {
 
   // Track which fonts have been checked for availability
   private fontPreviewLoaded = new Map<string, boolean>();
+
+  // Cache for font file data (for PDF embedding in Electron)
+  private fontFileCache = new Map<string, FontFileData>();
+  private fontFileLoadingPromises = new Map<string, Promise<FontFileData | null>>();
 
   /**
    * Get fonts for markdown styles (body, headings, etc.)
@@ -335,6 +347,124 @@ class FontService {
     }
 
     return true; // Assume available if we can't check
+  }
+
+  // ============================================
+  // Font File Loading (for PDF embedding in Electron)
+  // ============================================
+
+  /**
+   * Check if font file embedding is available (Electron only)
+   */
+  canEmbedFonts(): boolean {
+    return env.isElectron && !!window.electronAPI?.getFontFile;
+  }
+
+  /**
+   * Load font file data for a font family (all variants)
+   * Returns cached data if available, otherwise loads from system
+   */
+  async loadFontFileData(fontFamily: string): Promise<FontFileData | null> {
+    if (!this.canEmbedFonts()) {
+      return null;
+    }
+
+    // Check cache first
+    if (this.fontFileCache.has(fontFamily)) {
+      return this.fontFileCache.get(fontFamily)!;
+    }
+
+    // Check if already loading
+    if (this.fontFileLoadingPromises.has(fontFamily)) {
+      return this.fontFileLoadingPromises.get(fontFamily)!;
+    }
+
+    // Start loading
+    const loadPromise = this.doLoadFontFileData(fontFamily);
+    this.fontFileLoadingPromises.set(fontFamily, loadPromise);
+
+    try {
+      const data = await loadPromise;
+      if (data) {
+        this.fontFileCache.set(fontFamily, data);
+      }
+      return data;
+    } finally {
+      this.fontFileLoadingPromises.delete(fontFamily);
+    }
+  }
+
+  /**
+   * Load font file data for multiple font families
+   */
+  async loadMultipleFontFileData(fontFamilies: string[]): Promise<Map<string, FontFileData>> {
+    const results = new Map<string, FontFileData>();
+
+    await Promise.all(
+      fontFamilies.map(async (family) => {
+        const data = await this.loadFontFileData(family);
+        if (data) {
+          results.set(family, data);
+        }
+      })
+    );
+
+    return results;
+  }
+
+  /**
+   * Get cached font file data (returns null if not loaded)
+   */
+  getCachedFontFileData(fontFamily: string): FontFileData | null {
+    return this.fontFileCache.get(fontFamily) || null;
+  }
+
+  /**
+   * Clear font file cache
+   */
+  clearFontFileCache(): void {
+    this.fontFileCache.clear();
+  }
+
+  private async doLoadFontFileData(fontFamily: string): Promise<FontFileData | null> {
+    if (!window.electronAPI?.getFontFile) {
+      return null;
+    }
+
+    const data: FontFileData = {};
+    const variants: Array<{ key: keyof FontFileData; weight: 'normal' | 'bold'; style: 'normal' | 'italic' }> = [
+      { key: 'regular', weight: 'normal', style: 'normal' },
+      { key: 'bold', weight: 'bold', style: 'normal' },
+      { key: 'italic', weight: 'normal', style: 'italic' },
+      { key: 'boldItalic', weight: 'bold', style: 'italic' },
+    ];
+
+    // Load all variants in parallel
+    await Promise.all(
+      variants.map(async ({ key, weight, style }) => {
+        try {
+          const result = await window.electronAPI!.getFontFile(fontFamily, weight, style);
+          if (result.success && result.data) {
+            // Convert base64 to Uint8Array
+            const binaryString = atob(result.data);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
+            }
+            data[key] = bytes;
+          }
+        } catch (error) {
+          console.warn(`Failed to load ${key} variant of ${fontFamily}:`, error);
+        }
+      })
+    );
+
+    // Return null if no variants were loaded
+    if (!data.regular && !data.bold && !data.italic && !data.boldItalic) {
+      return null;
+    }
+
+    return data;
   }
 
   private async doLoadGoogleFont(font: FontDefinition): Promise<void> {

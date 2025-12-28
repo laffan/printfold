@@ -2,8 +2,13 @@ import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { exec } from 'child_process';
+import * as os from 'os';
 
 let mainWindow: BrowserWindow | null = null;
+
+// Cache for font file paths: Map<fontFamily, Map<variant, filePath>>
+// variant is 'regular', 'bold', 'italic', 'boldItalic'
+const fontFileCache: Map<string, Map<string, string>> = new Map();
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -247,4 +252,293 @@ function parseSystemProfiler(output: string): string[] {
 // IPC handler for system fonts
 ipcMain.handle('fonts:getSystemFonts', async () => {
   return getSystemFonts();
+});
+
+// Font file discovery and reading
+
+interface FontFileInfo {
+  family: string;
+  path: string;
+  weight: string; // 'normal', 'bold'
+  style: string;  // 'normal', 'italic'
+}
+
+/**
+ * Get font directories for the current platform
+ */
+function getFontDirectories(): string[] {
+  const platform = process.platform;
+  const home = os.homedir();
+
+  if (platform === 'darwin') {
+    return [
+      '/Library/Fonts',
+      '/System/Library/Fonts',
+      '/System/Library/Fonts/Supplemental',
+      path.join(home, 'Library/Fonts'),
+    ];
+  } else if (platform === 'win32') {
+    return [
+      'C:\\Windows\\Fonts',
+      path.join(home, 'AppData\\Local\\Microsoft\\Windows\\Fonts'),
+    ];
+  } else {
+    // Linux
+    return [
+      '/usr/share/fonts',
+      '/usr/local/share/fonts',
+      path.join(home, '.fonts'),
+      path.join(home, '.local/share/fonts'),
+    ];
+  }
+}
+
+/**
+ * Recursively find all font files in a directory
+ */
+async function findFontFiles(dir: string): Promise<string[]> {
+  const fontFiles: string[] = [];
+
+  try {
+    const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+
+      if (entry.isDirectory()) {
+        const subFiles = await findFontFiles(fullPath);
+        fontFiles.push(...subFiles);
+      } else if (entry.isFile()) {
+        const ext = path.extname(entry.name).toLowerCase();
+        if (['.ttf', '.otf', '.ttc'].includes(ext)) {
+          fontFiles.push(fullPath);
+        }
+      }
+    }
+  } catch {
+    // Directory doesn't exist or isn't readable
+  }
+
+  return fontFiles;
+}
+
+/**
+ * Parse font weight/style from filename
+ */
+function parseVariantFromFilename(filename: string): { weight: string; style: string } {
+  const lower = filename.toLowerCase();
+
+  let weight = 'normal';
+  let style = 'normal';
+
+  // Check for bold
+  if (lower.includes('bold') || lower.includes('-bd') || lower.includes('_bd') ||
+      lower.endsWith('bd.ttf') || lower.endsWith('bd.otf') ||
+      lower.includes('-b.') || lower.includes('_b.')) {
+    weight = 'bold';
+  }
+
+  // Check for italic/oblique
+  if (lower.includes('italic') || lower.includes('oblique') ||
+      lower.includes('-it') || lower.includes('_it') ||
+      lower.endsWith('it.ttf') || lower.endsWith('it.otf') ||
+      lower.includes('-i.') || lower.includes('_i.')) {
+    style = 'italic';
+  }
+
+  return { weight, style };
+}
+
+/**
+ * Extract font family name from filename (heuristic)
+ */
+function extractFamilyFromFilename(filename: string): string {
+  // Remove extension
+  let name = path.basename(filename, path.extname(filename));
+
+  // Remove common variant suffixes
+  name = name
+    .replace(/[-_]?(Bold|Bd|B)?(Italic|It|I|Oblique|Obl)?(Regular|Reg|R)?$/i, '')
+    .replace(/[-_]?(BoldItalic|BoldIt|BI|BdIt)$/i, '')
+    .trim();
+
+  // Convert CamelCase to spaces for readability
+  name = name.replace(/([a-z])([A-Z])/g, '$1 $2');
+
+  return name;
+}
+
+/**
+ * Build font file cache by scanning font directories
+ */
+async function buildFontFileCache(): Promise<void> {
+  if (fontFileCache.size > 0) return; // Already built
+
+  const dirs = getFontDirectories();
+  const allFontFiles: string[] = [];
+
+  for (const dir of dirs) {
+    const files = await findFontFiles(dir);
+    allFontFiles.push(...files);
+  }
+
+  // Group by family
+  for (const filePath of allFontFiles) {
+    const filename = path.basename(filePath);
+    const family = extractFamilyFromFilename(filename);
+    const { weight, style } = parseVariantFromFilename(filename);
+
+    // Determine variant key
+    let variant = 'regular';
+    if (weight === 'bold' && style === 'italic') {
+      variant = 'boldItalic';
+    } else if (weight === 'bold') {
+      variant = 'bold';
+    } else if (style === 'italic') {
+      variant = 'italic';
+    }
+
+    // Add to cache
+    if (!fontFileCache.has(family)) {
+      fontFileCache.set(family, new Map());
+    }
+    fontFileCache.get(family)!.set(variant, filePath);
+
+    // Also add normalized versions for matching
+    const normalizedFamily = family.toLowerCase().replace(/\s+/g, '');
+    if (!fontFileCache.has(normalizedFamily)) {
+      fontFileCache.set(normalizedFamily, new Map());
+    }
+    fontFileCache.get(normalizedFamily)!.set(variant, filePath);
+  }
+}
+
+/**
+ * Find font file for a given family and variant
+ */
+async function findFontFile(
+  fontFamily: string,
+  weight: 'normal' | 'bold' = 'normal',
+  style: 'normal' | 'italic' = 'normal'
+): Promise<string | null> {
+  await buildFontFileCache();
+
+  // Determine variant key
+  let variant = 'regular';
+  if (weight === 'bold' && style === 'italic') {
+    variant = 'boldItalic';
+  } else if (weight === 'bold') {
+    variant = 'bold';
+  } else if (style === 'italic') {
+    variant = 'italic';
+  }
+
+  // Try exact match first
+  const familyMap = fontFileCache.get(fontFamily);
+  if (familyMap?.has(variant)) {
+    return familyMap.get(variant)!;
+  }
+
+  // Try normalized match
+  const normalizedFamily = fontFamily.toLowerCase().replace(/\s+/g, '');
+  const normalizedMap = fontFileCache.get(normalizedFamily);
+  if (normalizedMap?.has(variant)) {
+    return normalizedMap.get(variant)!;
+  }
+
+  // Try partial match (font family might be a substring)
+  for (const [cachedFamily, variantMap] of fontFileCache) {
+    const cachedNormalized = cachedFamily.toLowerCase().replace(/\s+/g, '');
+    if (cachedNormalized.includes(normalizedFamily) || normalizedFamily.includes(cachedNormalized)) {
+      if (variantMap.has(variant)) {
+        return variantMap.get(variant)!;
+      }
+    }
+  }
+
+  // Fallback: try to find regular variant if specific variant not found
+  if (variant !== 'regular') {
+    const regularPath = await findFontFile(fontFamily, 'normal', 'normal');
+    if (regularPath) {
+      return regularPath;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Read font file and return as base64
+ */
+async function readFontFile(filePath: string): Promise<string | null> {
+  try {
+    const data = await fs.promises.readFile(filePath);
+    return data.toString('base64');
+  } catch {
+    return null;
+  }
+}
+
+// IPC handler for getting font file data
+ipcMain.handle('fonts:getFontFile', async (
+  _event,
+  fontFamily: string,
+  weight: 'normal' | 'bold' = 'normal',
+  style: 'normal' | 'italic' = 'normal'
+): Promise<{ success: boolean; data?: string; path?: string; error?: string }> => {
+  try {
+    const filePath = await findFontFile(fontFamily, weight, style);
+
+    if (!filePath) {
+      return { success: false, error: `Font file not found for: ${fontFamily} (${weight} ${style})` };
+    }
+
+    // Check if it's a TTC file (not directly supported by pdf-lib)
+    if (filePath.toLowerCase().endsWith('.ttc')) {
+      return { success: false, error: `TTC font collections not supported: ${filePath}` };
+    }
+
+    const data = await readFontFile(filePath);
+
+    if (!data) {
+      return { success: false, error: `Failed to read font file: ${filePath}` };
+    }
+
+    return { success: true, data, path: filePath };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+// IPC handler to get available font variants for a family
+ipcMain.handle('fonts:getFontVariants', async (
+  _event,
+  fontFamily: string
+): Promise<string[]> => {
+  await buildFontFileCache();
+
+  const normalizedFamily = fontFamily.toLowerCase().replace(/\s+/g, '');
+
+  // Check exact match
+  let familyMap = fontFileCache.get(fontFamily);
+  if (!familyMap) {
+    familyMap = fontFileCache.get(normalizedFamily);
+  }
+
+  // Try partial match
+  if (!familyMap) {
+    for (const [cachedFamily, variantMap] of fontFileCache) {
+      const cachedNormalized = cachedFamily.toLowerCase().replace(/\s+/g, '');
+      if (cachedNormalized.includes(normalizedFamily) || normalizedFamily.includes(cachedNormalized)) {
+        familyMap = variantMap;
+        break;
+      }
+    }
+  }
+
+  if (!familyMap) {
+    return [];
+  }
+
+  return Array.from(familyMap.keys());
 });
