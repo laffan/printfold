@@ -26,6 +26,12 @@
   letter-spacing: -0.02em;
 }
 
+/* Hide app title in Electron (window title bar shows app name) */
+.is-electron .app-title .logo,
+.is-electron .app-title h1 {
+  display: none;
+}
+
 .header-actions {
   display: flex;
   gap: 8px;

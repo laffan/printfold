@@ -12,6 +12,7 @@ import { FilePreview } from './FilePreview';
 import { SpreadEditor } from './SpreadEditor';
 import { PDFPreview } from './PDFPreview';
 import { OptionsPanel } from './OptionsPanel';
+import { updateStylesTab } from './OptionsPanel/stylesTab';
 import { ZipHandler } from '../services/zipHandler';
 import { PDFGenerator } from '../services/pdfGenerator';
 import type { BookletProject } from '../types';
@@ -162,6 +163,7 @@ export class App {
    */
   private updateOptionsTabsForMode(mode: 'editor' | 'preview'): void {
     const selectedTabBtn = document.querySelector('.options-tabs .tab-btn[data-tab="selected"]') as HTMLButtonElement;
+    const stylesTabBtn = document.querySelector('.options-tabs .tab-btn[data-tab="styles"]') as HTMLButtonElement;
     const optionsTabButtons = document.querySelectorAll('.options-tabs .tab-btn');
     const optionsTabPanels = document.querySelectorAll('.options-tab-content > .tab-panel');
 
@@ -184,6 +186,11 @@ export class App {
     } else {
       // Re-enable the Selected tab in editor mode
       selectedTabBtn.disabled = false;
+
+      // Refresh styles tab if it's active to ensure proper initialization
+      if (stylesTabBtn?.classList.contains('active')) {
+        updateStylesTab();
+      }
     }
   }
 
@@ -208,6 +215,11 @@ export class App {
           const isActive = panel.id === `tab-${tabName}`;
           panel.classList.toggle('active', isActive);
         });
+
+        // Refresh styles tab when it becomes active to ensure proper initialization
+        if (tabName === 'styles') {
+          updateStylesTab();
+        }
       });
     });
   }
