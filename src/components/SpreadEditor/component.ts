@@ -6,7 +6,7 @@
 import Konva from 'konva';
 import { appState } from '../../services/state';
 import type { PageContent, Margins, PageItem, ImagePageItem, FillConfig } from '../../types';
-import { SHEET_SIZES } from '../../types';
+import { getOrientedSheetSize } from '../../types';
 import type { MarginLine, MarginLabel } from './types';
 import { createItemNode, renderPageItems } from './items';
 import { renderThumbnails } from './thumbnails';
@@ -631,26 +631,29 @@ export class SpreadEditor {
 
   private getPageDimensions(): { width: number; height: number } {
     const project = appState.getProject();
-    const sheetSize = SHEET_SIZES[project.outputOptions.sheetSize];
+    const sheetSize = getOrientedSheetSize(
+      project.outputOptions.sheetSize,
+      project.outputOptions.orientation
+    );
+    const baseWidth = sheetSize.width / 2;
 
-    if (project.outputOptions.bookletSize === 'custom') {
-      return {
-        width: project.outputOptions.customWidth || sheetSize.width / 2,
-        height: project.outputOptions.customHeight || sheetSize.height,
-      };
+    switch (project.outputOptions.bookletSize) {
+      case 'custom':
+        return {
+          width: project.outputOptions.customWidth || baseWidth,
+          height: project.outputOptions.customHeight || sheetSize.height,
+        };
+      case 'half':
+        return { width: baseWidth, height: sheetSize.height };
+      case 'quarter':
+        return { width: baseWidth, height: sheetSize.height / 2 };
+      case 'eighth':
+        return { width: baseWidth, height: sheetSize.height / 4 };
+      case 'sixteenth':
+        return { width: baseWidth, height: sheetSize.height / 8 };
+      default:
+        return { width: baseWidth, height: sheetSize.height };
     }
-
-    if (project.outputOptions.bookletSize.startsWith('quarter-')) {
-      return {
-        width: sheetSize.width / 2,
-        height: sheetSize.height / 2,
-      };
-    }
-
-    return {
-      width: sheetSize.width / 2,
-      height: sheetSize.height,
-    };
   }
 
   /**

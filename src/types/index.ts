@@ -213,12 +213,13 @@ export interface PageMarginOverride {
 
 export interface OutputOptions {
   sheetSize: 'letter' | 'a4' | 'legal' | 'tabloid' | 'a3';
-  bookletSize: 'half-letter' | 'quarter-letter' | 'half-a4' | 'quarter-a4' | 'custom';
+  bookletSize: 'half' | 'quarter' | 'eighth' | 'sixteenth' | 'custom';
   customWidth?: number;
   customHeight?: number;
   pagesPerSignature: 4 | 8 | 12 | 16 | 20 | 24;
   orientation: 'portrait' | 'landscape';
   fillAvailableSpace: boolean; // Print multiple rows of spreads per sheet when possible
+  showFoldMarks: boolean; // Show fold marks on printed PDF (light gray)
   // Creep compensation - narrows inner pages to prevent outer edges from extending
   creepEnabled?: boolean;
   creepPerSheet?: number; // Amount to reduce each successive sheet (in points), default 0.0625 * 72 for bond paper
@@ -379,6 +380,7 @@ export interface BookletTemplate {
 }
 
 // Sheet sizes in points (72 points = 1 inch)
+// Stored in portrait orientation (width < height)
 export const SHEET_SIZES: Record<string, { width: number; height: number }> = {
   'letter': { width: 612, height: 792 },
   'a4': { width: 595.28, height: 841.89 },
@@ -386,6 +388,24 @@ export const SHEET_SIZES: Record<string, { width: number; height: number }> = {
   'tabloid': { width: 792, height: 1224 },
   'a3': { width: 841.89, height: 1190.55 },
 };
+
+/**
+ * Get sheet size with orientation applied
+ * Returns dimensions swapped for landscape orientation
+ */
+export function getOrientedSheetSize(
+  sheetSize: keyof typeof SHEET_SIZES | string,
+  orientation: 'portrait' | 'landscape'
+): { width: number; height: number } {
+  const size = SHEET_SIZES[sheetSize];
+  if (!size) {
+    return { width: 612, height: 792 }; // Default to letter
+  }
+  if (orientation === 'landscape') {
+    return { width: size.height, height: size.width };
+  }
+  return size;
+}
 
 // Events
 export type AppEventType =

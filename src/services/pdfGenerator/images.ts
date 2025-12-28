@@ -6,7 +6,7 @@ import type { PDFDocument, PDFImage } from 'pdf-lib';
 import type { ImagePageItem } from '../../types';
 import type { ImageCacheType, RenderedPageCacheType } from './types';
 import { renderPageToImage } from '../pageRenderer';
-import { SHEET_SIZES } from '../../types';
+import { getOrientedSheetSize } from '../../types';
 
 /**
  * Embed all images used in static pages
@@ -91,20 +91,33 @@ export async function preRenderStaticPages(
 ): Promise<void> {
   renderedPageCache.clear();
 
-  // Get page dimensions
-  const sheetSize = SHEET_SIZES[project.outputOptions.sheetSize];
-  let pageWidth: number;
+  // Get page dimensions (with orientation applied)
+  const sheetSize = getOrientedSheetSize(
+    project.outputOptions.sheetSize,
+    project.outputOptions.orientation
+  );
+  let pageWidth: number = sheetSize.width / 2;
   let pageHeight: number;
 
-  if (project.outputOptions.bookletSize === 'custom') {
-    pageWidth = project.outputOptions.customWidth || sheetSize.width / 2;
-    pageHeight = project.outputOptions.customHeight || sheetSize.height;
-  } else if (project.outputOptions.bookletSize.startsWith('quarter-')) {
-    pageWidth = sheetSize.width / 2;
-    pageHeight = sheetSize.height / 2;
-  } else {
-    pageWidth = sheetSize.width / 2;
-    pageHeight = sheetSize.height;
+  switch (project.outputOptions.bookletSize) {
+    case 'custom':
+      pageWidth = project.outputOptions.customWidth || sheetSize.width / 2;
+      pageHeight = project.outputOptions.customHeight || sheetSize.height;
+      break;
+    case 'half':
+      pageHeight = sheetSize.height;
+      break;
+    case 'quarter':
+      pageHeight = sheetSize.height / 2;
+      break;
+    case 'eighth':
+      pageHeight = sheetSize.height / 4;
+      break;
+    case 'sixteenth':
+      pageHeight = sheetSize.height / 8;
+      break;
+    default:
+      pageHeight = sheetSize.height;
   }
 
   // Build a global page map for reading-order adjacency lookup

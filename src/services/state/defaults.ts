@@ -35,10 +35,11 @@ const defaultHeadingStyle = (size: number, weight: 'bold' | 'normal' = 'bold'): 
 // Default options
 export const defaultOutputOptions: OutputOptions = {
   sheetSize: 'letter',
-  bookletSize: 'quarter-letter',
+  bookletSize: 'quarter',
   pagesPerSignature: 4,
   orientation: 'portrait',
   fillAvailableSpace: true,
+  showFoldMarks: false,
   creepEnabled: false,
   creepPerSheet: 0.0625 * 72,
 };

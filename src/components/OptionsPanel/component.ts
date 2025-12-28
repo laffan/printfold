@@ -120,6 +120,7 @@ export class OptionsPanel {
 
     // Output options
     setSelectValue('opt-sheet-size', project.outputOptions.sheetSize);
+    setSelectValue('opt-orientation', project.outputOptions.orientation);
     setSelectValue('opt-booklet-size', project.outputOptions.bookletSize);
     setSelectValue('opt-pages-per-sig', project.outputOptions.pagesPerSignature.toString());
 
@@ -133,6 +134,9 @@ export class OptionsPanel {
     // Fill available space
     setCheckboxValue('opt-fill-space', project.outputOptions.fillAvailableSpace);
     updateFillSpaceVisibility();
+
+    // Show fold marks
+    setCheckboxValue('opt-fold-marks', project.outputOptions.showFoldMarks);
 
     // Creep compensation
     setCheckboxValue('opt-creep-enabled', project.outputOptions.creepEnabled ?? false);

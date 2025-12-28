@@ -40,6 +40,17 @@
   background: var(--color-bg-tertiary);
 }
 
+.tab-btn:disabled {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.tab-btn:disabled:hover {
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
 .options-tab-content {
   flex: 1;
   overflow-y: auto;

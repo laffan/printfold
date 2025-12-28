@@ -14,3 +14,12 @@ export interface FontCache {
 
 export type ImageCacheType = Map<string, PDFImage>;
 export type RenderedPageCacheType = Map<number, PDFImage>;
+
+/**
+ * Imposition sheet representing front/back of a physical sheet
+ */
+export interface ImpositionSheet {
+  sheetNumber: number;
+  front: { left: number; right: number };
+  back: { left: number; right: number };
+}

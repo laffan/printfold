@@ -619,12 +619,19 @@
                 </select>
               </div>
               <div class="form-group">
+                <label for="opt-orientation">Orientation</label>
+                <select id="opt-orientation">
+                  <option value="portrait" selected>Portrait</option>
+                  <option value="landscape">Landscape</option>
+                </select>
+              </div>
+              <div class="form-group">
                 <label for="opt-booklet-size">Booklet Size</label>
                 <select id="opt-booklet-size">
-                  <option value="half-letter">Half Letter</option>
-                  <option value="quarter-letter" selected>Quarter Letter</option>
-                  <option value="half-a4">Half A4</option>
-                  <option value="quarter-a4">Quarter A4</option>
+                  <option value="half">1/2</option>
+                  <option value="quarter" selected>1/4</option>
+                  <option value="eighth">1/8</option>
+                  <option value="sixteenth">1/16</option>
                   <option value="custom">Custom</option>
                 </select>
               </div>
@@ -634,6 +641,12 @@
                   <span>Fill available space</span>
                 </label>
                 <p class="hint" id="fill-space-hint">Print multiple rows per sheet, then cut</p>
+              </div>
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="opt-fold-marks">
+                  <span>Show fold marks</span>
+                </label>
               </div>
               <div class="form-group" id="custom-size-group" style="display: none;">
                 <div class="inline-inputs">

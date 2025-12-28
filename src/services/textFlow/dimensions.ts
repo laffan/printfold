@@ -4,7 +4,7 @@
 
 import type { PageDimensions } from './types';
 import type { OutputOptions, LayoutOptions, HeaderFooterOptions, Margins } from '../../types';
-import { SHEET_SIZES } from '../../types';
+import { getOrientedSheetSize } from '../../types';
 
 /**
  * Calculate page content dimensions
@@ -15,20 +15,33 @@ export function calculatePageDimensions(
   layoutOptions: LayoutOptions,
   _headerFooter: HeaderFooterOptions
 ): PageDimensions {
-  const sheetSize = SHEET_SIZES[outputOptions.sheetSize];
+  const sheetSize = getOrientedSheetSize(outputOptions.sheetSize, outputOptions.orientation);
 
   let pageWidth: number;
   let pageHeight: number;
 
-  if (outputOptions.bookletSize === 'custom') {
-    pageWidth = outputOptions.customWidth || sheetSize.width / 2;
-    pageHeight = outputOptions.customHeight || sheetSize.height;
-  } else if (outputOptions.bookletSize.startsWith('half-')) {
-    pageWidth = sheetSize.width / 2;
-    pageHeight = sheetSize.height;
-  } else {
-    pageWidth = sheetSize.width / 2;
-    pageHeight = sheetSize.height / 2;
+  // Page width is always half the sheet width (for booklet spreads)
+  pageWidth = sheetSize.width / 2;
+
+  switch (outputOptions.bookletSize) {
+    case 'custom':
+      pageWidth = outputOptions.customWidth || sheetSize.width / 2;
+      pageHeight = outputOptions.customHeight || sheetSize.height;
+      break;
+    case 'half':
+      pageHeight = sheetSize.height;
+      break;
+    case 'quarter':
+      pageHeight = sheetSize.height / 2;
+      break;
+    case 'eighth':
+      pageHeight = sheetSize.height / 4;
+      break;
+    case 'sixteenth':
+      pageHeight = sheetSize.height / 8;
+      break;
+    default:
+      pageHeight = sheetSize.height;
   }
 
   const margins = layoutOptions.margins;

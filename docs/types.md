@@ -346,14 +346,26 @@ interface LayoutOptions {
 ```typescript
 interface OutputOptions {
   sheetSize: 'letter' | 'a4' | 'legal' | 'tabloid' | 'a3';
-  bookletSize: 'half-letter' | 'quarter-letter' | 'half-a4' | 'quarter-a4' | 'custom';
+  bookletSize: 'half' | 'quarter' | 'eighth' | 'sixteenth' | 'custom';
   customWidth?: number;
   customHeight?: number;
   pagesPerSignature: 4 | 8 | 12 | 16 | 20 | 24;
   orientation: 'portrait' | 'landscape';
   fillAvailableSpace: boolean;
+  showFoldMarks: boolean;       // Show fold marks on PDF (light gray)
+  creepEnabled?: boolean;       // Enable creep compensation
+  creepPerSheet?: number;       // Points to reduce per nested sheet
 }
 ```
+
+**Booklet Size Values:**
+| Value | Description |
+|-------|-------------|
+| half | 1/2 of sheet height |
+| quarter | 1/4 of sheet height |
+| eighth | 1/8 of sheet height |
+| sixteenth | 1/16 of sheet height |
+| custom | User-specified dimensions |
 
 ### calculateSpreadRowsPerSheet
 
@@ -533,6 +545,8 @@ Returns formatted string like `"0.75"` or `"54pt"`.
 const SHEET_SIZES: Record<string, { width: number; height: number }>;
 ```
 
+Sheet sizes are stored in **portrait orientation** (width < height).
+
 | Size | Width | Height | Notes |
 |------|-------|--------|-------|
 | letter | 612 | 792 | 8.5" × 11" |
@@ -542,6 +556,17 @@ const SHEET_SIZES: Record<string, { width: number; height: number }>;
 | a3 | 841.89 | 1190.55 | 297mm × 420mm |
 
 All dimensions in points (72 points = 1 inch).
+
+### getOrientedSheetSize
+
+```typescript
+function getOrientedSheetSize(
+  sheetSize: string,
+  orientation: 'portrait' | 'landscape'
+): { width: number; height: number };
+```
+
+Returns sheet dimensions with width/height swapped for landscape orientation. Use this helper instead of accessing `SHEET_SIZES` directly when orientation matters.
 
 ---
 
