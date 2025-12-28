@@ -4,16 +4,16 @@
  */
 
 import { appState } from '../../services/state';
-import { googleFonts } from '../../services/googleFonts';
-import { FontDropdown, createFontDropdown } from '../FontDropdown';
+import { fontService } from '../../services/fontService';
+import { FontDropdown, createStylesFontDropdown } from '../FontDropdown';
 import { bindNumberInput, bindColorInput, bindCheckbox, type DebounceCallback } from './helpers';
 
 /**
- * Initialize custom font dropdowns
+ * Initialize custom font dropdowns - uses 'styles' mode for web-safe/system fonts
  */
 export function initFontDropdowns(fontDropdowns: Map<string, FontDropdown>): void {
-  // Body font dropdown
-  const bodyDropdown = createFontDropdown('opt-font-body', (value) => {
+  // Body font dropdown - uses styles mode (web-safe for web, system fonts for Electron)
+  const bodyDropdown = createStylesFontDropdown('opt-font-body', (value) => {
     const fonts = appState.getProject().fontOptions;
     appState.updateFontOptions({
       body: { ...fonts.body, fontFamily: value },
@@ -21,8 +21,8 @@ export function initFontDropdowns(fontDropdowns: Map<string, FontDropdown>): voi
   });
   if (bodyDropdown) fontDropdowns.set('opt-font-body', bodyDropdown);
 
-  // Heading font dropdown
-  const headingDropdown = createFontDropdown('opt-font-h1', (value) => {
+  // Heading font dropdown - uses styles mode
+  const headingDropdown = createStylesFontDropdown('opt-font-h1', (value) => {
     const fonts = appState.getProject().fontOptions;
     appState.updateFontOptions({
       h1: { ...fonts.h1, fontFamily: value },
@@ -111,8 +111,9 @@ export function setupFontOptions(debounce: (fn: DebounceCallback) => void): void
 }
 
 /**
- * Start preloading fonts
+ * Start preloading Google fonts for static page items
+ * (Styles use web-safe fonts that don't need preloading)
  */
 export function preloadFonts(): void {
-  googleFonts.preloadAllFonts();
+  fontService.preloadAllGoogleFonts();
 }

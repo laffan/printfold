@@ -48,8 +48,8 @@
   top: 100%;
   left: 0;
   right: 0;
-  max-height: 300px;
-  overflow-y: auto;
+  max-height: 350px;
+  overflow: hidden;
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-primary);
   border-top: none;
@@ -57,6 +57,45 @@
   border-bottom-right-radius: var(--radius-sm);
   z-index: 100;
   box-shadow: var(--shadow-lg);
+  flex-direction: column;
+}
+
+.font-dropdown.open .font-dropdown-menu {
+  display: flex;
+}
+
+/* Search input container */
+.font-dropdown-search {
+  padding: 8px;
+  background: var(--color-bg-tertiary);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.font-dropdown-search-input {
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--color-text);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  outline: none;
+}
+
+.font-dropdown-search-input:focus {
+  border-color: var(--color-primary);
+}
+
+.font-dropdown-search-input::placeholder {
+  color: var(--color-text-muted);
+}
+
+/* Font options container */
+.font-dropdown-options {
+  overflow-y: auto;
+  flex: 1;
+  max-height: 280px;
 }
 
 .font-dropdown-header {

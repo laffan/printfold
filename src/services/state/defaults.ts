@@ -15,9 +15,9 @@ import type {
   Signature,
 } from '../../types';
 
-// Default font styles - using Google Fonts
+// Default font styles - using web-safe fonts for reliable PDF rendering
 const defaultFontStyle: FontStyle = {
-  fontFamily: 'Source Serif 4',
+  fontFamily: 'Georgia',
   fontSize: 12,
   fontWeight: 'normal',
   fontStyle: 'normal',
@@ -25,7 +25,7 @@ const defaultFontStyle: FontStyle = {
 };
 
 const defaultHeadingStyle = (size: number, weight: 'bold' | 'normal' = 'bold'): FontStyle => ({
-  fontFamily: 'Source Sans 3',
+  fontFamily: 'Arial',
   fontSize: size,
   fontWeight: weight,
   fontStyle: 'normal',
@@ -71,7 +71,7 @@ export const defaultFontOptions: FontOptions = {
   h6: defaultHeadingStyle(12, 'normal'),
   code: {
     ...defaultFontStyle,
-    fontFamily: 'Inconsolata',
+    fontFamily: 'Courier New',
     fontSize: 10,
   },
   blockquote: {

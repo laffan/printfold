@@ -25,6 +25,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Printing
   print: (options?: Electron.PrintToPDFOptions) => ipcRenderer.invoke('app:print', options),
+
+  // System fonts
+  getSystemFonts: () => ipcRenderer.invoke('fonts:getSystemFonts'),
 });
 
 // Type declarations for the exposed API
@@ -55,6 +58,7 @@ declare global {
       }>;
       openExternal: (url: string) => Promise<void>;
       print: (options?: Electron.PrintToPDFOptions) => Promise<string | null>;
+      getSystemFonts: () => Promise<string[]>;
     };
   }
 }

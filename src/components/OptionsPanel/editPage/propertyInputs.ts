@@ -3,7 +3,7 @@
  */
 
 import { appState } from '../../../services/state';
-import { createFontDropdown } from '../../FontDropdown';
+import { createItemsFontDropdown } from '../../FontDropdown';
 import { setItemFontDropdown } from './shared';
 import { addArrayDimension } from './arrayInstances';
 import type { TextPageItem, ArrayDimension } from '../../../types';
@@ -48,8 +48,8 @@ export function setupEditPropertyInputs(updateEditSelectedSectionFn: () => void)
   setupColorInput('item-stroke', 'strokeColor');
   setupPropInput('item-stroke-width', 'strokeWidth');
 
-  // Text properties - use custom font dropdown
-  const fontDropdown = createFontDropdown('item-font-family', (value) => {
+  // Text properties - use items font dropdown (Google Fonts + web-safe for static page items)
+  const fontDropdown = createItemsFontDropdown('item-font-family', (value) => {
     const editorState = appState.getEditor();
     if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
     appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { fontFamily: value });
