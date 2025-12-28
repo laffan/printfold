@@ -195,6 +195,11 @@ export function getFontForSpan(
   const isBold = baseStyle.fontWeight === 'bold' || span.bold === true;
   const isItalic = baseStyle.fontStyle === 'italic' || span.italic === true;
 
+  // DEBUG: Log what we're computing
+  console.log('[getFontForSpan] span.bold:', span.bold, 'span.italic:', span.italic,
+    'baseStyle.fontWeight:', baseStyle.fontWeight, 'baseStyle.fontStyle:', baseStyle.fontStyle,
+    '=> isBold:', isBold, 'isItalic:', isItalic);
+
   // Build a computed style and use the existing getFont function
   // This ensures consistent font lookup with the rest of the PDF generation
   const computedStyle: FontStyle = {
