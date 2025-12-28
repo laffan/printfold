@@ -185,44 +185,26 @@ export function getFontForSpan(
   fontOptions: FontOptions,
   fontCache: FontCache
 ): PDFFont {
-  // Determine the base bold/italic from base style
-  let isBold = baseStyle.fontWeight === 'bold';
-  let isItalic = baseStyle.fontStyle === 'italic';
-  let fontFamily = baseStyle.fontFamily;
+  // Determine the font family (code spans use the code font)
+  const fontFamily = span.code === true
+    ? fontOptions.code.fontFamily
+    : baseStyle.fontFamily;
 
-  // Apply span styling
-  if (span.bold) {
-    isBold = true;
-  }
-  if (span.italic) {
-    isItalic = true;
-  }
-  if (span.code) {
-    // Use code font family for code spans
-    fontFamily = fontOptions.code.fontFamily;
-  }
+  // Determine bold/italic: start with base style, then apply span overrides
+  // Use strict equality to avoid truthy issues
+  const isBold = baseStyle.fontWeight === 'bold' || span.bold === true;
+  const isItalic = baseStyle.fontStyle === 'italic' || span.italic === true;
 
-  const normalizedFamily = normalizeFontFamily(fontFamily);
+  // Build a computed style and use the existing getFont function
+  // This ensures consistent font lookup with the rest of the PDF generation
+  const computedStyle: FontStyle = {
+    ...baseStyle,
+    fontFamily,
+    fontWeight: isBold ? 'bold' : 'normal',
+    fontStyle: isItalic ? 'italic' : 'normal',
+  };
 
-  // First, try to find an embedded font
-  for (const [family, variants] of fontCache.embedded) {
-    if (normalizeFontFamily(family) === normalizedFamily) {
-      return getFontVariant(variants, isBold, isItalic);
-    }
-  }
-
-  // Partial match
-  for (const [family, variants] of fontCache.embedded) {
-    const normalizedCached = normalizeFontFamily(family);
-    if (normalizedFamily.includes(normalizedCached) || normalizedCached.includes(normalizedFamily)) {
-      return getFontVariant(variants, isBold, isItalic);
-    }
-  }
-
-  // Fall back to category-based standard fonts
-  const category = getFontCategory(fontFamily);
-  const fallbackVariants = fontCache.fallback[category];
-  return getFontVariant(fallbackVariants, isBold, isItalic);
+  return getFont(computedStyle, fontCache);
 }
 
 /**
