@@ -431,6 +431,8 @@ function renderTextContent(
               width: textWidth,
               height: lineHeight,
               fill: highlightColor,
+              stroke: undefined,
+              strokeWidth: 0,
             });
             layer.add(bgRect);
           }
