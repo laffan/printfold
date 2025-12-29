@@ -1270,12 +1270,11 @@ export class SpreadEditor {
     const margins = getMarginsForPage(pageContent.pageNumber);
 
     // Draw page background with optional fill
-    // If there's a custom background image, we'll make the page background transparent
-    // so the custom background image shows through
-    const hasCustomBg = !!pageContent.customBackgroundImageId;
+    // Always apply the background fill - custom background images overlay on top
+    // and transparent parts of the image will show the fill through
     this.drawPageBackground(x, y, dimensions.width, dimensions.height,
-      hasCustomBg ? undefined : pageContent.backgroundFill,
-      hasCustomBg,
+      pageContent.backgroundFill,
+      false,
       pageContent.pageNumber);
 
     // Draw custom background image if present (sits above fill, below text/items)
