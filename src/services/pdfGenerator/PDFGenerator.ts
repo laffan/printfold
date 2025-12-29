@@ -255,7 +255,7 @@ export class PDFGenerator {
     const contentHeight = height - margins.top - margins.bottom;
 
     const hasItems = pageContent.items && pageContent.items.length > 0;
-    const hasBackground = !!pageContent.backgroundFill;
+    const hasBackground = !!pageContent.backgroundFill || !!pageContent.customBackgroundImageId;
     // A page is a text page if its pageState is 'text' - these pages need text content rendered
     const isTextPage = pageContent.pageState === 'text';
     // Check for static/available pages using pageState (prefer) or deprecated flags (fallback)

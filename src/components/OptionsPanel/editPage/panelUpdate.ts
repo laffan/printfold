@@ -13,6 +13,7 @@ import {
 import { updateMultiSelectControls } from './multiSelect';
 import { updateArrayDimensionsList, setupAddDimensionButton } from './arrayInstances';
 import { setupPageBackgroundPicker } from './pageBackground';
+import { updateCustomBackgroundSection } from './customBackground';
 import { getTotalArrayInstances } from '../../SpreadEditor/items/arrayItems';
 import type { TextPageItem, ShapePageItem, FillConfig } from '../../../types';
 
@@ -138,6 +139,7 @@ export function updateEditSelectedSection(): void {
   const panel = document.getElementById('edit-page-panel');
   const section = document.getElementById('edit-selected-section');
   const pageBackgroundSection = document.getElementById('page-background-section');
+  const customBackgroundSection = document.getElementById('custom-background-section');
   const shapeProps = document.getElementById('shape-properties');
   const textProps = document.getElementById('text-properties');
 
@@ -148,24 +150,17 @@ export function updateEditSelectedSection(): void {
 
   const selectedCount = editorState.selectedItemIds.length;
 
-  // Get download/replace and delete sections, check if page is static
-  const downloadReplaceSection = document.getElementById('download-replace-section');
+  // Get delete section, check if page is static
   const deleteStaticPageSection = document.getElementById('delete-static-page-section');
   const noSelectionMessage = document.getElementById('no-selection-message');
   const selectedPage = findSelectedPage();
   const isStaticPage = selectedPage?.pageState === 'static' || selectedPage?.isStatic;
 
-  // Get spread buttons to control their visibility
-  const downloadSpreadBtn = document.getElementById('btn-download-spread-png');
-  const replaceSpreadBtn = document.getElementById('btn-replace-spread-image');
-  const spreadStatic = editorState.selectedPageNumber !== null &&
-    isEntireSpreadStatic(editorState.selectedPageNumber);
-
   // If multiple items selected, only show multi-select controls
   if (selectedCount > 1) {
     section.style.display = 'none';
     if (pageBackgroundSection) pageBackgroundSection.style.display = 'none';
-    if (downloadReplaceSection) downloadReplaceSection.style.display = 'none';
+    if (customBackgroundSection) customBackgroundSection.style.display = 'none';
     if (deleteStaticPageSection) deleteStaticPageSection.style.display = 'none';
     if (noSelectionMessage) noSelectionMessage.style.display = 'none';
     const effectsSection = document.getElementById('effects-section');
@@ -174,20 +169,20 @@ export function updateEditSelectedSection(): void {
     return;
   }
 
-  // If page selected but no item, show page background options plus download/replace/delete (if static)
+  // If page selected but no item, show custom background, page fill, and delete (if static)
   if (editorState.selectedPageNumber && selectedCount === 0) {
     section.style.display = 'none';
+
+    // Show custom background section for ALL pages (not just static)
+    updateCustomBackgroundSection();
+
+    // Show page fill picker
     if (pageBackgroundSection) {
       pageBackgroundSection.style.display = 'block';
       setupPageBackgroundPicker(editorState.selectedPageNumber);
     }
-    // Show download/replace and delete sections only for static pages
-    if (downloadReplaceSection) {
-      downloadReplaceSection.style.display = isStaticPage ? 'block' : 'none';
-    }
-    // Show spread buttons only when both pages in spread are static
-    if (downloadSpreadBtn) downloadSpreadBtn.style.display = spreadStatic ? 'block' : 'none';
-    if (replaceSpreadBtn) replaceSpreadBtn.style.display = spreadStatic ? 'block' : 'none';
+
+    // Show delete section only for static pages
     if (deleteStaticPageSection) {
       deleteStaticPageSection.style.display = isStaticPage ? 'block' : 'none';
     }
@@ -196,15 +191,17 @@ export function updateEditSelectedSection(): void {
     return;
   }
 
-  // Hide page background section if item is selected
+  // Hide page background sections if item is selected
   if (pageBackgroundSection) {
     pageBackgroundSection.style.display = 'none';
+  }
+  if (customBackgroundSection) {
+    customBackgroundSection.style.display = 'none';
   }
 
   // Hide if no item selected
   if (selectedCount === 0 || !editorState.selectedPageNumber) {
     section.style.display = 'none';
-    if (downloadReplaceSection) downloadReplaceSection.style.display = 'none';
     if (deleteStaticPageSection) deleteStaticPageSection.style.display = 'none';
     if (noSelectionMessage) noSelectionMessage.style.display = 'block';
     const effectsSection = document.getElementById('effects-section');
@@ -213,13 +210,8 @@ export function updateEditSelectedSection(): void {
     return;
   }
 
-  // When an item is selected, show download/replace and delete sections only for static pages
-  if (downloadReplaceSection) {
-    downloadReplaceSection.style.display = isStaticPage ? 'block' : 'none';
-  }
-  // Show spread buttons only when both pages in spread are static
-  if (downloadSpreadBtn) downloadSpreadBtn.style.display = spreadStatic ? 'block' : 'none';
-  if (replaceSpreadBtn) replaceSpreadBtn.style.display = spreadStatic ? 'block' : 'none';
+  // When an item is selected, hide custom background section, show delete only for static pages
+  if (customBackgroundSection) customBackgroundSection.style.display = 'none';
   if (deleteStaticPageSection) {
     deleteStaticPageSection.style.display = isStaticPage ? 'block' : 'none';
   }

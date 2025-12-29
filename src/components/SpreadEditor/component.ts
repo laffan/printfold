@@ -1268,6 +1268,28 @@ export class SpreadEditor {
     // Draw page background with optional fill
     this.drawPageBackground(x, y, dimensions.width, dimensions.height, pageContent.backgroundFill);
 
+    // Draw custom background image if present (sits above fill, below items)
+    if (pageContent.customBackgroundImageId) {
+      const file = project.files.find(f => f.id === pageContent.customBackgroundImageId);
+      if (file) {
+        const img = new window.Image();
+        img.src = `data:image/png;base64,${file.content}`;
+        img.onload = () => {
+          const konvaImage = new Konva.Image({
+            x,
+            y,
+            width: dimensions.width,
+            height: dimensions.height,
+            image: img,
+          });
+          // Insert before items layer by adding to the main layer
+          this.layer.add(konvaImage);
+          // Move to front of layer (items will be added after in renderItems)
+          this.layer.batchDraw();
+        };
+      }
+    }
+
     // Draw page number indicator only if footer is disabled (footer handles page numbers otherwise)
     if (!project.headerFooter.footer.enabled) {
       const pageNum = new Konva.Text({
