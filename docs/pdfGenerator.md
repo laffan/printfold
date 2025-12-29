@@ -387,9 +387,40 @@ When creep is enabled with "Fill available space" mode, crop marks are positione
 
 **Note:** The actual implementation of creep adjustment is pending. Currently, the UI and settings are in place but page width adjustment is not yet applied during PDF generation.
 
+## Render Text as Images Mode
+
+When `outputOptions.renderTextAsImages` is enabled, ALL pages (including text pages) are rendered as high-resolution PNG images instead of using embedded fonts.
+
+### How It Works
+
+1. **Pre-rendering**: All pages are pre-rendered via Konva at 300 DPI, including:
+   - Text content (sections, headings, paragraphs)
+   - Rich text styling (bold, italic, highlights, strikethrough)
+   - Headers and footers
+   - Page items and backgrounds
+
+2. **No Font Embedding**: Fonts are not embedded in the PDF since all text is rasterized
+
+3. **PDF Structure**: Each page contains a single full-page image
+
+### When to Use
+
+- Fonts aren't rendering correctly in the PDF
+- Bold/italic variants aren't available for a font
+- Complex text styling needs to be preserved exactly
+
+### Trade-offs
+
+| Aspect | Normal Mode | Text as Images |
+|--------|-------------|----------------|
+| File Size | Small (~50-200KB) | Large (depends on page count) |
+| Text Searchable | Yes | No |
+| Visual Fidelity | Depends on font availability | Exact match to editor |
+| Font Variants | Requires separate font files | Always works |
+
 ## Limitations
 
-1. **Rich Text**: No inline formatting (bold within paragraphs) for body text
+1. **Rich Text**: Inline formatting (bold within paragraphs) requires "Render text as images" mode for guaranteed fidelity
 2. **Images**: Only PNG and JPEG formats supported
 3. **Web Font Embedding**: In web environments, body text uses standard PDF fonts (Times, Helvetica, Courier) as fallback
 

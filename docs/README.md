@@ -125,6 +125,7 @@ Creates print-ready PDFs with booklet imposition.
 - Pre-rendering items via Konva for gradient/font support
 - **Font embedding** (Electron): Actual system fonts embedded with subsetting
 - **Font fallback** (Web): Standard PDF fonts (Times, Helvetica, Courier)
+- **Render text as images** mode: Optional fallback that renders all pages as 300 DPI images for guaranteed visual fidelity when fonts don't render correctly
 
 **Quick Reference:**
 ```typescript
