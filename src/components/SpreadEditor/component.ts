@@ -1277,26 +1277,40 @@ export class SpreadEditor {
       hasCustomBg);
 
     // Draw custom background image if present (sits above fill, below text/items)
-    // Create a placeholder image node at the correct z-position, then load the image
     if (pageContent.customBackgroundImageId) {
       const file = project.files.find(f => f.id === pageContent.customBackgroundImageId);
       if (file) {
-        // Create the Konva.Image node SYNCHRONOUSLY to preserve z-order
-        // Use empty image initially, then update when loaded
-        const konvaImage = new Konva.Image({
-          x,
-          y,
-          width: dimensions.width,
-          height: dimensions.height,
-          name: `custom-bg-${pageContent.pageNumber}`,
-        });
-        this.layer.add(konvaImage);
+        // Store values for the closure
+        const bgX = x;
+        const bgY = y;
+        const bgWidth = dimensions.width;
+        const bgHeight = dimensions.height;
+        const pageNum = pageContent.pageNumber;
+        const layerRef = this.layer;
 
-        // Load the actual image and update the node
         const img = new window.Image();
         img.onload = () => {
-          konvaImage.image(img);
-          this.layer.batchDraw();
+          // Remove any existing custom background for this page
+          const existing = layerRef.findOne(`.custom-bg-${pageNum}`);
+          if (existing) {
+            existing.destroy();
+          }
+
+          const konvaImage = new Konva.Image({
+            x: bgX,
+            y: bgY,
+            width: bgWidth,
+            height: bgHeight,
+            image: img,
+            name: `custom-bg-${pageNum}`,
+          });
+          layerRef.add(konvaImage);
+
+          // Move to bottom, then up once to be above the page background rect
+          konvaImage.moveToBottom();
+          konvaImage.moveUp();
+
+          layerRef.batchDraw();
         };
         img.src = `data:image/png;base64,${file.content}`;
       }
