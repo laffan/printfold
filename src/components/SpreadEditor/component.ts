@@ -1185,7 +1185,7 @@ export class SpreadEditor {
     this.layer.add(placeholder);
   }
 
-  private drawPageBackground(x: number, y: number, width: number, height: number, backgroundFill?: FillConfig): void {
+  private drawPageBackground(x: number, y: number, width: number, height: number, backgroundFill?: FillConfig, transparent?: boolean): void {
     const page = new Konva.Rect({
       x,
       y,
@@ -1199,8 +1199,11 @@ export class SpreadEditor {
       shadowOffset: { x: 2, y: 2 },
     });
 
-    // Apply background fill
-    if (backgroundFill) {
+    // If transparent is set (for custom background images), use transparent fill
+    if (transparent) {
+      page.fill('transparent');
+    } else if (backgroundFill) {
+      // Apply background fill
       if (backgroundFill.type === 'color') {
         page.fill(backgroundFill.color || '#ffffff');
       } else if (backgroundFill.type === 'linearGradient' && backgroundFill.linearGradient) {
@@ -1266,30 +1269,36 @@ export class SpreadEditor {
     const margins = getMarginsForPage(pageContent.pageNumber);
 
     // Draw page background with optional fill
-    this.drawPageBackground(x, y, dimensions.width, dimensions.height, pageContent.backgroundFill);
+    // If there's a custom background image, we'll make the page background transparent
+    // so the custom background image shows through
+    const hasCustomBg = !!pageContent.customBackgroundImageId;
+    this.drawPageBackground(x, y, dimensions.width, dimensions.height,
+      hasCustomBg ? undefined : pageContent.backgroundFill,
+      hasCustomBg);
 
     // Draw custom background image if present (sits above fill, below text/items)
+    // Create a placeholder image node at the correct z-position, then load the image
     if (pageContent.customBackgroundImageId) {
       const file = project.files.find(f => f.id === pageContent.customBackgroundImageId);
       if (file) {
+        // Create the Konva.Image node SYNCHRONOUSLY to preserve z-order
+        // Use empty image initially, then update when loaded
+        const konvaImage = new Konva.Image({
+          x,
+          y,
+          width: dimensions.width,
+          height: dimensions.height,
+          name: `custom-bg-${pageContent.pageNumber}`,
+        });
+        this.layer.add(konvaImage);
+
+        // Load the actual image and update the node
         const img = new window.Image();
-        img.src = `data:image/png;base64,${file.content}`;
         img.onload = () => {
-          const konvaImage = new Konva.Image({
-            x,
-            y,
-            width: dimensions.width,
-            height: dimensions.height,
-            image: img,
-            // Use a name to identify this as a background image
-            name: `custom-bg-${pageContent.pageNumber}`,
-          });
-          this.layer.add(konvaImage);
-          // Move to bottom of layer (just above background rects, below text content)
-          // Find position just after page backgrounds (which have zIndex ~0)
-          konvaImage.zIndex(1);
+          konvaImage.image(img);
           this.layer.batchDraw();
         };
+        img.src = `data:image/png;base64,${file.content}`;
       }
     }
 

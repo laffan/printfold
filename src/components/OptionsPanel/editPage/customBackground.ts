@@ -29,13 +29,16 @@ export function setupCustomBackgroundHandlers(): void {
     const editorState = appState.getEditor();
     if (editorState.selectedPageNumber === null) return;
 
+    // Capture the page number now, in case selection changes while file picker is open
+    const pageNumber = editorState.selectedPageNumber;
+
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/png,image/jpeg,image/webp,image/gif';
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
-      if (file && editorState.selectedPageNumber !== null) {
-        await uploadBackground(editorState.selectedPageNumber, file);
+      if (file) {
+        await uploadBackground(pageNumber, file);
       }
     };
     input.click();
