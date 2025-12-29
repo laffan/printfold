@@ -198,22 +198,30 @@ export class SpreadEditor {
       selectedPagePosition: position,
     });
 
-    // Add the image item
-    const item: ImagePageItem = {
-      id: crypto.randomUUID(),
-      type: 'image',
-      x: 50,
-      y: 50,
-      width: 150,
-      height: 100,
-      rotation: 0,
-      opacity: 1,
-      imageFileId: fileId,
-    };
+    // Load the image to get its natural dimensions for proper aspect ratio
+    const img = new window.Image();
+    img.onload = () => {
+      const aspectRatio = img.width / img.height;
+      const defaultWidth = 150;
+      const height = defaultWidth / aspectRatio;
 
-    appState.addItemToPage(pageNumber, item);
-    appState.updateEditor({ selectedItemId: item.id, selectedItemIds: [item.id] });
-    switchToSelectedTab();
+      const item: ImagePageItem = {
+        id: crypto.randomUUID(),
+        type: 'image',
+        x: 50,
+        y: 50,
+        width: defaultWidth,
+        height: height,
+        rotation: 0,
+        opacity: 1,
+        imageFileId: fileId,
+      };
+
+      appState.addItemToPage(pageNumber, item);
+      appState.updateEditor({ selectedItemId: item.id, selectedItemIds: [item.id] });
+      switchToSelectedTab();
+    };
+    img.src = `data:image/png;base64,${file.content}`;
   }
 
   /**
