@@ -29,7 +29,7 @@ export function getPageDimensions(): { width: number; height: number } {
 }
 
 /**
- * Download a blank single page as PNG (300 DPI)
+ * Download a blank single page as transparent PNG (300 DPI)
  */
 export async function downloadBlankPage(): Promise<void> {
   const { width, height } = getPageDimensions();
@@ -53,15 +53,7 @@ export async function downloadBlankPage(): Promise<void> {
     const layer = new Konva.Layer();
     stage.add(layer);
 
-    // Draw white background
-    const bg = new Konva.Rect({
-      x: 0,
-      y: 0,
-      width: scaledWidth,
-      height: scaledHeight,
-      fill: '#ffffff',
-    });
-    layer.add(bg);
+    // No background - keep it transparent so users can overlay on any page fill color
     layer.draw();
 
     // Export to data URL and download

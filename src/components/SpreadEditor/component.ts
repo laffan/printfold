@@ -1268,7 +1268,7 @@ export class SpreadEditor {
     // Draw page background with optional fill
     this.drawPageBackground(x, y, dimensions.width, dimensions.height, pageContent.backgroundFill);
 
-    // Draw custom background image if present (sits above fill, below items)
+    // Draw custom background image if present (sits above fill, below text/items)
     if (pageContent.customBackgroundImageId) {
       const file = project.files.find(f => f.id === pageContent.customBackgroundImageId);
       if (file) {
@@ -1281,10 +1281,13 @@ export class SpreadEditor {
             width: dimensions.width,
             height: dimensions.height,
             image: img,
+            // Use a name to identify this as a background image
+            name: `custom-bg-${pageContent.pageNumber}`,
           });
-          // Insert before items layer by adding to the main layer
           this.layer.add(konvaImage);
-          // Move to front of layer (items will be added after in renderItems)
+          // Move to bottom of layer (just above background rects, below text content)
+          // Find position just after page backgrounds (which have zIndex ~0)
+          konvaImage.zIndex(1);
           this.layer.batchDraw();
         };
       }
