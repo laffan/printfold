@@ -8,12 +8,13 @@ import fontkit from '@pdf-lib/fontkit';
 import { appState } from '../state';
 import { textFlowEngine } from '../textFlow';
 import { fontService, FontFileData } from '../fontService';
-import type { Signature, Spread, PageContent, PageItem, SpanningItem, StaticSpread } from '../../types';
+import type { Signature, Spread, PageContent, PageItem, SpanningItem, StaticSpread, RichTextLine } from '../../types';
 import { SHEET_SIZES, getOrientedSheetSize, calculateSpreadRowsPerSheet } from '../../types';
 import type { FontCache, FontVariants, ImageCacheType, RenderedPageCacheType, ImpositionSheet } from './types';
-import { sanitizeText } from './textUtils';
+import { sanitizeText, drawRichLine } from './textUtils';
 import { parseColor } from './colors';
 import { getFontStyleForSection, getFont } from './fonts';
+import type { MeasuredSection } from '../textFlow/types';
 import { embedImages, preRenderStaticPages } from './images';
 import { addPrintMarks } from './printMarks';
 import { drawPageItemsClipped, spanningItemToPageItem } from './itemDrawing';
@@ -30,16 +31,26 @@ export class PDFGenerator {
     const project = appState.getProject();
     const pdfDoc = await PDFDocument.create();
 
-    // Register fontkit for custom font embedding
-    pdfDoc.registerFontkit(fontkit);
+    // Check if we're rendering text as images (no font embedding needed)
+    const renderTextAsImages = project.outputOptions.renderTextAsImages === true;
 
-    // Build font cache with embedded fonts
-    this.fontCache = await this.buildFontCache(pdfDoc, project);
+    if (!renderTextAsImages) {
+      // Register fontkit for custom font embedding
+      pdfDoc.registerFontkit(fontkit);
+
+      // Build font cache with embedded fonts
+      this.fontCache = await this.buildFontCache(pdfDoc, project);
+    } else {
+      // When rendering text as images, only use fallback fonts for headers/footers
+      // that aren't part of the page image
+      this.fontCache = await this.buildFallbackFontCache(pdfDoc);
+    }
 
     // Embed images used in static pages
     await embedImages(pdfDoc, project, this.imageCache);
 
-    // Pre-render static/blank pages as high-res images for gradient/pattern/font support
+    // Pre-render pages as high-res images
+    // When renderTextAsImages is true, ALL pages (including text) are pre-rendered
     await preRenderStaticPages(pdfDoc, project, this.renderedPageCache);
 
     // Get sheet dimensions (with orientation applied)
@@ -251,6 +262,20 @@ export class PDFGenerator {
     const isStaticOrAvailable = pageContent.pageState === 'static' ||
                                  pageContent.pageState === 'available' ||
                                  pageContent.isBlank || pageContent.isStatic;
+    // Check if "render text as images" mode is enabled
+    const renderTextAsImages = project.outputOptions.renderTextAsImages === true;
+
+    // When renderTextAsImages is enabled, ALL pages (including text) use pre-rendered images
+    if (renderTextAsImages) {
+      const preRenderedImage = this.renderedPageCache.get(pageContent.pageNumber);
+      if (preRenderedImage) {
+        pdfPage.drawImage(preRenderedImage, { x, y, width, height });
+        this.drawSpanningItems(pdfPage, spreadSpanningItems, x, y, width, height, isRecto);
+        return;
+      }
+      // If pre-rendered image is missing, fall through to normal rendering
+      // (this shouldn't happen, but provides a safety net)
+    }
 
     // For static/blank pages with items or background, use pre-rendered image if available
     if (!isTextPage && (hasItems || hasBackground || isStaticOrAvailable)) {
@@ -332,67 +357,92 @@ export class PDFGenerator {
         continue;
       }
 
-      const lines = (section as { lines?: string[] }).lines || [section.content];
+      const measuredSection = section as MeasuredSection;
+      const lines = measuredSection.lines || [section.content];
+      const richLines = measuredSection.richLines;
       // Use per-element textAlign if set, otherwise fall back to layoutOptions
       const textAlign = fontStyle.textAlign || layoutOptions.textAlign || 'left';
 
-      for (const line of lines) {
-        if (currentY < contentY) break;
+      // Use rich lines if available (for paragraphs and blockquotes with inline styling)
+      if (richLines && richLines.length > 0) {
+        for (const richLine of richLines) {
+          if (currentY < contentY) break;
 
-        const sanitizedLine = sanitizeText(line);
-        const textWidth = font.widthOfTextAtSize(sanitizedLine, fontStyle.fontSize);
+          // Draw the rich line with all its styled spans
+          drawRichLine(
+            pdfPage,
+            richLine,
+            contentX,
+            currentY - fontStyle.fontSize,
+            fontStyle,
+            fontOptions,
+            this.fontCache,
+            contentWidth,
+            textAlign
+          );
 
-        // Calculate x position based on alignment
-        let lineX = contentX;
-        if (textAlign === 'center') {
-          lineX = contentX + (contentWidth - textWidth) / 2;
-        } else if (textAlign === 'right') {
-          lineX = contentX + contentWidth - textWidth;
+          currentY -= lineHeight;
         }
+      } else {
+        // Fallback to plain text rendering
+        for (const line of lines) {
+          if (currentY < contentY) break;
 
-        // Draw inline background color (highlight) if set
-        if (fontStyle.backgroundColor && fontStyle.backgroundColor !== '#ffffff') {
-          pdfPage.drawRectangle({
+          const sanitizedLine = sanitizeText(line);
+          const textWidth = font.widthOfTextAtSize(sanitizedLine, fontStyle.fontSize);
+
+          // Calculate x position based on alignment
+          let lineX = contentX;
+          if (textAlign === 'center') {
+            lineX = contentX + (contentWidth - textWidth) / 2;
+          } else if (textAlign === 'right') {
+            lineX = contentX + contentWidth - textWidth;
+          }
+
+          // Draw inline background color (highlight) if set
+          if (fontStyle.backgroundColor && fontStyle.backgroundColor !== '#ffffff') {
+            pdfPage.drawRectangle({
+              x: lineX,
+              y: currentY - fontStyle.fontSize,
+              width: textWidth,
+              height: lineHeight,
+              color: parseColor(fontStyle.backgroundColor),
+            });
+          }
+
+          pdfPage.drawText(sanitizedLine, {
             x: lineX,
             y: currentY - fontStyle.fontSize,
-            width: textWidth,
-            height: lineHeight,
-            color: parseColor(fontStyle.backgroundColor),
-          });
-        }
-
-        pdfPage.drawText(sanitizedLine, {
-          x: lineX,
-          y: currentY - fontStyle.fontSize,
-          size: fontStyle.fontSize,
-          font,
-          color: parseColor(fontStyle.color),
-        });
-
-        // Draw underline if set
-        const textDeco = fontStyle.textDecoration || 'none';
-        if (textDeco.includes('underline')) {
-          const underlineY = currentY - fontStyle.fontSize - 1;
-          pdfPage.drawLine({
-            start: { x: lineX, y: underlineY },
-            end: { x: lineX + textWidth, y: underlineY },
-            thickness: fontStyle.fontSize / 15,
+            size: fontStyle.fontSize,
+            font,
             color: parseColor(fontStyle.color),
           });
-        }
 
-        // Draw strikethrough if set
-        if (textDeco.includes('line-through')) {
-          const strikeY = currentY - fontStyle.fontSize * 0.6;
-          pdfPage.drawLine({
-            start: { x: lineX, y: strikeY },
-            end: { x: lineX + textWidth, y: strikeY },
-            thickness: fontStyle.fontSize / 15,
-            color: parseColor(fontStyle.color),
-          });
-        }
+          // Draw underline if set
+          const textDeco = fontStyle.textDecoration || 'none';
+          if (textDeco.includes('underline')) {
+            const underlineY = currentY - fontStyle.fontSize - 1;
+            pdfPage.drawLine({
+              start: { x: lineX, y: underlineY },
+              end: { x: lineX + textWidth, y: underlineY },
+              thickness: fontStyle.fontSize / 15,
+              color: parseColor(fontStyle.color),
+            });
+          }
 
-        currentY -= lineHeight;
+          // Draw strikethrough if set
+          if (textDeco.includes('line-through')) {
+            const strikeY = currentY - fontStyle.fontSize * 0.6;
+            pdfPage.drawLine({
+              start: { x: lineX, y: strikeY },
+              end: { x: lineX + textWidth, y: strikeY },
+              thickness: fontStyle.fontSize / 15,
+              color: parseColor(fontStyle.color),
+            });
+          }
+
+          currentY -= lineHeight;
+        }
       }
 
       currentY -= layoutOptions.paragraphSpacing;
@@ -609,6 +659,35 @@ export class PDFGenerator {
     }
 
     return { embedded, fallback };
+  }
+
+  /**
+   * Build a minimal font cache with only fallback fonts (for "render text as images" mode)
+   * Since all text is rendered as images, we only need standard fonts for any edge cases
+   */
+  private async buildFallbackFontCache(pdfDoc: PDFDocument): Promise<FontCache> {
+    const fallback = {
+      serif: {
+        regular: await pdfDoc.embedFont(StandardFonts.TimesRoman),
+        bold: await pdfDoc.embedFont(StandardFonts.TimesRomanBold),
+        italic: await pdfDoc.embedFont(StandardFonts.TimesRomanItalic),
+        boldItalic: await pdfDoc.embedFont(StandardFonts.TimesRomanBoldItalic),
+      },
+      sans: {
+        regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
+        bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
+        italic: await pdfDoc.embedFont(StandardFonts.HelveticaOblique),
+        boldItalic: await pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique),
+      },
+      mono: {
+        regular: await pdfDoc.embedFont(StandardFonts.Courier),
+        bold: await pdfDoc.embedFont(StandardFonts.CourierBold),
+        italic: await pdfDoc.embedFont(StandardFonts.CourierOblique),
+        boldItalic: await pdfDoc.embedFont(StandardFonts.CourierBoldOblique),
+      },
+    };
+
+    return { embedded: new Map(), fallback };
   }
 
   /**

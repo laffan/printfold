@@ -16,12 +16,24 @@ import { env } from '../services/environment';
 
 export type FontDropdownMode = 'styles' | 'items';
 
+// Cache for font variant availability
+interface FontVariantInfo {
+  regular: boolean;
+  bold: boolean;
+  italic: boolean;
+  boldItalic: boolean;
+}
+
+// Global cache for variant info (shared across all dropdowns)
+const variantInfoCache: Map<string, FontVariantInfo> = new Map();
+
 export class FontDropdown {
   private container: HTMLElement;
   private button: HTMLElement;
   private dropdown: HTMLElement;
   private searchInput: HTMLInputElement | null = null;
   private optionsContainer: HTMLElement;
+  private warningContainer: HTMLElement | null = null;
   private isOpen = false;
   private selectedFont: string;
   private onChange: (fontFamily: string) => void;
@@ -30,6 +42,7 @@ export class FontDropdown {
   private unsubscribeSystemFonts: (() => void) | null = null;
   private fontPreviewQueue: Map<string, HTMLElement> = new Map();
   private previewCheckInProgress = false;
+  private variantCheckQueue: Map<string, HTMLElement> = new Map();
 
   constructor(
     selectElement: HTMLSelectElement,
@@ -82,6 +95,14 @@ export class FontDropdown {
 
     this.container.appendChild(this.button);
     this.container.appendChild(this.dropdown);
+
+    // Create warning container for missing variant messages (Electron styles mode only)
+    if (env.isElectron && this.mode === 'styles') {
+      this.warningContainer = document.createElement('div');
+      this.warningContainer.className = 'font-dropdown-warning';
+      this.warningContainer.style.display = 'none';
+      this.container.appendChild(this.warningContainer);
+    }
 
     // Replace select element with custom dropdown
     selectElement.parentNode?.insertBefore(this.container, selectElement);
@@ -204,6 +225,12 @@ export class FontDropdown {
 
     // Start async font preview loading
     this.startFontPreviewLoading();
+
+    // Start variant checking separately (for Electron styles mode)
+    // This is separate from font preview loading because system fonts don't need preview loading
+    if (env.isElectron && this.mode === 'styles') {
+      this.startVariantChecking();
+    }
   }
 
   private createFontOption(font: FontDefinition, isGoogleFont: boolean): HTMLElement {
@@ -211,7 +238,12 @@ export class FontDropdown {
     option.className = 'font-dropdown-option';
     option.dataset.value = font.family;
     option.dataset.name = font.name.toLowerCase();
-    option.textContent = font.name;
+
+    // Create font name span
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'font-dropdown-option-name';
+    nameSpan.textContent = font.name;
+    option.appendChild(nameSpan);
 
     // For system fonts in Electron or web-safe fonts, try to show in font face immediately
     if (!isGoogleFont) {
@@ -219,6 +251,16 @@ export class FontDropdown {
     } else {
       // For Google fonts, queue for async loading
       this.fontPreviewQueue.set(font.name, option);
+    }
+
+    // For system fonts in Electron, add variant indicators
+    if (env.isElectron && this.mode === 'styles' && !isGoogleFont) {
+      const indicatorContainer = document.createElement('span');
+      indicatorContainer.className = 'font-variant-indicators';
+      option.appendChild(indicatorContainer);
+
+      // Queue for async variant checking
+      this.variantCheckQueue.set(font.family, indicatorContainer);
     }
 
     if (font.family === this.selectedFont || font.name === this.selectedFont) {
@@ -279,6 +321,79 @@ export class FontDropdown {
     requestAnimationFrame(() => loadBatch());
   }
 
+  /**
+   * Check font variants asynchronously and update indicators
+   */
+  private async startVariantChecking(): Promise<void> {
+    console.log(`[FontDropdown] Starting variant checking, queue size: ${this.variantCheckQueue.size}`);
+    if (this.variantCheckQueue.size === 0) return;
+
+    // Process variant checks in small batches to avoid blocking
+    const checkBatch = async () => {
+      const batchSize = 3;
+      const entries = Array.from(this.variantCheckQueue.entries()).slice(0, batchSize);
+
+      if (entries.length === 0) return;
+
+      for (const [fontFamily, indicatorContainer] of entries) {
+        this.variantCheckQueue.delete(fontFamily);
+
+        try {
+          // Check cache first
+          let variantInfo = variantInfoCache.get(fontFamily);
+
+          if (!variantInfo && window.electronAPI?.getFontVariants) {
+            console.log(`[FontDropdown] Checking variants for: ${fontFamily}`);
+            variantInfo = await window.electronAPI.getFontVariants(fontFamily);
+            console.log(`[FontDropdown] Got variants for ${fontFamily}:`, variantInfo);
+            if (variantInfo) {
+              variantInfoCache.set(fontFamily, variantInfo);
+            }
+          }
+
+          if (variantInfo) {
+            this.updateVariantIndicators(indicatorContainer, variantInfo);
+          }
+        } catch (error) {
+          console.warn(`Failed to check variants for ${fontFamily}:`, error);
+        }
+      }
+
+      // Continue with next batch
+      if (this.variantCheckQueue.size > 0) {
+        requestAnimationFrame(() => checkBatch());
+      }
+    };
+
+    requestAnimationFrame(() => checkBatch());
+  }
+
+  /**
+   * Update the variant indicator badges for a font option
+   */
+  private updateVariantIndicators(container: HTMLElement, info: FontVariantInfo): void {
+    container.innerHTML = '';
+
+    // Show red indicators for missing variants
+    if (!info.bold) {
+      const badge = document.createElement('span');
+      badge.className = 'font-variant-badge missing';
+      badge.textContent = 'B';
+      badge.title = 'Bold variant not available';
+      container.appendChild(badge);
+      console.log(`[FontDropdown] Added missing Bold indicator`);
+    }
+
+    if (!info.italic) {
+      const badge = document.createElement('span');
+      badge.className = 'font-variant-badge missing';
+      badge.textContent = 'I';
+      badge.title = 'Italic variant not available';
+      container.appendChild(badge);
+      console.log(`[FontDropdown] Added missing Italic indicator`);
+    }
+  }
+
   private filterFonts(query: string): void {
     const lowerQuery = query.toLowerCase();
     const options = this.optionsContainer.querySelectorAll('.font-dropdown-option');
@@ -313,8 +428,46 @@ export class FontDropdown {
     this.selectedFont = fontFamily;
     this.updateButtonDisplay();
     this.updateSelectedOption();
+    this.updateWarningMessage(fontFamily);
     this.close();
     this.onChange(fontFamily);
+  }
+
+  /**
+   * Update the warning message for missing font variants
+   */
+  private async updateWarningMessage(fontFamily: string): Promise<void> {
+    if (!this.warningContainer) return;
+
+    // Check cache first
+    let variantInfo = variantInfoCache.get(fontFamily);
+
+    if (!variantInfo && window.electronAPI?.getFontVariants) {
+      try {
+        variantInfo = await window.electronAPI.getFontVariants(fontFamily);
+        if (variantInfo) {
+          variantInfoCache.set(fontFamily, variantInfo);
+        }
+      } catch {
+        // Ignore errors
+      }
+    }
+
+    if (!variantInfo) {
+      this.warningContainer.style.display = 'none';
+      return;
+    }
+
+    const missingVariants: string[] = [];
+    if (!variantInfo.bold) missingVariants.push('bold');
+    if (!variantInfo.italic) missingVariants.push('italic');
+
+    if (missingVariants.length === 0) {
+      this.warningContainer.style.display = 'none';
+    } else {
+      this.warningContainer.textContent = `Missing: ${missingVariants.join(', ')} variant${missingVariants.length > 1 ? 's' : ''}`;
+      this.warningContainer.style.display = 'block';
+    }
   }
 
   private updateButtonDisplay(): void {

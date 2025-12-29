@@ -3,8 +3,9 @@
  */
 
 import { measurementCache } from './cache';
+import { parseInlineMarkdown, mergeAdjacentSpans } from './parsing';
 import type { MeasuredSection, PageDimensions } from './types';
-import type { DocumentSection, FontStyle, FontOptions, LayoutOptions } from '../../types';
+import type { DocumentSection, FontStyle, FontOptions, LayoutOptions, TextSpan, RichTextLine } from '../../types';
 
 /**
  * Measure text width using canvas context
@@ -164,10 +165,274 @@ export function measureSection(
 
   const measuredHeight = spacingBefore + wrappedLines.length * lineHeight + layoutOptions.paragraphSpacing;
 
+  // Generate rich text lines for sections that support inline formatting
+  let richLines: RichTextLine[] | undefined;
+  if (section.type === 'paragraph' || section.type === 'blockquote') {
+    richLines = wrapRichText(ctx, section.rawMarkdown, contentWidth, fontStyle, fontOptions);
+  }
+
   return {
     ...section,
     measuredHeight,
     lines: wrappedLines,
+    richLines,
     lineHeights,
   };
+}
+
+/**
+ * Get font style for a span, applying bold/italic/code modifiers
+ */
+export function getSpanFontStyle(baseStyle: FontStyle, span: TextSpan, fontOptions: FontOptions): FontStyle {
+  let style = { ...baseStyle };
+
+  // For code spans, use the code font
+  if (span.code) {
+    style = {
+      ...style,
+      fontFamily: fontOptions.code.fontFamily,
+      fontSize: baseStyle.fontSize * 0.9, // Slightly smaller for inline code
+    };
+  }
+
+  // Apply bold
+  if (span.bold) {
+    style.fontWeight = 'bold';
+  }
+
+  // Apply italic
+  if (span.italic) {
+    style.fontStyle = 'italic';
+  }
+
+  return style;
+}
+
+/**
+ * Measure the width of a TextSpan
+ */
+export function measureSpanWidth(
+  ctx: CanvasRenderingContext2D,
+  span: TextSpan,
+  baseStyle: FontStyle,
+  fontOptions: FontOptions
+): number {
+  const spanStyle = getSpanFontStyle(baseStyle, span, fontOptions);
+  return measureTextWidth(ctx, span.text, spanStyle);
+}
+
+/**
+ * Measure the total width of a RichTextLine
+ */
+export function measureRichLineWidth(
+  ctx: CanvasRenderingContext2D,
+  line: RichTextLine,
+  baseStyle: FontStyle,
+  fontOptions: FontOptions
+): number {
+  let totalWidth = 0;
+  for (const span of line.spans) {
+    totalWidth += measureSpanWidth(ctx, span, baseStyle, fontOptions);
+  }
+  return totalWidth;
+}
+
+/**
+ * Word with style tracking for rich text wrapping
+ */
+interface StyledWord {
+  text: string;
+  span: TextSpan;         // Original span for style info
+  trailingSpace: boolean; // Whether this word has trailing whitespace
+}
+
+/**
+ * Split spans into words while preserving style information
+ */
+function spansToWords(spans: TextSpan[]): StyledWord[] {
+  const words: StyledWord[] = [];
+
+  for (const span of spans) {
+    // Split on whitespace but preserve info about trailing spaces
+    const parts = span.text.split(/(\s+)/);
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      if (!part) continue;
+
+      if (/^\s+$/.test(part)) {
+        // This is whitespace - mark the previous word as having trailing space
+        if (words.length > 0) {
+          words[words.length - 1].trailingSpace = true;
+        }
+      } else {
+        // This is a word
+        words.push({
+          text: part,
+          span: { ...span, text: part }, // Copy span with just this word's text
+          trailingSpace: false,
+        });
+      }
+    }
+  }
+
+  return words;
+}
+
+/**
+ * Wrap rich text to fit within a width, preserving inline styles
+ */
+export function wrapRichText(
+  ctx: CanvasRenderingContext2D,
+  markdown: string,
+  maxWidth: number,
+  baseStyle: FontStyle,
+  fontOptions: FontOptions
+): RichTextLine[] {
+  // Apply safety margin
+  const safeMaxWidth = maxWidth * 0.98;
+
+  // Handle multiline markdown (split on actual newlines first)
+  const paragraphs = markdown.split(/\n\n+/);
+  const allLines: RichTextLine[] = [];
+
+  for (const paragraph of paragraphs) {
+    // Skip empty paragraphs
+    if (!paragraph.trim()) continue;
+
+    // Parse markdown to spans
+    const spans = parseInlineMarkdown(paragraph.replace(/\n/g, ' '));
+    if (spans.length === 0) continue;
+
+    // Convert spans to words
+    const words = spansToWords(spans);
+    if (words.length === 0) {
+      // Empty paragraph, add empty line
+      allLines.push({ spans: [{ text: '' }] });
+      continue;
+    }
+
+    // Wrap words into lines
+    const lines: RichTextLine[] = [];
+    let currentLineSpans: TextSpan[] = [];
+    let currentLineWidth = 0;
+
+    for (let i = 0; i < words.length; i++) {
+      const word = words[i];
+      const wordStyle = getSpanFontStyle(baseStyle, word.span, fontOptions);
+      const wordWidth = measureTextWidth(ctx, word.text, wordStyle);
+      const spaceWidth = word.trailingSpace ? measureTextWidth(ctx, ' ', wordStyle) : 0;
+
+      // Calculate width with space if not first word on line
+      const addedWidth = currentLineSpans.length > 0
+        ? measureTextWidth(ctx, ' ', wordStyle) + wordWidth
+        : wordWidth;
+
+      if (currentLineWidth + addedWidth <= safeMaxWidth) {
+        // Word fits on current line
+        if (currentLineSpans.length > 0) {
+          // Add space before word (as part of previous span or new span)
+          const lastSpan = currentLineSpans[currentLineSpans.length - 1];
+          if (spansHaveSameStyle(lastSpan, word.span)) {
+            // Same style, append to last span
+            lastSpan.text += ' ' + word.text;
+          } else {
+            // Different style, add space to last span and new span for word
+            lastSpan.text += ' ';
+            currentLineSpans.push({ ...word.span });
+          }
+        } else {
+          // First word on line
+          currentLineSpans.push({ ...word.span });
+        }
+        currentLineWidth += addedWidth;
+      } else {
+        // Word doesn't fit - start new line
+        if (currentLineSpans.length > 0) {
+          lines.push({ spans: mergeAdjacentSpans(currentLineSpans) });
+        }
+
+        // Check if single word is too long
+        if (wordWidth > safeMaxWidth) {
+          // Break the word character by character
+          const brokenLines = breakLongWord(ctx, word, safeMaxWidth, baseStyle, fontOptions);
+          for (let j = 0; j < brokenLines.length - 1; j++) {
+            lines.push(brokenLines[j]);
+          }
+          // Last part becomes current line
+          if (brokenLines.length > 0) {
+            const lastLine = brokenLines[brokenLines.length - 1];
+            currentLineSpans = [...lastLine.spans];
+            currentLineWidth = measureRichLineWidth(ctx, lastLine, baseStyle, fontOptions);
+          } else {
+            currentLineSpans = [];
+            currentLineWidth = 0;
+          }
+        } else {
+          // Word fits on new line
+          currentLineSpans = [{ ...word.span }];
+          currentLineWidth = wordWidth;
+        }
+      }
+    }
+
+    // Add final line
+    if (currentLineSpans.length > 0) {
+      lines.push({ spans: mergeAdjacentSpans(currentLineSpans) });
+    }
+
+    allLines.push(...lines);
+  }
+
+  return allLines;
+}
+
+/**
+ * Check if two spans have the same styling
+ */
+function spansHaveSameStyle(a: TextSpan, b: TextSpan): boolean {
+  return (
+    a.bold === b.bold &&
+    a.italic === b.italic &&
+    a.code === b.code &&
+    a.strikethrough === b.strikethrough &&
+    a.highlight === b.highlight &&
+    a.link === b.link
+  );
+}
+
+/**
+ * Break a long word into multiple lines
+ */
+function breakLongWord(
+  ctx: CanvasRenderingContext2D,
+  word: StyledWord,
+  maxWidth: number,
+  baseStyle: FontStyle,
+  fontOptions: FontOptions
+): RichTextLine[] {
+  const lines: RichTextLine[] = [];
+  const chars = word.text.split('');
+  const spanStyle = getSpanFontStyle(baseStyle, word.span, fontOptions);
+  let currentText = '';
+
+  for (const char of chars) {
+    const testText = currentText + char;
+    const testWidth = measureTextWidth(ctx, testText, spanStyle);
+
+    if (testWidth <= maxWidth) {
+      currentText = testText;
+    } else {
+      if (currentText) {
+        lines.push({ spans: [{ ...word.span, text: currentText }] });
+      }
+      currentText = char;
+    }
+  }
+
+  if (currentText) {
+    lines.push({ spans: [{ ...word.span, text: currentText }] });
+  }
+
+  return lines;
 }

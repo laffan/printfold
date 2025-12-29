@@ -204,6 +204,20 @@ function createDebouncer() {
 | `opt-custom-height` | Number | Custom height in current unit |
 | `opt-pages-per-sig` | Select | Pages per signature (4, 8, 12, 16, 20, 24) |
 | `opt-fill-space` | Checkbox | Fill available space mode |
+| `opt-fold-marks` | Checkbox | Show fold marks on printed PDF |
+| `opt-render-text-as-images` | Checkbox | Render all text as images (fallback for font issues) |
+
+### Render Text as Images
+
+When enabled, all pages (including text pages) are rendered as high-resolution PNG images at 300 DPI instead of using embedded fonts. This provides a fallback for fonts that don't render correctly with pdf-lib.
+
+**Trade-offs:**
+- **Pro**: Guaranteed visual fidelity - text appears exactly as in the editor
+- **Pro**: All styling (bold, italic, highlights, strikethrough) renders correctly
+- **Con**: Larger PDF file sizes (images instead of text)
+- **Con**: Text is not selectable/searchable in the PDF
+
+A warning message appears when this option is enabled to inform users of the file size impact.
 
 ### Download Blanks
 

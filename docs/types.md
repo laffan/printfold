@@ -355,6 +355,7 @@ interface OutputOptions {
   showFoldMarks: boolean;       // Show fold marks on PDF (light gray)
   creepEnabled?: boolean;       // Enable creep compensation
   creepPerSheet?: number;       // Points to reduce per nested sheet
+  renderTextAsImages?: boolean; // Render all pages as images (font fallback mode)
 }
 ```
 

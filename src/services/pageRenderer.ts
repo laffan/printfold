@@ -6,7 +6,8 @@
 import Konva from 'konva';
 import { appState } from './state';
 import { calculateArrayPositions, getTotalArrayInstances } from '../components/SpreadEditor/items/arrayItems';
-import type { PageContent, PageItem, TextPageItem, ShapePageItem, ImagePageItem, FillConfig } from '../types';
+import type { PageContent, PageItem, TextPageItem, ShapePageItem, ImagePageItem, FillConfig, FontStyle, RichTextLine, TextSpan } from '../types';
+import type { MeasuredSection } from './textFlow/types';
 
 // Target DPI for print-quality rendering
 const PRINT_DPI = 300;
@@ -283,17 +284,323 @@ function createRenderNode(
 }
 
 /**
+ * Get font style for a section type based on project font options
+ */
+function getFontStyleForSection(
+  sectionType: string,
+  level: number | undefined,
+  fontOptions: ReturnType<typeof appState.getProject>['fontOptions']
+): FontStyle {
+  if (sectionType === 'heading' && level !== undefined) {
+    switch (level) {
+      case 1: return fontOptions.h1;
+      case 2: return fontOptions.h2;
+      case 3: return fontOptions.h3;
+      case 4: return fontOptions.h4;
+      case 5: return fontOptions.h5;
+      case 6: return fontOptions.h6;
+      default: return fontOptions.body;
+    }
+  } else if (sectionType === 'code') {
+    return fontOptions.code;
+  } else if (sectionType === 'blockquote') {
+    return fontOptions.blockquote;
+  }
+  return fontOptions.body;
+}
+
+/**
+ * Render text content (sections) to a Konva layer
+ */
+function renderTextContent(
+  layer: Konva.Layer,
+  page: PageContent,
+  pageWidth: number,
+  pageHeight: number,
+  scale: number
+): void {
+  const project = appState.getProject();
+  const { layoutOptions, fontOptions, headerFooter } = project;
+  const margins = layoutOptions.margins;
+
+  const isRecto = page.isRecto;
+  const innerMargin = isRecto ? margins.inner : margins.outer;
+  const outerMargin = isRecto ? margins.outer : margins.inner;
+
+  const contentX = innerMargin * scale;
+  const contentY = margins.top * scale;
+  const contentWidth = (pageWidth - innerMargin - outerMargin) * scale;
+  const contentHeight = (pageHeight - margins.top - margins.bottom) * scale;
+
+  let currentY = contentY;
+
+  // Render each section
+  for (const section of page.sections) {
+    const fontStyle = getFontStyleForSection(section.type, section.level, fontOptions);
+    const lineHeight = layoutOptions.lineHeight * fontStyle.fontSize * scale;
+    const fontSize = fontStyle.fontSize * scale;
+
+    // Add spacing above headings
+    if (section.type === 'heading') {
+      switch (section.level) {
+        case 1: currentY += layoutOptions.spacingAboveH1 * scale; break;
+        case 2: currentY += layoutOptions.spacingAboveH2 * scale; break;
+        case 3: currentY += layoutOptions.spacingAboveH3 * scale; break;
+      }
+    }
+
+    // Skip image placeholders
+    if (section.type === 'image') {
+      currentY += 110 * scale; // Approximate placeholder height
+      continue;
+    }
+
+    const measuredSection = section as MeasuredSection;
+    const richLines = measuredSection.richLines;
+    const plainLines = measuredSection.lines || [section.content];
+    const textAlign = fontStyle.textAlign || layoutOptions.textAlign || 'left';
+
+    // Build Konva fontStyle string
+    let konvaFontStyle = '';
+    if (fontStyle.fontStyle === 'italic') konvaFontStyle += 'italic ';
+    if (fontStyle.fontWeight === 'bold') konvaFontStyle += 'bold';
+    konvaFontStyle = konvaFontStyle.trim() || 'normal';
+
+    // If we have rich lines, render each span separately for styling
+    if (richLines && richLines.length > 0) {
+      for (const richLine of richLines) {
+        if (currentY > contentY + contentHeight) break;
+
+        // Pre-calculate line width for alignment by measuring each span
+        let lineWidth = 0;
+        for (const span of richLine.spans) {
+          // Build span-specific style for accurate measurement
+          let spanFontStyle = '';
+          if (span.italic || fontStyle.fontStyle === 'italic') spanFontStyle += 'italic ';
+          if (span.bold || fontStyle.fontWeight === 'bold') spanFontStyle += 'bold';
+          spanFontStyle = spanFontStyle.trim() || 'normal';
+          const spanFontFamily = span.code ? fontOptions.code.fontFamily : fontStyle.fontFamily;
+
+          // Create temporary text node just for measurement
+          const measureNode = new Konva.Text({
+            text: span.text,
+            fontSize: fontSize,
+            fontFamily: spanFontFamily,
+            fontStyle: spanFontStyle,
+          });
+          lineWidth += measureNode.width();
+          measureNode.destroy();
+        }
+
+        let spanX = contentX;
+        if (textAlign === 'center') {
+          spanX = contentX + (contentWidth - lineWidth) / 2;
+        } else if (textAlign === 'right') {
+          spanX = contentX + contentWidth - lineWidth;
+        }
+
+        for (const span of richLine.spans) {
+          // Build span-specific style
+          let spanFontStyle = '';
+          if (span.italic || fontStyle.fontStyle === 'italic') spanFontStyle += 'italic ';
+          if (span.bold || fontStyle.fontWeight === 'bold') spanFontStyle += 'bold';
+          spanFontStyle = spanFontStyle.trim() || 'normal';
+
+          const spanFontFamily = span.code ? fontOptions.code.fontFamily : fontStyle.fontFamily;
+          const spanColor = span.code ? fontOptions.code.color : fontStyle.color;
+
+          // Create text node first to get accurate width
+          const textNode = new Konva.Text({
+            x: spanX,
+            y: currentY,
+            text: span.text,
+            fontSize: fontSize,
+            fontFamily: spanFontFamily,
+            fontStyle: spanFontStyle,
+            fill: spanColor,
+          });
+
+          const textWidth = textNode.width();
+
+          // Draw highlight background if needed (using actual text width)
+          if (span.highlight) {
+            const highlightColor = fontOptions.highlight?.backgroundColor || '#ffff00';
+            const bgRect = new Konva.Rect({
+              x: spanX,
+              y: currentY,
+              width: textWidth,
+              height: lineHeight,
+              fill: highlightColor,
+              stroke: undefined,
+              strokeWidth: 0,
+            });
+            layer.add(bgRect);
+          }
+
+          // Add text node after highlight so text appears on top
+          layer.add(textNode);
+
+          // Draw strikethrough if needed
+          if (span.strikethrough) {
+            const strikeY = currentY + fontSize * 0.6;
+            const line = new Konva.Line({
+              points: [spanX, strikeY, spanX + textWidth, strikeY],
+              stroke: spanColor,
+              strokeWidth: fontSize / 15,
+            });
+            layer.add(line);
+          }
+
+          spanX += textWidth;
+        }
+
+        currentY += lineHeight;
+      }
+    } else {
+      // Fallback to plain text rendering
+      for (const line of plainLines) {
+        if (currentY > contentY + contentHeight) break;
+
+        const textNode = new Konva.Text({
+          x: contentX,
+          y: currentY,
+          width: contentWidth,
+          text: line,
+          fontSize: fontSize,
+          fontFamily: fontStyle.fontFamily,
+          fontStyle: konvaFontStyle,
+          fill: fontStyle.color,
+          align: textAlign,
+        });
+        layer.add(textNode);
+
+        currentY += lineHeight;
+      }
+    }
+
+    currentY += layoutOptions.paragraphSpacing * scale;
+  }
+
+  // Render footer if enabled
+  if (headerFooter.footer.enabled) {
+    const footerHeight = headerFooter.footer.height * scale;
+    const footerY = (pageHeight - margins.bottom) * scale + footerHeight / 2;
+    const footerContent = isRecto ? headerFooter.footer.recto : headerFooter.footer.verso;
+    const footerFont = headerFooter.footer.font;
+    const footerSize = footerFont.fontSize * scale;
+    const pageNumStr = page.pageNumber.toString();
+
+    if (footerContent.left) {
+      const text = footerContent.left.replace('{{pageNumber}}', pageNumStr);
+      layer.add(new Konva.Text({
+        x: contentX,
+        y: footerY,
+        text,
+        fontSize: footerSize,
+        fontFamily: footerFont.fontFamily,
+        fill: footerFont.color,
+      }));
+    }
+
+    if (footerContent.center) {
+      const text = footerContent.center.replace('{{pageNumber}}', pageNumStr);
+      layer.add(new Konva.Text({
+        x: 0,
+        y: footerY,
+        width: pageWidth * scale,
+        text,
+        fontSize: footerSize,
+        fontFamily: footerFont.fontFamily,
+        fill: footerFont.color,
+        align: 'center',
+      }));
+    }
+
+    if (footerContent.right) {
+      const text = footerContent.right.replace('{{pageNumber}}', pageNumStr);
+      layer.add(new Konva.Text({
+        x: contentX,
+        y: footerY,
+        width: contentWidth,
+        text,
+        fontSize: footerSize,
+        fontFamily: footerFont.fontFamily,
+        fill: footerFont.color,
+        align: 'right',
+      }));
+    }
+  }
+
+  // Render header if enabled
+  if (headerFooter.header.enabled) {
+    const headerHeight = headerFooter.header.height * scale;
+    const headerY = margins.top * scale - headerHeight * 1.5;
+    const headerContent = isRecto ? headerFooter.header.recto : headerFooter.header.verso;
+    const headerFont = headerFooter.header.font;
+    const headerSize = headerFont.fontSize * scale;
+    const pageNumStr = page.pageNumber.toString();
+
+    if (headerContent.left) {
+      const text = headerContent.left.replace('{{pageNumber}}', pageNumStr);
+      layer.add(new Konva.Text({
+        x: contentX,
+        y: headerY,
+        text,
+        fontSize: headerSize,
+        fontFamily: headerFont.fontFamily,
+        fill: headerFont.color,
+      }));
+    }
+
+    if (headerContent.center) {
+      const text = headerContent.center.replace('{{pageNumber}}', pageNumStr);
+      layer.add(new Konva.Text({
+        x: 0,
+        y: headerY,
+        width: pageWidth * scale,
+        text,
+        fontSize: headerSize,
+        fontFamily: headerFont.fontFamily,
+        fill: headerFont.color,
+        align: 'center',
+      }));
+    }
+
+    if (headerContent.right) {
+      const text = headerContent.right.replace('{{pageNumber}}', pageNumStr);
+      layer.add(new Konva.Text({
+        x: contentX,
+        y: headerY,
+        width: contentWidth,
+        text,
+        fontSize: headerSize,
+        fontFamily: headerFont.fontFamily,
+        fill: headerFont.color,
+        align: 'right',
+      }));
+    }
+  }
+}
+
+/**
  * Render a page's items to a high-resolution image
  * Returns a data URL of the rendered image
  *
  * This renders both the page's own items AND crossing items from the adjacent page.
  * Konva's canvas automatically clips at boundaries, so all shapes are properly clipped.
+ *
+ * @param page The page content to render
+ * @param pageWidth Page width in points
+ * @param pageHeight Page height in points
+ * @param adjacentPage Optional adjacent page for crossing items
+ * @param includeTextContent If true, render text content (sections, headers, footers) as well
  */
 export async function renderPageToImage(
   page: PageContent,
   pageWidth: number,
   pageHeight: number,
-  adjacentPage?: PageContent | null
+  adjacentPage?: PageContent | null,
+  includeTextContent?: boolean
 ): Promise<string | null> {
   // Check if page has items worth rendering
   const hasOwnItems = page.items && page.items.length > 0;
@@ -305,8 +612,9 @@ export async function renderPageToImage(
     }
   });
   const hasItems = hasOwnItems || hasCrossingItems;
+  const hasTextContent = includeTextContent && page.sections && page.sections.length > 0;
 
-  if (!hasItems && !page.backgroundFill) {
+  if (!hasItems && !page.backgroundFill && !hasTextContent) {
     return null;
   }
 
@@ -343,6 +651,11 @@ export async function renderPageToImage(
       });
       applyFillToShape(bgRect, page.backgroundFill, '#ffffff', scaledWidth, scaledHeight, imageLoadPromises);
       layer.add(bgRect);
+    }
+
+    // Render text content if requested (for "render text as images" mode)
+    if (includeTextContent && page.sections && page.sections.length > 0) {
+      renderTextContent(layer, page, pageWidth, pageHeight, SCALE_FACTOR);
     }
 
     // Render page items (including array instances)

@@ -3,7 +3,7 @@
  */
 
 import type { PDFFont } from 'pdf-lib';
-import type { FontStyle, TextPageItem, FontOptions } from '../../types';
+import type { FontStyle, TextPageItem, FontOptions, TextSpan } from '../../types';
 import type { FontCache, FontVariants } from './types';
 
 // Sans-serif font names (for category detection)
@@ -125,7 +125,6 @@ export function getFont(style: FontStyle, fontCache: FontCache): PDFFont {
   // First, try to find an embedded font for this exact family
   for (const [family, variants] of fontCache.embedded) {
     if (normalizeFontFamily(family) === normalizedFamily) {
-      console.log(`Font match (exact): "${style.fontFamily}" -> embedded "${family}"`);
       return getFontVariant(variants, isBold, isItalic);
     }
   }
@@ -134,14 +133,12 @@ export function getFont(style: FontStyle, fontCache: FontCache): PDFFont {
   for (const [family, variants] of fontCache.embedded) {
     const normalizedCached = normalizeFontFamily(family);
     if (normalizedFamily.includes(normalizedCached) || normalizedCached.includes(normalizedFamily)) {
-      console.log(`Font match (partial): "${style.fontFamily}" -> embedded "${family}"`);
       return getFontVariant(variants, isBold, isItalic);
     }
   }
 
   // Fall back to category-based standard fonts
   const category = getFontCategory(style.fontFamily);
-  console.log(`Font fallback: "${style.fontFamily}" -> category "${category}" (embedded fonts: ${Array.from(fontCache.embedded.keys()).join(', ')})`);
   const fallbackVariants = fontCache.fallback[category];
   return getFontVariant(fallbackVariants, isBold, isItalic);
 }
@@ -173,4 +170,46 @@ export function getTextItemFont(textItem: TextPageItem, fontCache: FontCache): P
   const category = getFontCategory(textItem.fontFamily);
   const fallbackVariants = fontCache.fallback[category];
   return getFontVariant(fallbackVariants, isBold, isItalic);
+}
+
+/**
+ * Get font for a TextSpan, applying span styling on top of base font style
+ * For code spans, uses the code font from fontOptions
+ */
+export function getFontForSpan(
+  span: TextSpan,
+  baseStyle: FontStyle,
+  fontOptions: FontOptions,
+  fontCache: FontCache
+): PDFFont {
+  // Determine the font family (code spans use the code font)
+  const fontFamily = span.code === true
+    ? fontOptions.code.fontFamily
+    : baseStyle.fontFamily;
+
+  // Determine bold/italic: start with base style, then apply span overrides
+  // Use strict equality to avoid truthy issues
+  const isBold = baseStyle.fontWeight === 'bold' || span.bold === true;
+  const isItalic = baseStyle.fontStyle === 'italic' || span.italic === true;
+
+  // Build a computed style and use the existing getFont function
+  // This ensures consistent font lookup with the rest of the PDF generation
+  const computedStyle: FontStyle = {
+    ...baseStyle,
+    fontFamily,
+    fontWeight: isBold ? 'bold' : 'normal',
+    fontStyle: isItalic ? 'italic' : 'normal',
+  };
+
+  return getFont(computedStyle, fontCache);
+}
+
+/**
+ * Get font size for a span, applying code span size reduction
+ */
+export function getFontSizeForSpan(span: TextSpan, baseFontSize: number): number {
+  if (span.code) {
+    return baseFontSize * 0.9; // Slightly smaller for inline code
+  }
+  return baseFontSize;
 }

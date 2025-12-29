@@ -134,3 +134,52 @@
   background: var(--color-primary-hover);
 }
 
+/* Font option layout for variant indicators */
+.font-dropdown-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.font-dropdown-option-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Variant indicator badges */
+.font-variant-indicators {
+  display: flex;
+  gap: 3px;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.font-variant-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-sans);
+  border-radius: 2px;
+}
+
+.font-variant-badge.missing {
+  background: #ff4444;
+  color: white;
+}
+
+/* Warning message below dropdown */
+.font-dropdown-warning {
+  margin-top: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-family: var(--font-sans);
+  color: #ff4444;
+  background: rgba(255, 68, 68, 0.1);
+  border-radius: var(--radius-sm);
+}
+

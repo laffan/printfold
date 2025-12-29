@@ -75,6 +75,7 @@ export async function embedImages(
 
 /**
  * Pre-render static/blank pages as high-resolution images
+ * When renderTextAsImages is true, ALL pages are rendered as images (no font embedding)
  */
 export async function preRenderStaticPages(
   pdfDoc: PDFDocument,
@@ -135,9 +136,10 @@ export async function preRenderStaticPages(
     return globalPageMap.get(adjacentPageNum) || null;
   };
 
-  // Collect static/blank pages that need rendering
-  // Note: Text pages (pages with sections/text content) are NOT pre-rendered
-  // because the PDF generator handles text content differently (using pdf-lib text rendering)
+  // Check if we should render ALL pages as images (for font fallback mode)
+  const renderAllAsImages = project.outputOptions.renderTextAsImages === true;
+
+  // Collect pages that need rendering
   const pagesToRender: Array<{
     page: import('../../types').PageContent;
     adjacentPage: import('../../types').PageContent | null;
@@ -147,15 +149,22 @@ export async function preRenderStaticPages(
     for (const spread of sig.spreads) {
       const pages = [spread.verso, spread.recto].filter(Boolean) as import('../../types').PageContent[];
       for (const page of pages) {
+        // Get reading-order adjacent page for crossing items
+        const adjacentPage = getReadingOrderAdjacent(page);
+
+        // If renderTextAsImages is enabled, render ALL pages as images
+        if (renderAllAsImages) {
+          pagesToRender.push({ page, adjacentPage });
+          continue;
+        }
+
+        // Otherwise, use the normal logic to determine which pages need rendering
         const isTextPage = page.pageState === 'text';
         const hasOwnItems = page.items && page.items.length > 0;
         const hasBackgroundFill = !!page.backgroundFill;
         const isStaticOrAvailable = page.pageState === 'static' ||
                                      page.pageState === 'available' ||
                                      page.isBlank || page.isStatic;
-
-        // Get reading-order adjacent page for crossing items
-        const adjacentPage = getReadingOrderAdjacent(page);
 
         // Check for crossing items from adjacent page
         const hasCrossingItems = adjacentPage?.items?.some(item => {
@@ -190,7 +199,9 @@ export async function preRenderStaticPages(
   // Render each page
   for (const { page, adjacentPage } of pagesToRender) {
     try {
-      const dataUrl = await renderPageToImage(page, pageWidth, pageHeight, adjacentPage);
+      // When rendering text as images, include text content in the render
+      const includeTextContent = renderAllAsImages;
+      const dataUrl = await renderPageToImage(page, pageWidth, pageHeight, adjacentPage, includeTextContent);
       if (dataUrl) {
         const base64Data = dataUrl.split(',')[1];
         const imageBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
