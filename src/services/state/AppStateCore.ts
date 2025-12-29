@@ -199,6 +199,15 @@ declare module './AppStateCore' {
     moveItemForward(pageNumber: number, itemId: string): void;
     moveItemBackward(pageNumber: number, itemId: string): void;
 
+    // Custom backgrounds
+    setCustomBackground(pageNumber: number, imageFileId: string | undefined): void;
+    getCustomBackground(pageNumber: number): string | undefined;
+    addToBackgroundLibrary(imageFileId: string): void;
+    removeFromBackgroundLibrary(imageFileId: string): void;
+    getBackgroundLibrary(): string[];
+    applyBackgroundToPages(imageFileId: string, pageNumbers: number[]): void;
+    applyBackgroundToAllPages(imageFileId: string): void;
+
     // Multi-select
     selectItem(itemId: string, additive?: boolean): void;
     selectItems(itemIds: string[]): void;

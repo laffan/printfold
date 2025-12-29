@@ -7,7 +7,6 @@ import { appState } from '../../services/state';
 import type { OutputOptions } from '../../types';
 import { getOrientedSheetSize, UNIT_CONVERSIONS } from '../../types';
 import { bindSelect, bindCheckbox, type DebounceCallback } from './helpers';
-import { downloadBlankPage, downloadBlankSpread } from '../../services/pageExport';
 
 /**
  * Set up output options event handlers
@@ -118,16 +117,6 @@ export function setupOutputOptions(debounce: (fn: DebounceCallback) => void): vo
       });
     });
   }
-
-  // Download blank page
-  document.getElementById('btn-download-blank-page')?.addEventListener('click', () => {
-    downloadBlankPage();
-  });
-
-  // Download blank spread
-  document.getElementById('btn-download-blank-spread')?.addEventListener('click', () => {
-    downloadBlankSpread();
-  });
 }
 
 /**

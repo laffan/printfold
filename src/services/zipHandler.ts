@@ -40,6 +40,7 @@ interface StaticPageData {
   pageState: 'static' | 'available' | 'text';
   items: PageItem[];
   backgroundFill?: import('../types').FillConfig;
+  customBackgroundImageId?: string;
 }
 
 /**
@@ -114,11 +115,11 @@ export class ZipHandler {
       }
     }
 
-    // Export static page data (state, items, and background for static/available pages)
+    // Export static page data (state, items, backgrounds for static/available pages)
     const staticPages = this.collectStaticPageData(project);
     for (const [pageNumber, pageData] of staticPages) {
-      // Save any page that has state info, items, or background fill
-      if (pageData.pageState !== 'text' || pageData.items.length > 0 || pageData.backgroundFill) {
+      // Save any page that has state info, items, background fill, or custom background
+      if (pageData.pageState !== 'text' || pageData.items.length > 0 || pageData.backgroundFill || pageData.customBackgroundImageId) {
         const hash = this.generateHash(pageNumber);
         staticFolder.file(`${hash}.json`, JSON.stringify(pageData, null, 2));
       }
@@ -195,12 +196,13 @@ export class ZipHandler {
         const promise = (async () => {
           const jsonContent = await zipEntry.async('string');
           const parsed = JSON.parse(jsonContent);
-          // Convert legacy format (only items) to new format (with pageState, backgroundFill)
+          // Convert legacy format (only items) to new format (with pageState, backgroundFill, customBackgroundImageId)
           const pageData: StaticPageData = {
             pageNumber: parsed.pageNumber,
             pageState: parsed.pageState || 'static', // Default to 'static' for legacy files
             items: parsed.items || [],
             backgroundFill: parsed.backgroundFill,
+            customBackgroundImageId: parsed.customBackgroundImageId,
           };
           staticPages.set(pageData.pageNumber, pageData);
         })();
@@ -314,6 +316,11 @@ export class ZipHandler {
         appState.setPageBackgroundFill(pageNumber, pageData.backgroundFill);
       }
 
+      // Apply custom background image if present
+      if (pageData.customBackgroundImageId) {
+        appState.setCustomBackground(pageNumber, pageData.customBackgroundImageId);
+      }
+
       // Apply items
       for (const item of pageData.items) {
         appState.addItemToPage(pageNumber, item);
@@ -323,7 +330,7 @@ export class ZipHandler {
   }
 
   /**
-   * Collect page data from all pages that have state, items, or background fills
+   * Collect page data from all pages that have state, items, or backgrounds
    */
   private collectStaticPageData(project: BookletProject): Map<number, StaticPageData> {
     const result = new Map<number, StaticPageData>();
@@ -333,26 +340,28 @@ export class ZipHandler {
         // Check verso page
         if (spread.verso) {
           const page = spread.verso;
-          // Save page data if it has non-text state, items, or background fill
-          if (page.pageState !== 'text' || (page.items && page.items.length > 0) || page.backgroundFill) {
+          // Save page data if it has non-text state, items, background fill, or custom background
+          if (page.pageState !== 'text' || (page.items && page.items.length > 0) || page.backgroundFill || page.customBackgroundImageId) {
             result.set(page.pageNumber, {
               pageNumber: page.pageNumber,
               pageState: page.pageState,
               items: page.items || [],
               backgroundFill: page.backgroundFill,
+              customBackgroundImageId: page.customBackgroundImageId,
             });
           }
         }
         // Check recto page
         if (spread.recto) {
           const page = spread.recto;
-          // Save page data if it has non-text state, items, or background fill
-          if (page.pageState !== 'text' || (page.items && page.items.length > 0) || page.backgroundFill) {
+          // Save page data if it has non-text state, items, background fill, or custom background
+          if (page.pageState !== 'text' || (page.items && page.items.length > 0) || page.backgroundFill || page.customBackgroundImageId) {
             result.set(page.pageNumber, {
               pageNumber: page.pageNumber,
               pageState: page.pageState,
               items: page.items || [],
               backgroundFill: page.backgroundFill,
+              customBackgroundImageId: page.customBackgroundImageId,
             });
           }
         }

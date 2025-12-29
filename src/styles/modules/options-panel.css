@@ -604,3 +604,52 @@
   width: 100%;
   justify-content: center;
 }
+
+/* Background Library */
+.background-library {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.background-library-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+}
+
+.background-library-item.active {
+  border-color: var(--color-primary);
+  background: var(--color-bg-hover);
+}
+
+.background-thumbnail {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: #fff;
+}
+
+.background-actions {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.background-actions .btn {
+  padding: 4px 8px;
+  font-size: 10px;
+}
+
+.background-actions .btn-apply-range {
+  min-width: auto;
+}

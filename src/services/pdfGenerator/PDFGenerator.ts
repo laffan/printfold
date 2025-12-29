@@ -255,7 +255,7 @@ export class PDFGenerator {
     const contentHeight = height - margins.top - margins.bottom;
 
     const hasItems = pageContent.items && pageContent.items.length > 0;
-    const hasBackground = !!pageContent.backgroundFill;
+    const hasBackground = !!pageContent.backgroundFill || !!pageContent.customBackgroundImageId;
     // A page is a text page if its pageState is 'text' - these pages need text content rendered
     const isTextPage = pageContent.pageState === 'text';
     // Check for static/available pages using pageState (prefer) or deprecated flags (fallback)
@@ -316,6 +316,30 @@ export class PDFGenerator {
       }
       this.drawSpanningItems(pdfPage, spreadSpanningItems, x, y, width, height, isRecto);
       return;
+    }
+
+    // Draw background fill for text pages (if set)
+    if (pageContent.backgroundFill) {
+      const bgColor = pageContent.backgroundFill.type === 'color' && pageContent.backgroundFill.color
+        ? parseColor(pageContent.backgroundFill.color)
+        : null;
+      if (bgColor) {
+        pdfPage.drawRectangle({
+          x,
+          y,
+          width,
+          height,
+          color: bgColor,
+        });
+      }
+    }
+
+    // Draw custom background image for text pages (if set)
+    if (pageContent.customBackgroundImageId) {
+      const bgImage = this.imageCache.get(pageContent.customBackgroundImageId);
+      if (bgImage) {
+        pdfPage.drawImage(bgImage, { x, y, width, height });
+      }
     }
 
     // Draw content - header/footer are inside margin, so content starts at margin boundary

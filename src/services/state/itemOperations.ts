@@ -413,3 +413,150 @@ function reorderItemInPage(state: AppState, pageNumber: number, itemId: string, 
   state.setProject({ ...prevState, signatures });
   state.notifyProjectListeners(prevState);
 }
+
+/**
+ * Set custom background image for a specific page
+ * Also adds to the background library if not already present
+ */
+AppState.prototype.setCustomBackground = function(pageNumber: number, imageFileId: string | undefined): void {
+  const prevState = this.getProject();
+
+  // Update page's customBackgroundImageId
+  const signatures = prevState.signatures.map(sig => ({
+    ...sig,
+    spreads: sig.spreads.map(spread => ({
+      ...spread,
+      verso: spread.verso?.pageNumber === pageNumber
+        ? { ...spread.verso, customBackgroundImageId: imageFileId }
+        : spread.verso,
+      recto: spread.recto?.pageNumber === pageNumber
+        ? { ...spread.recto, customBackgroundImageId: imageFileId }
+        : spread.recto,
+    })),
+  }));
+
+  // If adding a background (not removing), add to library if not present
+  let customBackgrounds = prevState.customBackgrounds || [];
+  if (imageFileId && !customBackgrounds.includes(imageFileId)) {
+    customBackgrounds = [...customBackgrounds, imageFileId];
+  }
+
+  this.setProject({ ...prevState, signatures, customBackgrounds });
+  this.notifyProjectListeners(prevState);
+};
+
+/**
+ * Get the custom background image ID for a specific page
+ */
+AppState.prototype.getCustomBackground = function(pageNumber: number): string | undefined {
+  const project = this.getProject();
+  for (const sig of project.signatures) {
+    for (const spread of sig.spreads) {
+      if (spread.verso?.pageNumber === pageNumber) return spread.verso.customBackgroundImageId;
+      if (spread.recto?.pageNumber === pageNumber) return spread.recto.customBackgroundImageId;
+    }
+  }
+  return undefined;
+};
+
+/**
+ * Add an image to the background library
+ */
+AppState.prototype.addToBackgroundLibrary = function(imageFileId: string): void {
+  const prevState = this.getProject();
+  const customBackgrounds = prevState.customBackgrounds || [];
+  if (!customBackgrounds.includes(imageFileId)) {
+    this.setProject({ ...prevState, customBackgrounds: [...customBackgrounds, imageFileId] });
+    this.notifyProjectListeners(prevState);
+  }
+};
+
+/**
+ * Remove an image from the background library
+ * Also removes from any pages using it
+ */
+AppState.prototype.removeFromBackgroundLibrary = function(imageFileId: string): void {
+  const prevState = this.getProject();
+
+  // Remove from library
+  const customBackgrounds = (prevState.customBackgrounds || []).filter(id => id !== imageFileId);
+
+  // Remove from any pages using this background
+  const signatures = prevState.signatures.map(sig => ({
+    ...sig,
+    spreads: sig.spreads.map(spread => ({
+      ...spread,
+      verso: spread.verso?.customBackgroundImageId === imageFileId
+        ? { ...spread.verso, customBackgroundImageId: undefined }
+        : spread.verso,
+      recto: spread.recto?.customBackgroundImageId === imageFileId
+        ? { ...spread.recto, customBackgroundImageId: undefined }
+        : spread.recto,
+    })),
+  }));
+
+  this.setProject({ ...prevState, signatures, customBackgrounds });
+  this.notifyProjectListeners(prevState);
+};
+
+/**
+ * Get the list of background image IDs in the library
+ */
+AppState.prototype.getBackgroundLibrary = function(): string[] {
+  return this.getProject().customBackgrounds || [];
+};
+
+/**
+ * Apply a background to multiple pages
+ */
+AppState.prototype.applyBackgroundToPages = function(imageFileId: string, pageNumbers: number[]): void {
+  const prevState = this.getProject();
+  const pageSet = new Set(pageNumbers);
+
+  const signatures = prevState.signatures.map(sig => ({
+    ...sig,
+    spreads: sig.spreads.map(spread => ({
+      ...spread,
+      verso: spread.verso && pageSet.has(spread.verso.pageNumber)
+        ? { ...spread.verso, customBackgroundImageId: imageFileId }
+        : spread.verso,
+      recto: spread.recto && pageSet.has(spread.recto.pageNumber)
+        ? { ...spread.recto, customBackgroundImageId: imageFileId }
+        : spread.recto,
+    })),
+  }));
+
+  // Ensure it's in the library
+  let customBackgrounds = prevState.customBackgrounds || [];
+  if (!customBackgrounds.includes(imageFileId)) {
+    customBackgrounds = [...customBackgrounds, imageFileId];
+  }
+
+  this.setProject({ ...prevState, signatures, customBackgrounds });
+  this.notifyProjectListeners(prevState);
+};
+
+/**
+ * Apply a background to all pages
+ */
+AppState.prototype.applyBackgroundToAllPages = function(imageFileId: string): void {
+  const prevState = this.getProject();
+
+  const signatures = prevState.signatures.map(sig => ({
+    ...sig,
+    spreads: sig.spreads.map(spread => ({
+      ...spread,
+      verso: spread.verso ? { ...spread.verso, customBackgroundImageId: imageFileId } : null,
+      recto: spread.recto ? { ...spread.recto, customBackgroundImageId: imageFileId } : null,
+    })),
+  }));
+
+  // Ensure it's in the library
+  let customBackgrounds = prevState.customBackgrounds || [];
+  if (!customBackgrounds.includes(imageFileId)) {
+    customBackgrounds = [...customBackgrounds, imageFileId];
+  }
+
+  this.setProject({ ...prevState, signatures, customBackgrounds });
+  this.notifyProjectListeners(prevState);
+};

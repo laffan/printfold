@@ -16,8 +16,8 @@ export async function embedImages(
   project: {
     signatures: Array<{
       spreads: Array<{
-        verso: { isBlank?: boolean; isStatic?: boolean; items?: Array<{ type: string; imageFileId?: string }> } | null;
-        recto: { isBlank?: boolean; isStatic?: boolean; items?: Array<{ type: string; imageFileId?: string }> } | null;
+        verso: { isBlank?: boolean; isStatic?: boolean; customBackgroundImageId?: string; items?: Array<{ type: string; imageFileId?: string }> } | null;
+        recto: { isBlank?: boolean; isStatic?: boolean; customBackgroundImageId?: string; items?: Array<{ type: string; imageFileId?: string }> } | null;
       }>;
     }>;
     files: Array<{ id: string; type: string; isBase64?: boolean; content: string; name: string }>;
@@ -26,12 +26,17 @@ export async function embedImages(
 ): Promise<void> {
   imageCache.clear();
 
-  // Collect all image file IDs from static pages
+  // Collect all image file IDs from static pages and custom backgrounds
   const imageFileIds = new Set<string>();
   for (const sig of project.signatures) {
     for (const spread of sig.spreads) {
       const pages = [spread.verso, spread.recto].filter(Boolean);
       for (const page of pages) {
+        // Collect custom background images from any page type
+        if (page?.customBackgroundImageId) {
+          imageFileIds.add(page.customBackgroundImageId);
+        }
+        // Collect image items from static pages
         if ((page?.isBlank || page?.isStatic) && page?.items) {
           for (const item of page.items) {
             if (item.type === 'image') {
@@ -162,6 +167,7 @@ export async function preRenderStaticPages(
         const isTextPage = page.pageState === 'text';
         const hasOwnItems = page.items && page.items.length > 0;
         const hasBackgroundFill = !!page.backgroundFill;
+        const hasCustomBackground = !!page.customBackgroundImageId;
         const isStaticOrAvailable = page.pageState === 'static' ||
                                      page.pageState === 'available' ||
                                      page.isBlank || page.isStatic;
@@ -185,9 +191,9 @@ export async function preRenderStaticPages(
         }
 
         // For static/available pages: pre-render if they have content
-        if (!(hasOwnItems || hasBackgroundFill || isStaticOrAvailable)) continue;
+        if (!(hasOwnItems || hasBackgroundFill || hasCustomBackground || isStaticOrAvailable)) continue;
 
-        const hasOwnContent = page.items?.length || page.backgroundFill;
+        const hasOwnContent = page.items?.length || page.backgroundFill || page.customBackgroundImageId;
 
         if (hasOwnContent || hasCrossingItems) {
           pagesToRender.push({ page, adjacentPage });

@@ -115,6 +115,7 @@ export interface PageContent {
   isBackCover?: boolean; // Special back cover page (verso of first spread)
   items?: PageItem[]; // Items placed on static pages
   backgroundFill?: FillConfig; // Optional background fill for the page
+  customBackgroundImageId?: string; // Optional custom background image (sits above backgroundFill, below items)
 }
 
 // Items that can be placed on static pages
@@ -384,6 +385,7 @@ export interface BookletProject {
   signatures: Signature[];
   blankPages: number[]; // Page numbers where blank pages should be inserted
   staticSpreads?: StaticSpread[]; // Spreads that exist without markdown
+  customBackgrounds?: string[]; // Image file IDs used as custom backgrounds (library)
 }
 
 // Template definitions

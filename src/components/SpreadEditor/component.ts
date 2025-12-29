@@ -198,22 +198,30 @@ export class SpreadEditor {
       selectedPagePosition: position,
     });
 
-    // Add the image item
-    const item: ImagePageItem = {
-      id: crypto.randomUUID(),
-      type: 'image',
-      x: 50,
-      y: 50,
-      width: 150,
-      height: 100,
-      rotation: 0,
-      opacity: 1,
-      imageFileId: fileId,
-    };
+    // Load the image to get its natural dimensions for proper aspect ratio
+    const img = new window.Image();
+    img.onload = () => {
+      const aspectRatio = img.width / img.height;
+      const defaultWidth = 150;
+      const height = defaultWidth / aspectRatio;
 
-    appState.addItemToPage(pageNumber, item);
-    appState.updateEditor({ selectedItemId: item.id, selectedItemIds: [item.id] });
-    switchToSelectedTab();
+      const item: ImagePageItem = {
+        id: crypto.randomUUID(),
+        type: 'image',
+        x: 50,
+        y: 50,
+        width: defaultWidth,
+        height: height,
+        rotation: 0,
+        opacity: 1,
+        imageFileId: fileId,
+      };
+
+      appState.addItemToPage(pageNumber, item);
+      appState.updateEditor({ selectedItemId: item.id, selectedItemIds: [item.id] });
+      switchToSelectedTab();
+    };
+    img.src = `data:image/png;base64,${file.content}`;
   }
 
   /**
@@ -1185,7 +1193,7 @@ export class SpreadEditor {
     this.layer.add(placeholder);
   }
 
-  private drawPageBackground(x: number, y: number, width: number, height: number, backgroundFill?: FillConfig): void {
+  private drawPageBackground(x: number, y: number, width: number, height: number, backgroundFill?: FillConfig, transparent?: boolean, pageNumber?: number): void {
     const page = new Konva.Rect({
       x,
       y,
@@ -1197,10 +1205,14 @@ export class SpreadEditor {
       shadowBlur: 10,
       shadowOpacity: 0.2,
       shadowOffset: { x: 2, y: 2 },
+      name: pageNumber !== undefined ? `page-bg-${pageNumber}` : undefined,
     });
 
-    // Apply background fill
-    if (backgroundFill) {
+    // If transparent is set (for custom background images), use transparent fill
+    if (transparent) {
+      page.fill('transparent');
+    } else if (backgroundFill) {
+      // Apply background fill
       if (backgroundFill.type === 'color') {
         page.fill(backgroundFill.color || '#ffffff');
       } else if (backgroundFill.type === 'linearGradient' && backgroundFill.linearGradient) {
@@ -1266,7 +1278,59 @@ export class SpreadEditor {
     const margins = getMarginsForPage(pageContent.pageNumber);
 
     // Draw page background with optional fill
-    this.drawPageBackground(x, y, dimensions.width, dimensions.height, pageContent.backgroundFill);
+    // Always apply the background fill - custom background images overlay on top
+    // and transparent parts of the image will show the fill through
+    this.drawPageBackground(x, y, dimensions.width, dimensions.height,
+      pageContent.backgroundFill,
+      false,
+      pageContent.pageNumber);
+
+    // Draw custom background image if present (sits above fill, below text/items)
+    if (pageContent.customBackgroundImageId) {
+      const file = project.files.find(f => f.id === pageContent.customBackgroundImageId);
+      if (file) {
+        // Store values for the closure
+        const bgX = x;
+        const bgY = y;
+        const bgWidth = dimensions.width;
+        const bgHeight = dimensions.height;
+        const pageNum = pageContent.pageNumber;
+        const layerRef = this.layer;
+
+        const img = new window.Image();
+        img.onload = () => {
+          // Remove any existing custom background for this page
+          const existing = layerRef.findOne(`.custom-bg-${pageNum}`);
+          if (existing) {
+            existing.destroy();
+          }
+
+          const konvaImage = new Konva.Image({
+            x: bgX,
+            y: bgY,
+            width: bgWidth,
+            height: bgHeight,
+            image: img,
+            name: `custom-bg-${pageNum}`,
+          });
+
+          // Find the page background rect and insert custom background right after it
+          const pageBgRect = layerRef.findOne(`.page-bg-${pageNum}`);
+          if (pageBgRect) {
+            // Get the z-index of the page background and set custom bg to be just above it
+            const bgIndex = pageBgRect.zIndex();
+            layerRef.add(konvaImage);
+            konvaImage.zIndex(bgIndex + 1);
+          } else {
+            // Fallback: just add to layer
+            layerRef.add(konvaImage);
+          }
+
+          layerRef.batchDraw();
+        };
+        img.src = `data:image/png;base64,${file.content}`;
+      }
+    }
 
     // Draw page number indicator only if footer is disabled (footer handles page numbers otherwise)
     if (!project.headerFooter.footer.enabled) {

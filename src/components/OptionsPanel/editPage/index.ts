@@ -11,3 +11,4 @@ export { setupEditPagePanel } from './setupPanel';
 export { updateEditPagePanel, updateEditSelectedSection } from './panelUpdate';
 export { updateArrayDimensionsList, addArrayDimension, setupAddDimensionButton } from './arrayInstances';
 export { setupPageBackgroundPicker } from './pageBackground';
+export { setupCustomBackgroundHandlers, updateCustomBackgroundSection } from './customBackground';

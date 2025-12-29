@@ -29,7 +29,7 @@ export function getPageDimensions(): { width: number; height: number } {
 }
 
 /**
- * Download a blank single page as PNG (300 DPI)
+ * Download a blank single page as transparent PNG (300 DPI)
  */
 export async function downloadBlankPage(): Promise<void> {
   const { width, height } = getPageDimensions();
@@ -53,15 +53,7 @@ export async function downloadBlankPage(): Promise<void> {
     const layer = new Konva.Layer();
     stage.add(layer);
 
-    // Draw white background
-    const bg = new Konva.Rect({
-      x: 0,
-      y: 0,
-      width: scaledWidth,
-      height: scaledHeight,
-      fill: '#ffffff',
-    });
-    layer.add(bg);
+    // No background - keep it transparent so users can overlay on any page fill color
     layer.draw();
 
     // Export to data URL and download
@@ -346,11 +338,35 @@ async function renderPageItems(
   const scaledWidth = pageWidth * scale;
   const scaledHeight = pageHeight * scale;
 
-  // Draw background if present
+  // Draw background fill if present
   if (page.backgroundFill) {
     const bgRect = new Konva.Rect({ x: 0, y: 0, width: scaledWidth, height: scaledHeight });
     applyFillToShape(bgRect, page.backgroundFill, '#ffffff', scaledWidth, scaledHeight, imageLoadPromises);
     layer.add(bgRect);
+  }
+
+  // Draw custom background image if present (sits above fill, below items)
+  if (page.customBackgroundImageId) {
+    const file = appState.getProject().files.find(f => f.id === page.customBackgroundImageId);
+    if (file) {
+      const loadPromise = new Promise<void>((resolve) => {
+        const img = new window.Image();
+        img.onload = () => {
+          const konvaImage = new Konva.Image({
+            x: 0,
+            y: 0,
+            width: scaledWidth,
+            height: scaledHeight,
+            image: img,
+          });
+          layer.add(konvaImage);
+          resolve();
+        };
+        img.onerror = () => resolve();
+        img.src = `data:image/png;base64,${file.content}`;
+      });
+      imageLoadPromises.push(loadPromise);
+    }
   }
 
   // Render page items
@@ -641,11 +657,28 @@ export async function downloadSpreadAsPng(pageNumber: number): Promise<void> {
 
     // Render verso (left page)
     if (spread.verso) {
-      // Draw verso background
+      // Draw verso background fill
       if (spread.verso.backgroundFill) {
         const versoBg = new Konva.Rect({ x: 0, y: 0, width: scaledPageWidth, height: scaledHeight });
         applyFillToShape(versoBg, spread.verso.backgroundFill, '#ffffff', scaledPageWidth, scaledHeight, imageLoadPromises);
         layer.add(versoBg);
+      }
+      // Draw verso custom background image
+      if (spread.verso.customBackgroundImageId) {
+        const file = appState.getProject().files.find(f => f.id === spread.verso!.customBackgroundImageId);
+        if (file) {
+          const loadPromise = new Promise<void>((resolve) => {
+            const img = new window.Image();
+            img.onload = () => {
+              const konvaImage = new Konva.Image({ x: 0, y: 0, width: scaledPageWidth, height: scaledHeight, image: img });
+              layer.add(konvaImage);
+              resolve();
+            };
+            img.onerror = () => resolve();
+            img.src = `data:image/png;base64,${file.content}`;
+          });
+          imageLoadPromises.push(loadPromise);
+        }
       }
       // Render verso items
       if (spread.verso.items) {
@@ -658,11 +691,28 @@ export async function downloadSpreadAsPng(pageNumber: number): Promise<void> {
 
     // Render recto (right page)
     if (spread.recto) {
-      // Draw recto background (offset by page width)
+      // Draw recto background fill (offset by page width)
       if (spread.recto.backgroundFill) {
         const rectoBg = new Konva.Rect({ x: scaledPageWidth, y: 0, width: scaledPageWidth, height: scaledHeight });
         applyFillToShape(rectoBg, spread.recto.backgroundFill, '#ffffff', scaledPageWidth, scaledHeight, imageLoadPromises);
         layer.add(rectoBg);
+      }
+      // Draw recto custom background image
+      if (spread.recto.customBackgroundImageId) {
+        const file = appState.getProject().files.find(f => f.id === spread.recto!.customBackgroundImageId);
+        if (file) {
+          const loadPromise = new Promise<void>((resolve) => {
+            const img = new window.Image();
+            img.onload = () => {
+              const konvaImage = new Konva.Image({ x: scaledPageWidth, y: 0, width: scaledPageWidth, height: scaledHeight, image: img });
+              layer.add(konvaImage);
+              resolve();
+            };
+            img.onerror = () => resolve();
+            img.src = `data:image/png;base64,${file.content}`;
+          });
+          imageLoadPromises.push(loadPromise);
+        }
       }
       // Render recto items (offset by page width)
       if (spread.recto.items) {

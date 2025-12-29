@@ -26,7 +26,7 @@ export interface EnvironmentAPI {
   // File operations
   openFiles(options?: OpenFilesOptions): Promise<ProjectFile[] | null>;
   saveFile(options: SaveFileOptions): Promise<boolean>;
-  downloadFile(filename: string, content: Uint8Array | Blob): void;
+  downloadFile(filename: string, content: Uint8Array | Blob): void | Promise<void>;
 
   // Printing
   print(content?: Uint8Array): Promise<void>;
@@ -242,14 +242,30 @@ class ElectronEnvironment implements EnvironmentAPI {
     });
   }
 
-  downloadFile(filename: string, content: Uint8Array | Blob): void {
+  async downloadFile(filename: string, content: Uint8Array | Blob): Promise<void> {
     // In Electron, we use the save dialog instead
-    const contentArray = content instanceof Blob
-      ? new Uint8Array(0) // Will be handled differently
-      : content;
+    let contentArray: Uint8Array;
+    if (content instanceof Blob) {
+      const arrayBuffer = await content.arrayBuffer();
+      contentArray = new Uint8Array(arrayBuffer);
+    } else {
+      contentArray = content;
+    }
 
-    this.saveFile({
+    // Determine filters based on filename extension
+    const ext = filename.split('.').pop()?.toLowerCase() || '';
+    let filters: FileFilter[] | undefined;
+    if (ext === 'png') {
+      filters = [{ name: 'PNG Image', extensions: ['png'] }];
+    } else if (ext === 'svg') {
+      filters = [{ name: 'SVG Image', extensions: ['svg'] }];
+    } else if (ext === 'pdf') {
+      filters = [{ name: 'PDF Document', extensions: ['pdf'] }];
+    }
+
+    await this.saveFile({
       defaultName: filename,
+      filters,
       content: contentArray,
     });
   }

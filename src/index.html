@@ -407,32 +407,41 @@
               </div>
             </div>
 
-            <!-- Page Background Section -->
-            <div id="page-background-section" class="options-section" style="display: none;">
-              <h4 class="section-header">Page Background</h4>
+            <!-- Custom Background Section (available for all pages) -->
+            <div id="custom-background-section" class="options-section" style="display: none;">
+              <h4 class="section-header">Custom Background</h4>
+              <p class="hint">Add a background image layer above the fill color.</p>
+
+              <!-- Download buttons -->
               <div class="form-group">
-                <div id="page-background-picker"></div>
+                <div class="button-group-vertical">
+                  <button id="btn-download-blank" class="btn btn-secondary btn-small">Download Blank</button>
+                  <button id="btn-download-current" class="btn btn-secondary btn-small">Download Current</button>
+                </div>
               </div>
-              <p class="hint">Select an item to edit its properties.</p>
+
+              <!-- Upload/Remove buttons -->
+              <div class="form-group">
+                <div class="button-group-vertical">
+                  <button id="btn-upload-background" class="btn btn-secondary btn-small">Upload Background</button>
+                  <button id="btn-remove-background" class="btn btn-secondary btn-small" style="display: none;">Remove Background</button>
+                </div>
+              </div>
+
+              <!-- Background Library -->
+              <div id="background-library-section" class="form-group" style="display: none;">
+                <label class="form-label">Background Library</label>
+                <div id="background-library" class="background-library">
+                  <!-- Background items will be dynamically added here -->
+                </div>
+              </div>
             </div>
 
-            <!-- Download / Replace Section (shown when static page is selected) -->
-            <div id="download-replace-section" class="options-section" style="display: none;">
-              <h4 class="section-header">Download / Replace</h4>
-              <p class="hint">Export or replace page content for external editing.</p>
+            <!-- Page Background Fill Section (separate from custom background image) -->
+            <div id="page-background-section" class="options-section" style="display: none;">
+              <h4 class="section-header">Page Fill</h4>
               <div class="form-group">
-                <label class="form-label">Download</label>
-                <div class="button-group-vertical">
-                  <button id="btn-download-page-png" class="btn btn-secondary btn-small">Page as PNG (300 DPI)</button>
-                  <button id="btn-download-spread-png" class="btn btn-secondary btn-small" style="display: none;">Spread as PNG (300 DPI)</button>
-                </div>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Replace with Image</label>
-                <div class="button-group-vertical">
-                  <button id="btn-replace-page-image" class="btn btn-secondary btn-small">Replace Page...</button>
-                  <button id="btn-replace-spread-image" class="btn btn-secondary btn-small" style="display: none;">Replace Spread...</button>
-                </div>
+                <div id="page-background-picker"></div>
               </div>
             </div>
 
@@ -699,14 +708,6 @@
               </div>
             </div>
 
-            <div class="options-section">
-              <h4 class="section-header">Download Blanks</h4>
-              <p class="hint">Download blank pages for external editing.</p>
-              <div class="form-group button-group-vertical">
-                <button id="btn-download-blank-page" class="btn btn-secondary btn-small">Single Page (PNG)</button>
-                <button id="btn-download-blank-spread" class="btn btn-secondary btn-small">Full Spread (PNG)</button>
-              </div>
-            </div>
           </div>
         </div>
       </section>
