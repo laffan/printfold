@@ -1185,7 +1185,7 @@ export class SpreadEditor {
     this.layer.add(placeholder);
   }
 
-  private drawPageBackground(x: number, y: number, width: number, height: number, backgroundFill?: FillConfig, transparent?: boolean): void {
+  private drawPageBackground(x: number, y: number, width: number, height: number, backgroundFill?: FillConfig, transparent?: boolean, pageNumber?: number): void {
     const page = new Konva.Rect({
       x,
       y,
@@ -1197,6 +1197,7 @@ export class SpreadEditor {
       shadowBlur: 10,
       shadowOpacity: 0.2,
       shadowOffset: { x: 2, y: 2 },
+      name: pageNumber !== undefined ? `page-bg-${pageNumber}` : undefined,
     });
 
     // If transparent is set (for custom background images), use transparent fill
@@ -1274,7 +1275,8 @@ export class SpreadEditor {
     const hasCustomBg = !!pageContent.customBackgroundImageId;
     this.drawPageBackground(x, y, dimensions.width, dimensions.height,
       hasCustomBg ? undefined : pageContent.backgroundFill,
-      hasCustomBg);
+      hasCustomBg,
+      pageContent.pageNumber);
 
     // Draw custom background image if present (sits above fill, below text/items)
     if (pageContent.customBackgroundImageId) {
@@ -1304,11 +1306,18 @@ export class SpreadEditor {
             image: img,
             name: `custom-bg-${pageNum}`,
           });
-          layerRef.add(konvaImage);
 
-          // Move to bottom, then up once to be above the page background rect
-          konvaImage.moveToBottom();
-          konvaImage.moveUp();
+          // Find the page background rect and insert custom background right after it
+          const pageBgRect = layerRef.findOne(`.page-bg-${pageNum}`);
+          if (pageBgRect) {
+            // Get the z-index of the page background and set custom bg to be just above it
+            const bgIndex = pageBgRect.zIndex();
+            layerRef.add(konvaImage);
+            konvaImage.zIndex(bgIndex + 1);
+          } else {
+            // Fallback: just add to layer
+            layerRef.add(konvaImage);
+          }
 
           layerRef.batchDraw();
         };
