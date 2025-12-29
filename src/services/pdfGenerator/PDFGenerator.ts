@@ -318,6 +318,30 @@ export class PDFGenerator {
       return;
     }
 
+    // Draw background fill for text pages (if set)
+    if (pageContent.backgroundFill) {
+      const bgColor = pageContent.backgroundFill.type === 'color' && pageContent.backgroundFill.color
+        ? parseColor(pageContent.backgroundFill.color)
+        : null;
+      if (bgColor) {
+        pdfPage.drawRectangle({
+          x,
+          y,
+          width,
+          height,
+          color: bgColor,
+        });
+      }
+    }
+
+    // Draw custom background image for text pages (if set)
+    if (pageContent.customBackgroundImageId) {
+      const bgImage = this.imageCache.get(pageContent.customBackgroundImageId);
+      if (bgImage) {
+        pdfPage.drawImage(bgImage, { x, y, width, height });
+      }
+    }
+
     // Draw content - header/footer are inside margin, so content starts at margin boundary
     let currentY = y + height - margins.top;
 
