@@ -161,7 +161,8 @@ export function renderThumbnails(
     canvas.height = thumbHeight * 2;
     canvas.style.width = `${thumbWidth}px`;
     canvas.style.height = `${thumbHeight}px`;
-    const ctx = canvas.getContext('2d')!;
+    const ctx = canvas.getContext('2d', { alpha: true })!;
+    ctx.globalAlpha = 1.0;
     ctx.scale(2, 2);
 
     // Draw verso background (left side)
@@ -177,9 +178,9 @@ export function renderThumbnails(
       }
     } else {
       // Draw null page (inactive) with container background and dashed border
-      ctx.fillStyle = '#bbbaba';
+      ctx.fillStyle = 'rgba(187, 186, 186, 1)'; // #bbbaba with explicit opacity
       ctx.fillRect(0, 0, thumbWidth / 2, thumbHeight);
-      ctx.strokeStyle = '#aaaaaa';
+      ctx.strokeStyle = 'rgba(170, 170, 170, 1)'; // #aaaaaa
       ctx.lineWidth = 0.5;
       ctx.setLineDash([4, 2]);
       ctx.strokeRect(0, 0, thumbWidth / 2, thumbHeight);
@@ -194,14 +195,14 @@ export function renderThumbnails(
         ctx.fillRect(thumbWidth / 2, 0, thumbWidth / 2, thumbHeight);
       } else {
         // Page exists but has no custom background - draw white
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = 'rgba(255, 255, 255, 1)'; // White with explicit opacity
         ctx.fillRect(thumbWidth / 2, 0, thumbWidth / 2, thumbHeight);
       }
     } else {
       // Draw null page (inactive) with container background and dashed border
-      ctx.fillStyle = '#bbbaba';
+      ctx.fillStyle = 'rgba(187, 186, 186, 1)'; // #bbbaba with explicit opacity
       ctx.fillRect(thumbWidth / 2, 0, thumbWidth / 2, thumbHeight);
-      ctx.strokeStyle = '#aaaaaa';
+      ctx.strokeStyle = 'rgba(170, 170, 170, 1)'; // #aaaaaa
       ctx.lineWidth = 0.5;
       ctx.setLineDash([4, 2]);
       ctx.strokeRect(thumbWidth / 2, 0, thumbWidth / 2, thumbHeight);

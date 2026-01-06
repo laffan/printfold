@@ -124,7 +124,7 @@
 
 .spread-thumbnail {
   width: 84px;
-  background: #bbbaba;
+  background: rgba(187, 186, 186, 1); /* #bbbaba with explicit opacity */
   border: 2px solid var(--color-border);
   border-radius: 4px;
   cursor: pointer;
@@ -191,12 +191,12 @@
 
 /* Empty label (for null/inactive pages) - same as container background */
 .spread-thumbnail-page-label.empty {
-  background: #bbbaba;
+  background: rgba(187, 186, 186, 1); /* #bbbaba with explicit opacity */
   cursor: default;
 }
 
 .spread-thumbnail-page-label.empty:hover {
-  background: #bbbaba;
+  background: rgba(187, 186, 186, 1); /* #bbbaba with explicit opacity */
 }
 
 /* Page state label colors */
