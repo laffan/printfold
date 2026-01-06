@@ -189,6 +189,16 @@
   color: white;
 }
 
+/* Empty label (for null/inactive pages) - no background */
+.spread-thumbnail-page-label.empty {
+  background: transparent;
+  cursor: default;
+}
+
+.spread-thumbnail-page-label.empty:hover {
+  background: transparent;
+}
+
 /* Page state label colors */
 /* Available: medium gray - empty pages */
 .spread-thumbnail-page-label.page-state-available {
