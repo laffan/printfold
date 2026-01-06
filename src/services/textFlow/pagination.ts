@@ -81,9 +81,14 @@ export function flowSections(
           const firstPartLines = measured.lines.slice(0, linesPerPage);
           const remainingLines = measured.lines.slice(linesPerPage);
 
+          // Also split richLines if present (for inline formatting)
+          const firstPartRichLines = measured.richLines?.slice(0, linesPerPage);
+          const remainingRichLines = measured.richLines?.slice(linesPerPage);
+
           const firstPart: MeasuredSection = {
             ...measured,
             lines: firstPartLines,
+            richLines: firstPartRichLines,
             lineHeights: firstPartLines.map(() => lineHeight),
             measuredHeight: linesPerPage * lineHeight,
           };
@@ -99,6 +104,7 @@ export function flowSections(
             const remainingPart: MeasuredSection = {
               ...measured,
               lines: remainingLines,
+              richLines: remainingRichLines,
               lineHeights: remainingLines.map(() => lineHeight),
               measuredHeight: remainingLines.length * lineHeight + layoutOptions.paragraphSpacing,
             };
