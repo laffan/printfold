@@ -382,6 +382,11 @@
   gap: 2px;
 }
 
+.inline-inputs label span {
+  font-size: 10px;
+  color: var(--color-text-muted);
+}
+
 .inline-inputs .unit {
   font-size: 10px;
   color: var(--color-text-muted);
