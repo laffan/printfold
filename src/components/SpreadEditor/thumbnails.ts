@@ -172,6 +172,15 @@ export function renderThumbnails(
         ctx.fillRect(0, 0, thumbWidth / 2, thumbHeight);
       }
       // If no background fill, leave transparent
+    } else {
+      // Draw null page (inactive) with dashed border and transparent background
+      ctx.fillStyle = 'rgba(128, 128, 128, 0.1)';
+      ctx.fillRect(0, 0, thumbWidth / 2, thumbHeight);
+      ctx.strokeStyle = '#aaaaaa';
+      ctx.lineWidth = 0.5;
+      ctx.setLineDash([4, 2]);
+      ctx.strokeRect(0, 0, thumbWidth / 2, thumbHeight);
+      ctx.setLineDash([]);
     }
 
     // Draw recto background (right side)
@@ -181,6 +190,15 @@ export function renderThumbnails(
         ctx.fillStyle = bgColor;
         ctx.fillRect(thumbWidth / 2, 0, thumbWidth / 2, thumbHeight);
       }
+    } else {
+      // Draw null page (inactive) with dashed border and transparent background
+      ctx.fillStyle = 'rgba(128, 128, 128, 0.1)';
+      ctx.fillRect(thumbWidth / 2, 0, thumbWidth / 2, thumbHeight);
+      ctx.strokeStyle = '#aaaaaa';
+      ctx.lineWidth = 0.5;
+      ctx.setLineDash([4, 2]);
+      ctx.strokeRect(thumbWidth / 2, 0, thumbWidth / 2, thumbHeight);
+      ctx.setLineDash([]);
     }
 
     // Draw spine line (with signature boundary indicator if needed)
