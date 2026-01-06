@@ -841,7 +841,7 @@ export class PDFGenerator {
     this.drawCornerCrosses(page1, sheetSize.width, sheetSize.height, offsetX, offsetY);
 
     // Draw center calibration grid with hash marks
-    this.drawCalibrationGrid(page1, sheetSize.width, sheetSize.height, offsetX, offsetY, font);
+    this.drawCalibrationGrid(page1, sheetSize.width, sheetSize.height, offsetX, offsetY, font, true);
 
     // Draw offset info text above center
     const text = `Duplex Offset: X=${displayOffsetX.toFixed(1)}mm, Y=${displayOffsetY.toFixed(1)}mm`;
@@ -855,10 +855,10 @@ export class PDFGenerator {
       color: rgb(0, 0, 0),
     });
 
-    // Page 2 (Back - even page, no offset)
+    // Page 2 (Back - even page, no offset, only center cross)
     const page2 = pdfDoc.addPage([sheetSize.width, sheetSize.height]);
     this.drawCornerCrosses(page2, sheetSize.width, sheetSize.height, 0, 0);
-    this.drawCalibrationGrid(page2, sheetSize.width, sheetSize.height, 0, 0, font);
+    this.drawCalibrationGrid(page2, sheetSize.width, sheetSize.height, 0, 0, font, false);
 
     return pdfDoc.save();
   }
@@ -909,7 +909,7 @@ export class PDFGenerator {
   }
 
   /**
-   * Draw calibration grid with hash marks every 5mm
+   * Draw calibration grid with hash marks every 1mm and 5mm
    */
   private drawCalibrationGrid(
     page: PDFPage,
@@ -917,19 +917,21 @@ export class PDFGenerator {
     height: number,
     offsetX: number,
     offsetY: number,
-    font: PDFFont
+    font: PDFFont,
+    drawHashMarks: boolean = true
   ): void {
     const centerX = width / 2;
     const centerY = height / 2;
-    const lineWidth = 0.5;
-    const color = rgb(0, 0, 0);
+    const darkColor = rgb(0, 0, 0);
+    const lightColor = rgb(0.7, 0.7, 0.7);
 
-    // 5mm in points (1mm = 72/25.4 points)
+    // 1mm in points (1mm = 72/25.4 points)
     const mmToPoints = 72 / 25.4;
-    const tickInterval = 5 * mmToPoints; // 5mm
-    const maxTicks = 6; // Go up to ±30mm
-    const hashLength = 10; // Length of hash mark
-    const fontSize = 8;
+    const maxMm = 30; // Go up to ±30mm
+    const darkHashLength = 10; // Length of 5mm hash marks
+    const lightHashLength = 5; // Length of 1mm hash marks
+    const fontSize = 10;
+    const lineWidth = 0.5;
 
     // Draw center cross
     const centerCrossSize = 15;
@@ -937,21 +939,28 @@ export class PDFGenerator {
       start: { x: centerX - centerCrossSize + offsetX, y: centerY + offsetY },
       end: { x: centerX + centerCrossSize + offsetX, y: centerY + offsetY },
       thickness: lineWidth,
-      color,
+      color: darkColor,
     });
     page.drawLine({
       start: { x: centerX + offsetX, y: centerY - centerCrossSize + offsetY },
       end: { x: centerX + offsetX, y: centerY + centerCrossSize + offsetY },
       thickness: lineWidth,
-      color,
+      color: darkColor,
     });
 
-    // Draw horizontal hash marks and labels (left and right from center)
-    for (let i = 1; i <= maxTicks; i++) {
-      const mmValue = i * 5;
-      const offset = i * tickInterval;
+    // Only draw hash marks if requested (front page only)
+    if (!drawHashMarks) {
+      return;
+    }
 
-      // Right side (+mm)
+    // Draw horizontal hash marks (left and right from center)
+    for (let mm = 1; mm <= maxMm; mm++) {
+      const offset = mm * mmToPoints;
+      const isDarkMark = mm % 5 === 0;
+      const hashLength = isDarkMark ? darkHashLength : lightHashLength;
+      const color = isDarkMark ? darkColor : lightColor;
+
+      // Right side (+X)
       const xRight = centerX + offset + offsetX;
       page.drawLine({
         start: { x: xRight, y: centerY - hashLength + offsetY },
@@ -960,18 +969,7 @@ export class PDFGenerator {
         color,
       });
 
-      // Label above the hash mark
-      const labelRight = `+${mmValue}`;
-      const labelWidthRight = font.widthOfTextAtSize(labelRight, fontSize);
-      page.drawText(labelRight, {
-        x: xRight - labelWidthRight / 2,
-        y: centerY + hashLength + 3 + offsetY,
-        size: fontSize,
-        font,
-        color,
-      });
-
-      // Left side (-mm)
+      // Left side (-X)
       const xLeft = centerX - offset + offsetX;
       page.drawLine({
         start: { x: xLeft, y: centerY - hashLength + offsetY },
@@ -979,25 +977,16 @@ export class PDFGenerator {
         thickness: lineWidth,
         color,
       });
-
-      // Label above the hash mark
-      const labelLeft = `-${mmValue}`;
-      const labelWidthLeft = font.widthOfTextAtSize(labelLeft, fontSize);
-      page.drawText(labelLeft, {
-        x: xLeft - labelWidthLeft / 2,
-        y: centerY + hashLength + 3 + offsetY,
-        size: fontSize,
-        font,
-        color,
-      });
     }
 
-    // Draw vertical hash marks and labels (up and down from center)
-    for (let i = 1; i <= maxTicks; i++) {
-      const mmValue = i * 5;
-      const offset = i * tickInterval;
+    // Draw vertical hash marks (up and down from center)
+    for (let mm = 1; mm <= maxMm; mm++) {
+      const offset = mm * mmToPoints;
+      const isDarkMark = mm % 5 === 0;
+      const hashLength = isDarkMark ? darkHashLength : lightHashLength;
+      const color = isDarkMark ? darkColor : lightColor;
 
-      // Top side (+mm)
+      // Top side (+Y)
       const yTop = centerY + offset + offsetY;
       page.drawLine({
         start: { x: centerX - hashLength + offsetX, y: yTop },
@@ -1006,17 +995,7 @@ export class PDFGenerator {
         color,
       });
 
-      // Label to the right of the hash mark
-      const labelTop = `+${mmValue}`;
-      page.drawText(labelTop, {
-        x: centerX + hashLength + 3 + offsetX,
-        y: yTop - fontSize / 2,
-        size: fontSize,
-        font,
-        color,
-      });
-
-      // Bottom side (-mm)
+      // Bottom side (-Y)
       const yBottom = centerY - offset + offsetY;
       page.drawLine({
         start: { x: centerX - hashLength + offsetX, y: yBottom },
@@ -1024,16 +1003,65 @@ export class PDFGenerator {
         thickness: lineWidth,
         color,
       });
-
-      // Label to the right of the hash mark
-      const labelBottom = `-${mmValue}`;
-      page.drawText(labelBottom, {
-        x: centerX + hashLength + 3 + offsetX,
-        y: yBottom - fontSize / 2,
-        size: fontSize,
-        font,
-        color,
-      });
     }
+
+    // Add axis labels
+    const labelFontSize = 10;
+
+    // +X label (to the right of right hash marks)
+    const plusXLabel = '+X';
+    const plusXWidth = font.widthOfTextAtSize(plusXLabel, labelFontSize);
+    page.drawText(plusXLabel, {
+      x: centerX + maxMm * mmToPoints + darkHashLength + 5 + offsetX,
+      y: centerY - labelFontSize / 2 + offsetY,
+      size: labelFontSize,
+      font,
+      color: darkColor,
+    });
+
+    // -X label (to the left of left hash marks)
+    const minusXLabel = '-X';
+    const minusXWidth = font.widthOfTextAtSize(minusXLabel, labelFontSize);
+    page.drawText(minusXLabel, {
+      x: centerX - maxMm * mmToPoints - darkHashLength - 5 - minusXWidth + offsetX,
+      y: centerY - labelFontSize / 2 + offsetY,
+      size: labelFontSize,
+      font,
+      color: darkColor,
+    });
+
+    // +Y label (above top hash marks)
+    const plusYLabel = '+Y';
+    const plusYWidth = font.widthOfTextAtSize(plusYLabel, labelFontSize);
+    page.drawText(plusYLabel, {
+      x: centerX - plusYWidth / 2 + offsetX,
+      y: centerY + maxMm * mmToPoints + darkHashLength + 5 + offsetY,
+      size: labelFontSize,
+      font,
+      color: darkColor,
+    });
+
+    // -Y label (below bottom hash marks)
+    const minusYLabel = '-Y';
+    const minusYWidth = font.widthOfTextAtSize(minusYLabel, labelFontSize);
+    page.drawText(minusYLabel, {
+      x: centerX - minusYWidth / 2 + offsetX,
+      y: centerY - maxMm * mmToPoints - darkHashLength - 5 - labelFontSize + offsetY,
+      size: labelFontSize,
+      font,
+      color: darkColor,
+    });
+
+    // Add descriptive label below the grid
+    const descLabel = 'Each dark line represents 5mm';
+    const descFontSize = 9;
+    const descWidth = font.widthOfTextAtSize(descLabel, descFontSize);
+    page.drawText(descLabel, {
+      x: centerX - descWidth / 2 + offsetX,
+      y: centerY - maxMm * mmToPoints - darkHashLength - 30 + offsetY,
+      size: descFontSize,
+      font,
+      color: darkColor,
+    });
   }
 }
