@@ -656,14 +656,14 @@ export class SpreadEditor {
     const spreadWidth = pageDimensions.width * 2;
     const spreadHeight = pageDimensions.height;
 
-    // Calculate scale to fit
+    // Calculate scale to fit - fill available space (no upper limit)
     const padding = 40;
     const availableWidth = this.container.clientWidth - padding * 2;
     const availableHeight = this.container.clientHeight - padding * 2;
 
     const scaleX = availableWidth / spreadWidth;
     const scaleY = availableHeight / spreadHeight;
-    const scale = Math.min(scaleX, scaleY, 1);
+    const scale = Math.min(scaleX, scaleY); // Use whichever fits, allow zoom > 100%
 
     this.setZoom(scale); // Don't pass isManualZoom, this is automatic
 
