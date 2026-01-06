@@ -934,7 +934,7 @@ export class PDFGenerator {
     const lineWidth = 0.5;
 
     // Draw center cross
-    const centerCrossSize = 15;
+    const centerCrossSize = 7.5;
     page.drawLine({
       start: { x: centerX - centerCrossSize + offsetX, y: centerY + offsetY },
       end: { x: centerX + centerCrossSize + offsetX, y: centerY + offsetY },
