@@ -89,6 +89,17 @@
   border-color: var(--color-primary);
 }
 
+.btn-icon.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+.btn-icon.active:hover {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}
+
 .btn-icon svg {
   width: 16px;
   height: 16px;

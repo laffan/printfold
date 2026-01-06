@@ -34,6 +34,7 @@ export class SpreadEditor {
   private currentSpreadIndex = 0;
   private zoomLevel = 1;
   private showMargins = true;
+  private fitToViewEnabled = true; // Toggle state for fit-to-view mode
   private marginLines: MarginLine[] = [];
   private marginLabels: MarginLabel[] = [];
   private isDraggingMargin = false;
@@ -104,6 +105,7 @@ export class SpreadEditor {
     // and DOM is fully ready
     requestAnimationFrame(() => {
       this.fitToView();
+      this.updateFitToViewButton();
       this.render();
     });
   }
@@ -343,15 +345,15 @@ export class SpreadEditor {
   private setupControls(): void {
     // Zoom controls
     document.getElementById('btn-zoom-in')?.addEventListener('click', () => {
-      this.setZoom(Math.min(this.zoomLevel + 0.25, 3));
+      this.setZoom(Math.min(this.zoomLevel + 0.25, 3), true); // true = manual zoom
     });
 
     document.getElementById('btn-zoom-out')?.addEventListener('click', () => {
-      this.setZoom(Math.max(this.zoomLevel - 0.25, 0.25));
+      this.setZoom(Math.max(this.zoomLevel - 0.25, 0.25), true); // true = manual zoom
     });
 
     document.getElementById('btn-zoom-fit')?.addEventListener('click', () => {
-      this.fitToView();
+      this.toggleFitToView();
     });
 
     // Navigation
@@ -398,7 +400,7 @@ export class SpreadEditor {
       const direction = e.evt.deltaY > 0 ? -1 : 1;
       const newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy;
 
-      this.setZoom(Math.max(0.25, Math.min(3, newScale)));
+      this.setZoom(Math.max(0.25, Math.min(3, newScale)), true); // true = manual zoom
 
       const newPos = {
         x: pointer.x - mousePointTo.x * this.zoomLevel,
@@ -603,14 +605,48 @@ export class SpreadEditor {
     }
     this.stage.width(this.container.clientWidth);
     this.stage.height(this.container.clientHeight);
-    this.fitToView();
+
+    // Only auto-fit if fit-to-view mode is enabled
+    if (this.fitToViewEnabled) {
+      this.fitToView();
+    }
+
     this.render();
   }
 
-  private setZoom(level: number): void {
+  private setZoom(level: number, isManualZoom = false): void {
     this.zoomLevel = level;
     this.stage.scale({ x: level, y: level });
     document.getElementById('zoom-level')!.textContent = `${Math.round(level * 100)}%`;
+
+    // Disable fit-to-view when user manually zooms
+    if (isManualZoom && this.fitToViewEnabled) {
+      this.fitToViewEnabled = false;
+      this.updateFitToViewButton();
+    }
+  }
+
+  private toggleFitToView(): void {
+    this.fitToViewEnabled = !this.fitToViewEnabled;
+
+    if (this.fitToViewEnabled) {
+      this.fitToView();
+    }
+
+    this.updateFitToViewButton();
+  }
+
+  private updateFitToViewButton(): void {
+    const button = document.getElementById('btn-zoom-fit');
+    if (button) {
+      if (this.fitToViewEnabled) {
+        button.classList.add('active');
+        button.setAttribute('title', 'Fit to View (active)');
+      } else {
+        button.classList.remove('active');
+        button.setAttribute('title', 'Fit to View');
+      }
+    }
   }
 
   private fitToView(): void {
@@ -629,7 +665,7 @@ export class SpreadEditor {
     const scaleY = availableHeight / spreadHeight;
     const scale = Math.min(scaleX, scaleY, 1);
 
-    this.setZoom(scale);
+    this.setZoom(scale); // Don't pass isManualZoom, this is automatic
 
     // Center the spread
     const centerX = (this.container.clientWidth - spreadWidth * scale) / 2;
