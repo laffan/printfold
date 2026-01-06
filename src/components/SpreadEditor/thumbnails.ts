@@ -173,7 +173,9 @@ export function renderThumbnails(
       }
       // If no background fill, leave transparent
     } else {
-      // Draw null page (inactive) with dashed border only, no background
+      // Draw null page (inactive) with container background and dashed border
+      ctx.fillStyle = '#bbbaba';
+      ctx.fillRect(0, 0, thumbWidth / 2, thumbHeight);
       ctx.strokeStyle = '#aaaaaa';
       ctx.lineWidth = 0.5;
       ctx.setLineDash([4, 2]);
@@ -189,7 +191,9 @@ export function renderThumbnails(
         ctx.fillRect(thumbWidth / 2, 0, thumbWidth / 2, thumbHeight);
       }
     } else {
-      // Draw null page (inactive) with dashed border only, no background
+      // Draw null page (inactive) with container background and dashed border
+      ctx.fillStyle = '#bbbaba';
+      ctx.fillRect(thumbWidth / 2, 0, thumbWidth / 2, thumbHeight);
       ctx.strokeStyle = '#aaaaaa';
       ctx.lineWidth = 0.5;
       ctx.setLineDash([4, 2]);

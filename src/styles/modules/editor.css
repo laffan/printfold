@@ -189,14 +189,14 @@
   color: white;
 }
 
-/* Empty label (for null/inactive pages) - no background */
+/* Empty label (for null/inactive pages) - same as container background */
 .spread-thumbnail-page-label.empty {
-  background: transparent;
+  background: #bbbaba;
   cursor: default;
 }
 
 .spread-thumbnail-page-label.empty:hover {
-  background: transparent;
+  background: #bbbaba;
 }
 
 /* Page state label colors */
