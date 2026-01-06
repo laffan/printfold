@@ -927,7 +927,7 @@ export class PDFGenerator {
 
     // 1mm in points (1mm = 72/25.4 points)
     const mmToPoints = 72 / 25.4;
-    const maxMm = 30; // Go up to ±30mm
+    const maxMm = 15; // Go up to ±15mm
     const darkHashLength = 10; // Length of 5mm hash marks
     const lightHashLength = 5; // Length of 1mm hash marks
     const fontSize = 10;
