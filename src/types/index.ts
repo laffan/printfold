@@ -226,10 +226,9 @@ export interface OutputOptions {
   creepPerSheet?: number; // Amount to reduce each successive sheet (in points), default 0.0625 * 72 for bond paper
   // Render all pages as images instead of embedding fonts - larger file size but preserves all styling
   renderTextAsImages?: boolean;
-  // Duplex offset - compensate for printer misalignment on odd pages
+  // Duplex offset - compensate for printer misalignment on odd pages (stored in points)
   duplexOffsetX?: number; // Horizontal offset in points
   duplexOffsetY?: number; // Vertical offset in points
-  duplexOffsetUnit?: 'in' | 'cm'; // Unit for display (stored in points internally)
 }
 
 /**

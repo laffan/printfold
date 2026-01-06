@@ -810,7 +810,7 @@ export class PDFGenerator {
 
   /**
    * Generate a test page PDF for duplex offset calibration
-   * Creates a 2-page PDF with alignment crosses and offset info
+   * Creates a 2-page PDF with alignment crosses and hash marks
    */
   async generateTestPage(): Promise<Uint8Array> {
     const project = appState.getProject();
@@ -822,46 +822,51 @@ export class PDFGenerator {
       project.outputOptions.orientation
     );
 
-    // Get offset values
+    // Get offset values (in points)
     const offsetX = project.outputOptions.duplexOffsetX || 0;
     const offsetY = project.outputOptions.duplexOffsetY || 0;
-    const unit = project.outputOptions.duplexOffsetUnit || 'in';
 
-    // Convert offsets to display units for text
-    const displayOffsetX = unit === 'in' ? offsetX / 72 : offsetX * 2.54 / 72;
-    const displayOffsetY = unit === 'in' ? offsetY / 72 : offsetY * 2.54 / 72;
-    const unitLabel = unit === 'in' ? 'in' : 'cm';
+    // Convert offsets to mm for display
+    const displayOffsetX = offsetX * 25.4 / 72;
+    const displayOffsetY = offsetY * 25.4 / 72;
 
     // Embed font for text
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
     // Page 1 (Front - odd page, with offset applied)
     const page1 = pdfDoc.addPage([sheetSize.width, sheetSize.height]);
-    this.drawTestPageCrosses(page1, sheetSize.width, sheetSize.height, offsetX, offsetY);
 
-    // Draw offset info text above center cross
-    const text = `Duplex Offset: X=${displayOffsetX.toFixed(2)}${unitLabel}, Y=${displayOffsetY.toFixed(2)}${unitLabel}`;
-    const fontSize = 24;
-    const textWidth = font.widthOfTextAtSize(text, fontSize);
+    // Draw corner crosses
+    this.drawCornerCrosses(page1, sheetSize.width, sheetSize.height, offsetX, offsetY);
+
+    // Draw center calibration grid with hash marks
+    this.drawCalibrationGrid(page1, sheetSize.width, sheetSize.height, offsetX, offsetY, font);
+
+    // Draw offset info text above center
+    const text = `Duplex Offset: X=${displayOffsetX.toFixed(1)}mm, Y=${displayOffsetY.toFixed(1)}mm`;
+    const fontSize = 20;
+    const textWidth = fontBold.widthOfTextAtSize(text, fontSize);
     page1.drawText(text, {
       x: sheetSize.width / 2 - textWidth / 2 + offsetX,
-      y: sheetSize.height / 2 + 30 + offsetY,
+      y: sheetSize.height / 2 + 100 + offsetY,
       size: fontSize,
-      font,
+      font: fontBold,
       color: rgb(0, 0, 0),
     });
 
     // Page 2 (Back - even page, no offset)
     const page2 = pdfDoc.addPage([sheetSize.width, sheetSize.height]);
-    this.drawTestPageCrosses(page2, sheetSize.width, sheetSize.height, 0, 0);
+    this.drawCornerCrosses(page2, sheetSize.width, sheetSize.height, 0, 0);
+    this.drawCalibrationGrid(page2, sheetSize.width, sheetSize.height, 0, 0, font);
 
     return pdfDoc.save();
   }
 
   /**
-   * Draw alignment crosses on a test page
+   * Draw alignment crosses in corners
    */
-  private drawTestPageCrosses(
+  private drawCornerCrosses(
     page: PDFPage,
     width: number,
     height: number,
@@ -872,16 +877,15 @@ export class PDFGenerator {
     const lineWidth = 0.5;
     const color = rgb(0, 0, 0);
 
-    // Define cross positions (corners and center)
+    // Define corner positions
     const positions = [
       { x: 36, y: height - 36 },           // Top-left
       { x: width - 36, y: height - 36 },   // Top-right
       { x: 36, y: 36 },                    // Bottom-left
       { x: width - 36, y: 36 },            // Bottom-right
-      { x: width / 2, y: height / 2 },     // Center
     ];
 
-    // Draw crosses at each position
+    // Draw crosses at each corner
     for (const pos of positions) {
       const x = pos.x + offsetX;
       const y = pos.y + offsetY;
@@ -899,6 +903,135 @@ export class PDFGenerator {
         start: { x, y: y - crossSize },
         end: { x, y: y + crossSize },
         thickness: lineWidth,
+        color,
+      });
+    }
+  }
+
+  /**
+   * Draw calibration grid with hash marks every 5mm
+   */
+  private drawCalibrationGrid(
+    page: PDFPage,
+    width: number,
+    height: number,
+    offsetX: number,
+    offsetY: number,
+    font: PDFFont
+  ): void {
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const lineWidth = 0.5;
+    const color = rgb(0, 0, 0);
+
+    // 5mm in points (1mm = 72/25.4 points)
+    const mmToPoints = 72 / 25.4;
+    const tickInterval = 5 * mmToPoints; // 5mm
+    const maxTicks = 6; // Go up to ±30mm
+    const hashLength = 10; // Length of hash mark
+    const fontSize = 8;
+
+    // Draw center cross
+    const centerCrossSize = 15;
+    page.drawLine({
+      start: { x: centerX - centerCrossSize + offsetX, y: centerY + offsetY },
+      end: { x: centerX + centerCrossSize + offsetX, y: centerY + offsetY },
+      thickness: lineWidth,
+      color,
+    });
+    page.drawLine({
+      start: { x: centerX + offsetX, y: centerY - centerCrossSize + offsetY },
+      end: { x: centerX + offsetX, y: centerY + centerCrossSize + offsetY },
+      thickness: lineWidth,
+      color,
+    });
+
+    // Draw horizontal hash marks and labels (left and right from center)
+    for (let i = 1; i <= maxTicks; i++) {
+      const mmValue = i * 5;
+      const offset = i * tickInterval;
+
+      // Right side (+mm)
+      const xRight = centerX + offset + offsetX;
+      page.drawLine({
+        start: { x: xRight, y: centerY - hashLength + offsetY },
+        end: { x: xRight, y: centerY + hashLength + offsetY },
+        thickness: lineWidth,
+        color,
+      });
+
+      // Label above the hash mark
+      const labelRight = `+${mmValue}`;
+      const labelWidthRight = font.widthOfTextAtSize(labelRight, fontSize);
+      page.drawText(labelRight, {
+        x: xRight - labelWidthRight / 2,
+        y: centerY + hashLength + 3 + offsetY,
+        size: fontSize,
+        font,
+        color,
+      });
+
+      // Left side (-mm)
+      const xLeft = centerX - offset + offsetX;
+      page.drawLine({
+        start: { x: xLeft, y: centerY - hashLength + offsetY },
+        end: { x: xLeft, y: centerY + hashLength + offsetY },
+        thickness: lineWidth,
+        color,
+      });
+
+      // Label above the hash mark
+      const labelLeft = `-${mmValue}`;
+      const labelWidthLeft = font.widthOfTextAtSize(labelLeft, fontSize);
+      page.drawText(labelLeft, {
+        x: xLeft - labelWidthLeft / 2,
+        y: centerY + hashLength + 3 + offsetY,
+        size: fontSize,
+        font,
+        color,
+      });
+    }
+
+    // Draw vertical hash marks and labels (up and down from center)
+    for (let i = 1; i <= maxTicks; i++) {
+      const mmValue = i * 5;
+      const offset = i * tickInterval;
+
+      // Top side (+mm)
+      const yTop = centerY + offset + offsetY;
+      page.drawLine({
+        start: { x: centerX - hashLength + offsetX, y: yTop },
+        end: { x: centerX + hashLength + offsetX, y: yTop },
+        thickness: lineWidth,
+        color,
+      });
+
+      // Label to the right of the hash mark
+      const labelTop = `+${mmValue}`;
+      page.drawText(labelTop, {
+        x: centerX + hashLength + 3 + offsetX,
+        y: yTop - fontSize / 2,
+        size: fontSize,
+        font,
+        color,
+      });
+
+      // Bottom side (-mm)
+      const yBottom = centerY - offset + offsetY;
+      page.drawLine({
+        start: { x: centerX - hashLength + offsetX, y: yBottom },
+        end: { x: centerX + hashLength + offsetX, y: yBottom },
+        thickness: lineWidth,
+        color,
+      });
+
+      // Label to the right of the hash mark
+      const labelBottom = `-${mmValue}`;
+      page.drawText(labelBottom, {
+        x: centerX + hashLength + 3 + offsetX,
+        y: yBottom - fontSize / 2,
+        size: fontSize,
+        font,
         color,
       });
     }
