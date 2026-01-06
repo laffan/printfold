@@ -74,7 +74,8 @@ export function flowSections(
         const remainingHeight = pageDimensions.contentHeight - currentHeight;
         const fontStyle = getFontStyleForSection(section, fontOptions);
         const lineHeight = layoutOptions.lineHeight * fontStyle.fontSize;
-        const linesPerPage = Math.floor(remainingHeight / lineHeight);
+        // Account for paragraph spacing when calculating how many lines fit
+        const linesPerPage = Math.floor((remainingHeight - layoutOptions.paragraphSpacing) / lineHeight);
 
         if (linesPerPage >= 2) {
           // Split the paragraph
@@ -90,7 +91,7 @@ export function flowSections(
             lines: firstPartLines,
             richLines: firstPartRichLines,
             lineHeights: firstPartLines.map(() => lineHeight),
-            measuredHeight: linesPerPage * lineHeight,
+            measuredHeight: linesPerPage * lineHeight + layoutOptions.paragraphSpacing,
           };
 
           currentPage.sections.push(firstPart);
