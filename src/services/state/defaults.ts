@@ -42,6 +42,9 @@ export const defaultOutputOptions: OutputOptions = {
   showFoldMarks: false,
   creepEnabled: false,
   creepPerSheet: 0.0625 * 72,
+  duplexOffsetX: 0,
+  duplexOffsetY: 0,
+  duplexOffsetUnit: 'in',
 };
 
 export const defaultLayoutOptions: LayoutOptions = {

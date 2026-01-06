@@ -7,6 +7,8 @@ import { appState } from '../../services/state';
 import type { OutputOptions } from '../../types';
 import { getOrientedSheetSize, UNIT_CONVERSIONS } from '../../types';
 import { bindSelect, bindCheckbox, type DebounceCallback } from './helpers';
+import { PDFGenerator } from '../../services/pdfGenerator';
+import { env } from '../../services/environment';
 
 /**
  * Set up output options event handlers
@@ -117,6 +119,59 @@ export function setupOutputOptions(debounce: (fn: DebounceCallback) => void): vo
       });
     });
   }
+
+  // Duplex offset unit
+  bindSelect('opt-duplex-offset-unit', (value) => {
+    appState.updateOutputOptions({ duplexOffsetUnit: value as 'in' | 'cm' });
+    updateDuplexOffsetUnits();
+  }, debounce);
+
+  // Duplex offset X - convert from display unit to points
+  const duplexOffsetXInput = document.getElementById('opt-duplex-offset-x') as HTMLInputElement;
+  if (duplexOffsetXInput) {
+    duplexOffsetXInput.addEventListener('input', () => {
+      const displayValue = parseFloat(duplexOffsetXInput.value);
+      if (isNaN(displayValue)) return;
+      const unit = appState.getProject().outputOptions.duplexOffsetUnit || 'in';
+      const pointsValue = unit === 'in' ? displayValue * 72 : displayValue * 72 / 2.54;
+      debounce(() => {
+        appState.updateOutputOptions({ duplexOffsetX: pointsValue });
+      });
+    });
+  }
+
+  // Duplex offset Y - convert from display unit to points
+  const duplexOffsetYInput = document.getElementById('opt-duplex-offset-y') as HTMLInputElement;
+  if (duplexOffsetYInput) {
+    duplexOffsetYInput.addEventListener('input', () => {
+      const displayValue = parseFloat(duplexOffsetYInput.value);
+      if (isNaN(displayValue)) return;
+      const unit = appState.getProject().outputOptions.duplexOffsetUnit || 'in';
+      const pointsValue = unit === 'in' ? displayValue * 72 : displayValue * 72 / 2.54;
+      debounce(() => {
+        appState.updateOutputOptions({ duplexOffsetY: pointsValue });
+      });
+    });
+  }
+
+  // Print Test Page button
+  const printTestPageBtn = document.getElementById('btn-print-test-page') as HTMLButtonElement;
+  if (printTestPageBtn) {
+    printTestPageBtn.addEventListener('click', async () => {
+      try {
+        const generator = new PDFGenerator();
+        const pdfBytes = await generator.generateTestPage();
+        await env.saveFile({
+          defaultName: 'duplex-test-page.pdf',
+          filters: [{ name: 'PDF', extensions: ['pdf'] }],
+          content: pdfBytes,
+        });
+      } catch (error) {
+        console.error('Test page generation failed:', error);
+        alert('Failed to generate test page. See console for details.');
+      }
+    });
+  }
 }
 
 /**
@@ -175,5 +230,40 @@ export function updateFillSpaceVisibility(): void {
         appState.updateOutputOptions({ fillAvailableSpace: false });
       }
     }
+  }
+}
+
+/**
+ * Update the duplex offset unit labels when unit changes
+ */
+export function updateDuplexOffsetUnits(): void {
+  const project = appState.getProject();
+  const unit = project.outputOptions.duplexOffsetUnit || 'in';
+  const unitLabel = unit === 'in' ? 'in' : 'cm';
+
+  const xUnitLabel = document.getElementById('duplex-offset-x-unit');
+  const yUnitLabel = document.getElementById('duplex-offset-y-unit');
+
+  if (xUnitLabel) {
+    xUnitLabel.textContent = unitLabel;
+  }
+  if (yUnitLabel) {
+    yUnitLabel.textContent = unitLabel;
+  }
+
+  // Also update input values to reflect the new unit
+  const xInput = document.getElementById('opt-duplex-offset-x') as HTMLInputElement;
+  const yInput = document.getElementById('opt-duplex-offset-y') as HTMLInputElement;
+
+  const offsetX = project.outputOptions.duplexOffsetX || 0;
+  const offsetY = project.outputOptions.duplexOffsetY || 0;
+
+  if (xInput) {
+    const displayValue = unit === 'in' ? offsetX / 72 : offsetX * 2.54 / 72;
+    xInput.value = displayValue.toFixed(2);
+  }
+  if (yInput) {
+    const displayValue = unit === 'in' ? offsetY / 72 : offsetY * 2.54 / 72;
+    yInput.value = displayValue.toFixed(2);
   }
 }

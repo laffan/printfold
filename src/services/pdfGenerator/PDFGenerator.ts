@@ -170,11 +170,15 @@ export class PDFGenerator {
       return globalPageMap.get(adjacentPageNum) || null;
     };
 
+    // Get duplex offset values (in points)
+    const duplexOffsetX = project.outputOptions.duplexOffsetX || 0;
+    const duplexOffsetY = project.outputOptions.duplexOffsetY || 0;
+
     // Group sheets across all signatures by rowsPerSheet
     for (let i = 0; i < allSheets.length; i += rowsPerSheet) {
       const sheetsInGroup = allSheets.slice(i, i + rowsPerSheet);
 
-      // Front of combined sheet
+      // Front of combined sheet (odd PDF pages - apply duplex offset)
       const frontPage = pdfDoc.addPage([sheetSize.width, sheetSize.height]);
 
       sheetsInGroup.forEach(({ sheet, spreadForPage }, rowIndex) => {
@@ -188,18 +192,18 @@ export class PDFGenerator {
           const info = spreadForPage.get(leftPage.pageNumber);
           const spanningItems = info?.staticSpread?.spanningItems;
           const adjacentPage = getReadingOrderAdjacent(leftPage);
-          this.drawPage(frontPage, leftPage, 0, rowY, pageWidth, pageHeight, project, leftPage.isRecto, adjacentPage, spanningItems);
+          this.drawPage(frontPage, leftPage, 0 + duplexOffsetX, rowY + duplexOffsetY, pageWidth, pageHeight, project, leftPage.isRecto, adjacentPage, spanningItems);
         }
 
         if (rightPage) {
           const info = spreadForPage.get(rightPage.pageNumber);
           const spanningItems = info?.staticSpread?.spanningItems;
           const adjacentPage = getReadingOrderAdjacent(rightPage);
-          this.drawPage(frontPage, rightPage, pageWidth, rowY, pageWidth, pageHeight, project, rightPage.isRecto, adjacentPage, spanningItems);
+          this.drawPage(frontPage, rightPage, pageWidth + duplexOffsetX, rowY + duplexOffsetY, pageWidth, pageHeight, project, rightPage.isRecto, adjacentPage, spanningItems);
         }
       });
 
-      // Back of combined sheet
+      // Back of combined sheet (even PDF pages - no offset)
       const backPage = pdfDoc.addPage([sheetSize.width, sheetSize.height]);
 
       sheetsInGroup.forEach(({ sheet, spreadForPage }, rowIndex) => {
@@ -801,6 +805,102 @@ export class PDFGenerator {
     } catch (error) {
       console.warn('Failed to embed font:', error);
       return null;
+    }
+  }
+
+  /**
+   * Generate a test page PDF for duplex offset calibration
+   * Creates a 2-page PDF with alignment crosses and offset info
+   */
+  async generateTestPage(): Promise<Uint8Array> {
+    const project = appState.getProject();
+    const pdfDoc = await PDFDocument.create();
+
+    // Get sheet dimensions
+    const sheetSize = getOrientedSheetSize(
+      project.outputOptions.sheetSize,
+      project.outputOptions.orientation
+    );
+
+    // Get offset values
+    const offsetX = project.outputOptions.duplexOffsetX || 0;
+    const offsetY = project.outputOptions.duplexOffsetY || 0;
+    const unit = project.outputOptions.duplexOffsetUnit || 'in';
+
+    // Convert offsets to display units for text
+    const displayOffsetX = unit === 'in' ? offsetX / 72 : offsetX * 2.54 / 72;
+    const displayOffsetY = unit === 'in' ? offsetY / 72 : offsetY * 2.54 / 72;
+    const unitLabel = unit === 'in' ? 'in' : 'cm';
+
+    // Embed font for text
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+    // Page 1 (Front - odd page, with offset applied)
+    const page1 = pdfDoc.addPage([sheetSize.width, sheetSize.height]);
+    this.drawTestPageCrosses(page1, sheetSize.width, sheetSize.height, offsetX, offsetY);
+
+    // Draw offset info text above center cross
+    const text = `Duplex Offset: X=${displayOffsetX.toFixed(2)}${unitLabel}, Y=${displayOffsetY.toFixed(2)}${unitLabel}`;
+    const fontSize = 24;
+    const textWidth = font.widthOfTextAtSize(text, fontSize);
+    page1.drawText(text, {
+      x: sheetSize.width / 2 - textWidth / 2 + offsetX,
+      y: sheetSize.height / 2 + 30 + offsetY,
+      size: fontSize,
+      font,
+      color: rgb(0, 0, 0),
+    });
+
+    // Page 2 (Back - even page, no offset)
+    const page2 = pdfDoc.addPage([sheetSize.width, sheetSize.height]);
+    this.drawTestPageCrosses(page2, sheetSize.width, sheetSize.height, 0, 0);
+
+    return pdfDoc.save();
+  }
+
+  /**
+   * Draw alignment crosses on a test page
+   */
+  private drawTestPageCrosses(
+    page: PDFPage,
+    width: number,
+    height: number,
+    offsetX: number,
+    offsetY: number
+  ): void {
+    const crossSize = 20; // Length of each arm of the cross
+    const lineWidth = 0.5;
+    const color = rgb(0, 0, 0);
+
+    // Define cross positions (corners and center)
+    const positions = [
+      { x: 36, y: height - 36 },           // Top-left
+      { x: width - 36, y: height - 36 },   // Top-right
+      { x: 36, y: 36 },                    // Bottom-left
+      { x: width - 36, y: 36 },            // Bottom-right
+      { x: width / 2, y: height / 2 },     // Center
+    ];
+
+    // Draw crosses at each position
+    for (const pos of positions) {
+      const x = pos.x + offsetX;
+      const y = pos.y + offsetY;
+
+      // Horizontal line
+      page.drawLine({
+        start: { x: x - crossSize, y },
+        end: { x: x + crossSize, y },
+        thickness: lineWidth,
+        color,
+      });
+
+      // Vertical line
+      page.drawLine({
+        start: { x, y: y - crossSize },
+        end: { x, y: y + crossSize },
+        thickness: lineWidth,
+        color,
+      });
     }
   }
 }
