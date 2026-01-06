@@ -170,8 +170,11 @@ export function renderThumbnails(
       if (bgColor) {
         ctx.fillStyle = bgColor;
         ctx.fillRect(0, 0, thumbWidth / 2, thumbHeight);
+      } else {
+        // Page exists but has no custom background - draw white
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, thumbWidth / 2, thumbHeight);
       }
-      // If no background fill, leave transparent
     } else {
       // Draw null page (inactive) with container background and dashed border
       ctx.fillStyle = '#bbbaba';
@@ -188,6 +191,10 @@ export function renderThumbnails(
       const bgColor = getBackgroundColor(vSpread.recto);
       if (bgColor) {
         ctx.fillStyle = bgColor;
+        ctx.fillRect(thumbWidth / 2, 0, thumbWidth / 2, thumbHeight);
+      } else {
+        // Page exists but has no custom background - draw white
+        ctx.fillStyle = '#ffffff';
         ctx.fillRect(thumbWidth / 2, 0, thumbWidth / 2, thumbHeight);
       }
     } else {

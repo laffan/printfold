@@ -124,7 +124,7 @@
 
 .spread-thumbnail {
   width: 84px;
-  background: white;
+  background: #bbbaba;
   border: 2px solid var(--color-border);
   border-radius: 4px;
   cursor: pointer;
