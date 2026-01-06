@@ -163,20 +163,30 @@ export function measureSection(
     }
   }
 
-  const measuredHeight = spacingBefore + wrappedLines.length * lineHeight + layoutOptions.paragraphSpacing;
-
   // Generate rich text lines for sections that support inline formatting
   let richLines: RichTextLine[] | undefined;
+  let finalLines: string[] = wrappedLines;
+  let finalLineHeights: number[] = lineHeights;
+
   if (section.type === 'paragraph' || section.type === 'blockquote') {
     richLines = wrapRichText(ctx, section.rawMarkdown, contentWidth, fontStyle, fontOptions);
+
+    // IMPORTANT: Derive lines from richLines to ensure consistent line counts
+    // This prevents text from being cropped when paragraphs are split across pages
+    if (richLines && richLines.length > 0) {
+      finalLines = richLines.map(rl => rl.spans.map(s => s.text).join(''));
+      finalLineHeights = richLines.map(() => lineHeight);
+    }
   }
+
+  const measuredHeight = spacingBefore + finalLines.length * lineHeight + layoutOptions.paragraphSpacing;
 
   return {
     ...section,
     measuredHeight,
-    lines: wrappedLines,
+    lines: finalLines,
     richLines,
-    lineHeights,
+    lineHeights: finalLineHeights,
   };
 }
 

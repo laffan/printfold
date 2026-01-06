@@ -69,44 +69,78 @@ export function flowSections(
       currentHeight += measured.measuredHeight;
     } else {
       // Need to break to new page
-      // Try to fit partial content if possible (for paragraphs)
-      if (section.type === 'paragraph' && measured.lines.length > 1) {
-        const remainingHeight = pageDimensions.contentHeight - currentHeight;
+      // Try to fit partial content if possible (for paragraphs and blockquotes)
+      if ((section.type === 'paragraph' || section.type === 'blockquote') && measured.lines.length > 1) {
         const fontStyle = getFontStyleForSection(section, fontOptions);
         const lineHeight = layoutOptions.lineHeight * fontStyle.fontSize;
-        const linesPerPage = Math.floor(remainingHeight / lineHeight);
 
-        if (linesPerPage >= 2) {
-          // Split the paragraph
-          const firstPartLines = measured.lines.slice(0, linesPerPage);
-          const remainingLines = measured.lines.slice(linesPerPage);
+        // Use richLines for line count if available, otherwise use lines
+        // This ensures we split based on what's actually rendered
+        const sourceLines = measured.richLines && measured.richLines.length > 0
+          ? measured.richLines
+          : measured.lines;
+        const totalLineCount = Array.isArray(sourceLines) ? sourceLines.length : 0;
+
+        let remainingLineIndex = 0;
+
+        // First, fit what we can on the current page
+        const remainingHeight = pageDimensions.contentHeight - currentHeight;
+        const linesForCurrentPage = Math.floor(remainingHeight / lineHeight);
+
+        if (linesForCurrentPage >= 2 && remainingLineIndex < totalLineCount) {
+          const endIndex = Math.min(remainingLineIndex + linesForCurrentPage, totalLineCount);
 
           const firstPart: MeasuredSection = {
             ...measured,
-            lines: firstPartLines,
-            lineHeights: firstPartLines.map(() => lineHeight),
-            measuredHeight: linesPerPage * lineHeight,
+            lines: measured.lines.slice(remainingLineIndex, endIndex),
+            richLines: measured.richLines?.slice(remainingLineIndex, endIndex),
+            lineHeights: measured.lines.slice(remainingLineIndex, endIndex).map(() => lineHeight),
+            measuredHeight: (endIndex - remainingLineIndex) * lineHeight,
           };
 
           currentPage.sections.push(firstPart);
           pages.push(currentPage);
+          remainingLineIndex = endIndex;
 
-          // Start new page with remaining lines
           currentPage = createEmptyPage(pages.length + 1);
           currentHeight = 0;
-
-          if (remainingLines.length > 0) {
-            const remainingPart: MeasuredSection = {
-              ...measured,
-              lines: remainingLines,
-              lineHeights: remainingLines.map(() => lineHeight),
-              measuredHeight: remainingLines.length * lineHeight + layoutOptions.paragraphSpacing,
-            };
-            currentPage.sections.push(remainingPart);
-            currentHeight = remainingPart.measuredHeight;
-          }
-          continue;
+        } else if (currentPage.sections.length > 0) {
+          // Can't fit enough lines, move to next page
+          pages.push(currentPage);
+          currentPage = createEmptyPage(pages.length + 1);
+          currentHeight = 0;
         }
+
+        // Now handle remaining lines, splitting across as many pages as needed
+        const maxLinesPerPage = Math.floor(pageDimensions.contentHeight / lineHeight);
+
+        while (remainingLineIndex < totalLineCount) {
+          const linesLeft = totalLineCount - remainingLineIndex;
+          const linesToAdd = Math.min(linesLeft, maxLinesPerPage);
+          const endIndex = remainingLineIndex + linesToAdd;
+          const isLastPart = endIndex >= totalLineCount;
+
+          const part: MeasuredSection = {
+            ...measured,
+            lines: measured.lines.slice(remainingLineIndex, endIndex),
+            richLines: measured.richLines?.slice(remainingLineIndex, endIndex),
+            lineHeights: measured.lines.slice(remainingLineIndex, endIndex).map(() => lineHeight),
+            measuredHeight: linesToAdd * lineHeight + (isLastPart ? layoutOptions.paragraphSpacing : 0),
+          };
+
+          currentPage.sections.push(part);
+          currentHeight = part.measuredHeight;
+          remainingLineIndex = endIndex;
+
+          // If there are more lines and current page is full, create new page
+          if (remainingLineIndex < totalLineCount) {
+            pages.push(currentPage);
+            currentPage = createEmptyPage(pages.length + 1);
+            currentHeight = 0;
+          }
+        }
+
+        continue;
       }
 
       // Can't split or don't want to, move whole section to new page
@@ -116,17 +150,45 @@ export function flowSections(
       currentPage = createEmptyPage(pages.length + 1);
       currentHeight = 0;
 
-      // Add section to new page
+      // Add section to new page - handle oversized sections by splitting
       if (measured.measuredHeight <= pageDimensions.contentHeight) {
         currentPage.sections.push(measured);
         currentHeight = measured.measuredHeight;
       } else {
-        // Section is too tall for a single page - will need to force-break
-        currentPage.sections.push(measured);
-        currentPage.overflow = [measured];
-        pages.push(currentPage);
-        currentPage = createEmptyPage(pages.length + 1);
-        currentHeight = 0;
+        // Section is too tall for a single page - force-break by lines
+        const fontStyle = getFontStyleForSection(section, fontOptions);
+        const lineHeight = layoutOptions.lineHeight * fontStyle.fontSize;
+        const maxLinesPerPage = Math.floor(pageDimensions.contentHeight / lineHeight);
+        const sourceLines = measured.richLines && measured.richLines.length > 0
+          ? measured.richLines
+          : measured.lines;
+        const totalLineCount = Array.isArray(sourceLines) ? sourceLines.length : 0;
+
+        let lineIndex = 0;
+        while (lineIndex < totalLineCount) {
+          const linesLeft = totalLineCount - lineIndex;
+          const linesToAdd = Math.min(linesLeft, maxLinesPerPage);
+          const endIndex = lineIndex + linesToAdd;
+          const isLastPart = endIndex >= totalLineCount;
+
+          const part: MeasuredSection = {
+            ...measured,
+            lines: measured.lines.slice(lineIndex, endIndex),
+            richLines: measured.richLines?.slice(lineIndex, endIndex),
+            lineHeights: measured.lines.slice(lineIndex, endIndex).map(() => lineHeight),
+            measuredHeight: linesToAdd * lineHeight + (isLastPart ? layoutOptions.paragraphSpacing : 0),
+          };
+
+          currentPage.sections.push(part);
+          currentHeight = part.measuredHeight;
+          lineIndex = endIndex;
+
+          if (lineIndex < totalLineCount) {
+            pages.push(currentPage);
+            currentPage = createEmptyPage(pages.length + 1);
+            currentHeight = 0;
+          }
+        }
       }
     }
   }
