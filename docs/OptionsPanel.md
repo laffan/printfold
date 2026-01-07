@@ -62,6 +62,7 @@ Contains:
 Contains:
 - **Sheet & Booklet Section** - Paper size, booklet size, signatures
 - **Creep Compensation** - Adjustment for paper thickness in signatures
+- **Print Settings Section** - Duplex offset for printer alignment, crop marks customization
 - **Download Blanks Section** - Export blank page/spread templates for external editing
 
 ## Main Class (`component.ts`)
@@ -206,6 +207,35 @@ function createDebouncer() {
 | `opt-fill-space` | Checkbox | Fill available space mode |
 | `opt-fold-marks` | Checkbox | Show fold marks on printed PDF |
 | `opt-render-text-as-images` | Checkbox | Render all text as images (fallback for font issues) |
+| `opt-duplex-offset-x` | Number | Horizontal duplex offset in mm |
+| `opt-duplex-offset-y` | Number | Vertical duplex offset in mm |
+| `opt-crop-marks` | Checkbox | Show crop marks on printed PDF |
+| `opt-crop-mark-color` | Color | Crop mark color (hex) |
+| `opt-crop-mark-thickness` | Number | Crop mark thickness in points (0.1-3pt) |
+
+### Duplex Offset
+
+Compensates for printer misalignment when duplex printing. Values are entered in millimeters and stored internally as points.
+
+**Controls:**
+- **X Offset**: Horizontal shift applied to odd (back) pages
+- **Y Offset**: Vertical shift applied to odd (back) pages
+
+**Usage:**
+1. Print a test page using the "Print Test Page" button
+2. Measure any misalignment between front and back
+3. Enter offset values to compensate
+
+### Crop Marks
+
+Configurable crop marks (cut marks) on printed PDFs for trimming guidance.
+
+**Controls:**
+- **Enable/Disable**: Toggle crop marks visibility
+- **Color**: Hex color picker (default: black #000000)
+- **Thickness**: Line thickness in points (default: 0.5pt, range: 0.1-3pt)
+
+**Note:** Crop marks are independent of fold marks. Both can be enabled/disabled separately.
 
 ### Render Text as Images
 

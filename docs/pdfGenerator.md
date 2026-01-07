@@ -150,18 +150,24 @@ Renders items with clipping for cross-page content (fallback when pre-rendering 
 
 ### Print Marks
 
-#### `addPrintMarks(pdfDoc, sheetSize, pageHeight, rowsPerSheet, showFoldMarks)`
+#### `addPrintMarks(pdfDoc, sheetSize, pageHeight, rowsPerSheet, showFoldMarks, cropMarkOptions?)`
 
 Adds production marks to all pages.
 
 **Parameters:**
 - `showFoldMarks` (boolean, default: false) - Whether to show fold marks
+- `cropMarkOptions` (optional) - Configuration for crop marks:
+  - `showCropMarks` (boolean, default: true) - Whether to show crop marks
+  - `cropMarkColor` (string, default: '#000000') - Hex color for crop marks
+  - `cropMarkThickness` (number, default: 0.5) - Line thickness in points
 
 **Marks Added:**
-- Corner cut marks (L-shaped, black)
+- Corner cut marks (L-shaped, configurable color/thickness) - only if `showCropMarks` is true
 - Center fold marks (top and bottom, light gray) - only if `showFoldMarks` is true
-- Horizontal cut marks for multi-row layouts (black)
+- Horizontal cut marks for multi-row layouts (configurable color/thickness) - only if `showCropMarks` is true
 - Horizontal fold marks at cut lines - only if `showFoldMarks` is true
+
+**Note:** Fold marks are always drawn in light gray (rgb 0.7, 0.7, 0.7) regardless of crop mark color settings.
 
 ### Font Handling
 
@@ -386,6 +392,67 @@ When creep is enabled with "Fill available space" mode, crop marks are positione
 | Cover (80lb) | 0.08" (5.8pt) |
 
 **Note:** The actual implementation of creep adjustment is pending. Currently, the UI and settings are in place but page width adjustment is not yet applied during PDF generation.
+
+## Crop Marks Configuration
+
+Crop marks (cut marks) can be customized for color and thickness.
+
+### Configuration
+
+```typescript
+outputOptions: {
+  showCropMarks?: boolean;      // Enable/disable crop marks (default: true)
+  cropMarkColor?: string;       // Hex color (default: '#000000')
+  cropMarkThickness?: number;   // Thickness in points (default: 0.5)
+}
+```
+
+### Mark Placement
+
+- **Corner marks**: L-shaped marks at all four corners of the sheet
+- **Row dividers**: Horizontal marks between rows when using "Fill available space" mode
+
+### Use Cases
+
+- **Default (black)**: Standard printing on white paper
+- **Light gray**: For proofing on colored paper where black marks would be too prominent
+- **Thicker lines**: For easier visibility when cutting by hand
+- **Disabled**: When sending to a print shop that adds their own marks
+
+## Duplex Offset
+
+Compensates for printer misalignment when printing double-sided (duplex). Many consumer printers have slight registration errors between front and back sides.
+
+### Configuration
+
+```typescript
+outputOptions: {
+  duplexOffsetX?: number;  // Horizontal offset in points
+  duplexOffsetY?: number;  // Vertical offset in points
+}
+```
+
+### How It Works
+
+The offset is applied to odd-numbered PDF pages (the back sides when duplex printing):
+- **X Offset**: Shifts content horizontally
+- **Y Offset**: Shifts content vertically
+
+Positive values shift right/up, negative values shift left/down.
+
+### Workflow
+
+1. **Print Test Page**: Use the "Print Test Page" button to generate a calibration page
+2. **Measure Misalignment**: Print the test page duplex and measure any offset between front and back
+3. **Enter Offset**: Input the measured values in millimeters (converted to points internally)
+4. **Verify**: Print another test page to confirm alignment
+
+### Unit Conversion
+
+Values are entered in millimeters in the UI but stored as points:
+```typescript
+const pointsValue = mmValue * 72 / 25.4;
+```
 
 ## Render Text as Images Mode
 
