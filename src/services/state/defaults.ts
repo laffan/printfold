@@ -44,6 +44,9 @@ export const defaultOutputOptions: OutputOptions = {
   creepPerSheet: 0.0625 * 72,
   duplexOffsetX: 0,
   duplexOffsetY: 0,
+  showCropMarks: true,
+  cropMarkColor: '#000000',
+  cropMarkThickness: 0.5,
 };
 
 export const defaultLayoutOptions: LayoutOptions = {

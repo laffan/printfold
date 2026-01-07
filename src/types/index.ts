@@ -229,6 +229,10 @@ export interface OutputOptions {
   // Duplex offset - compensate for printer misalignment on odd pages (stored in points)
   duplexOffsetX?: number; // Horizontal offset in points
   duplexOffsetY?: number; // Vertical offset in points
+  // Crop marks settings
+  showCropMarks?: boolean; // Show crop marks on printed PDF
+  cropMarkColor?: string; // Hex color for crop marks
+  cropMarkThickness?: number; // Thickness in points
 }
 
 /**

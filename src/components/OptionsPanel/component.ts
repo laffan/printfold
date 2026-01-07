@@ -148,6 +148,15 @@ export class OptionsPanel {
     const creepPerSheetInches = (project.outputOptions.creepPerSheet ?? (0.0625 * 72)) / 72;
     setInputValue('opt-creep-per-sheet', creepPerSheetInches.toFixed(4));
 
+    // Crop marks
+    setCheckboxValue('opt-crop-marks', project.outputOptions.showCropMarks ?? true);
+    const cropMarksSettings = document.getElementById('crop-marks-settings');
+    if (cropMarksSettings) {
+      cropMarksSettings.style.display = (project.outputOptions.showCropMarks ?? true) ? 'block' : 'none';
+    }
+    setColorValue('opt-crop-mark-color', project.outputOptions.cropMarkColor ?? '#000000');
+    setInputValue('opt-crop-mark-thickness', (project.outputOptions.cropMarkThickness ?? 0.5).toString());
+
     // Layout options - margins are converted to display unit
     setMarginInputValue('opt-margin-top', project.layoutOptions.margins.top, unit);
     setMarginInputValue('opt-margin-bottom', project.layoutOptions.margins.bottom, unit);

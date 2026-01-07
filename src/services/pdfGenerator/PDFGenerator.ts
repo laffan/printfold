@@ -140,7 +140,11 @@ export class PDFGenerator {
 
     // Add cut marks and optional fold indicators if there are pages
     if (project.signatures.length > 0) {
-      addPrintMarks(pdfDoc, sheetSize, pageHeight, rowsPerSheet, project.outputOptions.showFoldMarks);
+      addPrintMarks(pdfDoc, sheetSize, pageHeight, rowsPerSheet, project.outputOptions.showFoldMarks, {
+        showCropMarks: project.outputOptions.showCropMarks,
+        cropMarkColor: project.outputOptions.cropMarkColor,
+        cropMarkThickness: project.outputOptions.cropMarkThickness,
+      });
     }
 
     return pdfDoc.save();

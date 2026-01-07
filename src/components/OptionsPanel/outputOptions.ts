@@ -166,6 +166,40 @@ export function setupOutputOptions(debounce: (fn: DebounceCallback) => void): vo
       }
     });
   }
+
+  // Crop marks
+  const cropMarksCheckbox = document.getElementById('opt-crop-marks') as HTMLInputElement;
+  const cropMarksSettings = document.getElementById('crop-marks-settings');
+  if (cropMarksCheckbox) {
+    cropMarksCheckbox.addEventListener('change', () => {
+      appState.updateOutputOptions({ showCropMarks: cropMarksCheckbox.checked });
+      if (cropMarksSettings) {
+        cropMarksSettings.style.display = cropMarksCheckbox.checked ? 'block' : 'none';
+      }
+    });
+  }
+
+  // Crop mark color
+  const cropMarkColorInput = document.getElementById('opt-crop-mark-color') as HTMLInputElement;
+  if (cropMarkColorInput) {
+    cropMarkColorInput.addEventListener('input', () => {
+      debounce(() => {
+        appState.updateOutputOptions({ cropMarkColor: cropMarkColorInput.value });
+      });
+    });
+  }
+
+  // Crop mark thickness
+  const cropMarkThicknessInput = document.getElementById('opt-crop-mark-thickness') as HTMLInputElement;
+  if (cropMarkThicknessInput) {
+    cropMarkThicknessInput.addEventListener('input', () => {
+      const value = parseFloat(cropMarkThicknessInput.value);
+      if (isNaN(value)) return;
+      debounce(() => {
+        appState.updateOutputOptions({ cropMarkThickness: value });
+      });
+    });
+  }
 }
 
 /**
