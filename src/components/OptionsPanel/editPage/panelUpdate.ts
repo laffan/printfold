@@ -14,8 +14,9 @@ import { updateMultiSelectControls } from './multiSelect';
 import { updateArrayDimensionsList, setupAddDimensionButton } from './arrayInstances';
 import { setupPageBackgroundPicker } from './pageBackground';
 import { updateCustomBackgroundSection } from './customBackground';
+import { updateTextFlowsList } from './textFlowsList';
 import { getTotalArrayInstances } from '../../SpreadEditor/items/arrayItems';
-import type { TextPageItem, ShapePageItem, FillConfig } from '../../../types';
+import type { TextPageItem, ShapePageItem, TextFlowPageItem, FillConfig } from '../../../types';
 
 /**
  * Update the Edit Page panel visibility and toolbar add buttons
@@ -156,12 +157,16 @@ export function updateEditSelectedSection(): void {
   const selectedPage = findSelectedPage();
   const isStaticPage = selectedPage?.pageState === 'static' || selectedPage?.isStatic;
 
+  // Get text flows section
+  const textFlowsSection = document.getElementById('text-flows-section');
+
   // If multiple items selected, only show multi-select controls
   if (selectedCount > 1) {
     section.style.display = 'none';
     if (pageBackgroundSection) pageBackgroundSection.style.display = 'none';
     if (customBackgroundSection) customBackgroundSection.style.display = 'none';
     if (deleteStaticPageSection) deleteStaticPageSection.style.display = 'none';
+    if (textFlowsSection) textFlowsSection.style.display = 'none';
     if (noSelectionMessage) noSelectionMessage.style.display = 'none';
     const effectsSection = document.getElementById('effects-section');
     if (effectsSection) effectsSection.style.display = 'none';
@@ -169,7 +174,7 @@ export function updateEditSelectedSection(): void {
     return;
   }
 
-  // If page selected but no item, show custom background, page fill, and delete (if static)
+  // If page selected but no item, show custom background, page fill, text flows, and delete (if static)
   if (editorState.selectedPageNumber && selectedCount === 0) {
     section.style.display = 'none';
 
@@ -182,6 +187,12 @@ export function updateEditSelectedSection(): void {
       setupPageBackgroundPicker(editorState.selectedPageNumber);
     }
 
+    // Show text flows section and update the list
+    if (textFlowsSection) {
+      textFlowsSection.style.display = 'block';
+      updateTextFlowsList();
+    }
+
     // Show delete section only for static pages
     if (deleteStaticPageSection) {
       deleteStaticPageSection.style.display = isStaticPage ? 'block' : 'none';
@@ -191,12 +202,15 @@ export function updateEditSelectedSection(): void {
     return;
   }
 
-  // Hide page background sections if item is selected
+  // Hide page background sections and text flows if item is selected
   if (pageBackgroundSection) {
     pageBackgroundSection.style.display = 'none';
   }
   if (customBackgroundSection) {
     customBackgroundSection.style.display = 'none';
+  }
+  if (textFlowsSection) {
+    textFlowsSection.style.display = 'none';
   }
 
   // Hide if no item selected

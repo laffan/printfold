@@ -119,7 +119,7 @@ export interface PageContent {
 }
 
 // Items that can be placed on static pages
-export type PageItemType = 'text' | 'shape' | 'image';
+export type PageItemType = 'text' | 'shape' | 'image' | 'textflow';
 
 export interface PageItemBase {
   id: string;
@@ -183,7 +183,24 @@ export interface ImagePageItem extends PageItemBase {
   imageFileId: string; // Reference to project file
 }
 
-export type PageItem = TextPageItem | ShapePageItem | ImagePageItem;
+// Text flow region - a shape that markdown text flows through
+export interface TextFlowPageItem extends PageItemBase {
+  type: 'textflow';
+  // Text flows render with no fill/stroke by default, they're flow regions
+  // Optional styling for visibility in the editor
+  showBorder?: boolean; // Show a dashed border in editor (not in PDF)
+  flowId?: string; // Links this item to a TextFlowRegion in the project's textFlows array
+}
+
+// Text flow region definition - stored at the project level to track order
+export interface TextFlowRegion {
+  id: string; // Unique ID
+  name: string; // Display name (e.g., "Text Flow A")
+  itemId: string; // Reference to the TextFlowPageItem
+  pageNumber: number; // Which page the flow region is on
+}
+
+export type PageItem = TextPageItem | ShapePageItem | ImagePageItem | TextFlowPageItem;
 
 export interface Spread {
   id: string;
@@ -393,6 +410,7 @@ export interface BookletProject {
   blankPages: number[]; // Page numbers where blank pages should be inserted
   staticSpreads?: StaticSpread[]; // Spreads that exist without markdown
   customBackgrounds?: string[]; // Image file IDs used as custom backgrounds (library)
+  textFlows?: TextFlowRegion[]; // Ordered list of text flow regions for flowing content through static pages
 }
 
 // Template definitions

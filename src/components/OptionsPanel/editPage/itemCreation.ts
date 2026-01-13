@@ -4,7 +4,7 @@
 
 import { appState } from '../../../services/state';
 import { switchToSelectedTab } from './shared';
-import type { PageItem, TextPageItem, ShapePageItem, ImagePageItem, ProjectFile } from '../../../types';
+import type { PageItem, TextPageItem, ShapePageItem, ImagePageItem, TextFlowPageItem, ProjectFile } from '../../../types';
 
 /**
  * Add an item to the currently selected static page
@@ -128,4 +128,39 @@ export function addImageFromFileToPage(fileId: string): void {
   appState.addItemToPage(editorState.selectedPageNumber, item);
   appState.updateEditor({ selectedItemId: item.id });
   switchToSelectedTab();
+}
+
+/**
+ * Add a text flow region to the currently selected page
+ * Text flow regions define areas where markdown content flows through static pages
+ */
+export function addTextFlowToCurrentPage(): void {
+  const editorState = appState.getEditor();
+  if (editorState.selectedPageNumber === null) return;
+
+  // Create the TextFlowPageItem with default size
+  const item: TextFlowPageItem = {
+    id: crypto.randomUUID(),
+    type: 'textflow',
+    x: 50,
+    y: 50,
+    width: 200,
+    height: 150,
+    rotation: 0,
+    opacity: 1,
+    showBorder: true, // Show border in editor for visibility
+  };
+
+  // Add the item to the page
+  appState.addItemToPage(editorState.selectedPageNumber, item);
+
+  // Register the text flow region in the project's textFlows list
+  appState.addTextFlowRegion(item.id, editorState.selectedPageNumber);
+
+  // Select the new item
+  appState.updateEditor({ selectedItemId: item.id });
+  switchToSelectedTab();
+
+  // Request reflow to update text flow through the new region
+  appState.requestReflow();
 }

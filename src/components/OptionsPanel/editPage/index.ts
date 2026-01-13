@@ -6,9 +6,10 @@
 // Re-export all public functions
 export { switchToSelectedTab } from './shared';
 export { setupMultiSelectControls, updateMultiSelectControls } from './multiSelect';
-export { addItemToCurrentPage, addImageToCurrentPage, addImageFromFileToPage } from './itemCreation';
+export { addItemToCurrentPage, addImageToCurrentPage, addImageFromFileToPage, addTextFlowToCurrentPage } from './itemCreation';
 export { setupEditPagePanel } from './setupPanel';
 export { updateEditPagePanel, updateEditSelectedSection } from './panelUpdate';
 export { updateArrayDimensionsList, addArrayDimension, setupAddDimensionButton } from './arrayInstances';
 export { setupPageBackgroundPicker } from './pageBackground';
 export { setupCustomBackgroundHandlers, updateCustomBackgroundSection } from './customBackground';
+export { updateTextFlowsList, setupTextFlowsListHandlers, selectTextFlow, clearTextFlowSelection } from './textFlowsList';

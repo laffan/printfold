@@ -12,6 +12,7 @@
  * - signatureOperations.ts: Signature and spread management
  * - itemOperations.ts: Page item CRUD and z-ordering
  * - multiSelect.ts: Multi-selection, clipboard, and alignment
+ * - textFlowOperations.ts: Text flow region management
  */
 
 // Export defaults
@@ -34,6 +35,7 @@ import './pageOperations';
 import './signatureOperations';
 import './itemOperations';
 import './multiSelect';
+import './textFlowOperations';
 
 // Create and export the singleton instance
 import { AppState } from './AppStateCore';

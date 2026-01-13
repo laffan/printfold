@@ -222,5 +222,15 @@ declare module './AppStateCore' {
     duplicateItemsInPlace(): PageItem[];
     alignItems(alignment: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom'): void;
     distributeItems(axis: 'horizontal' | 'vertical'): void;
+
+    // Text flow regions
+    addTextFlowRegion(itemId: string, pageNumber: number): import('../../types').TextFlowRegion;
+    removeTextFlowRegion(regionId: string): void;
+    updateTextFlowRegion(regionId: string, updates: Partial<import('../../types').TextFlowRegion>): void;
+    reorderTextFlows(regionIds: string[]): void;
+    getTextFlows(): import('../../types').TextFlowRegion[];
+    getTextFlowRegion(regionId: string): import('../../types').TextFlowRegion | null;
+    getTextFlowByItemId(itemId: string): import('../../types').TextFlowRegion | null;
+    cleanupOrphanedTextFlows(): void;
   }
 }

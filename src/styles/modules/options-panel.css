@@ -658,3 +658,91 @@
 .background-actions .btn-apply-range {
   min-width: auto;
 }
+
+/* Text Flows List */
+.text-flows-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.text-flows-empty {
+  padding: 12px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.text-flow-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.text-flow-item:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-primary-light);
+}
+
+.text-flow-item.selected {
+  background: var(--color-bg-hover);
+  border-color: var(--color-primary);
+}
+
+.text-flow-item.dragging {
+  opacity: 0.5;
+}
+
+.text-flow-item.drop-above {
+  border-top: 2px solid var(--color-primary);
+}
+
+.text-flow-item.drop-below {
+  border-bottom: 2px solid var(--color-primary);
+}
+
+.text-flow-handle {
+  cursor: grab;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  user-select: none;
+}
+
+.text-flow-handle:hover {
+  color: var(--color-text);
+}
+
+.text-flow-name {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.text-flow-page {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+
+.text-flows-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.text-flows-actions .btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 16px;
+}

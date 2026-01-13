@@ -119,6 +119,9 @@
                 <button id="btn-add-image" class="btn btn-icon" title="Add Image">
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1"/><circle cx="5.5" cy="6.5" r="1.5" fill="currentColor"/><path d="M2 11l3-3 2 2 4-4 3 3"/></svg>
                 </button>
+                <button id="btn-add-textflow" class="btn btn-icon" title="Add Text Flow">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4 Q5 2, 8 4 T14 4"/><path d="M2 8 Q5 6, 8 8 T14 8"/><path d="M2 12 Q5 10, 8 12 T14 12"/></svg>
+                </button>
               </div>
             </div>
             <div id="spread-editor" class="spread-editor">
@@ -459,6 +462,19 @@
                 <button id="btn-delete-static-page" class="btn btn-secondary btn-small btn-danger">Delete Static Page</button>
               </div>
               <p class="hint">Removes this page and restores it to text flow.</p>
+            </div>
+
+            <!-- Text Flows Section (shown when static page is selected with no item selected) -->
+            <div id="text-flows-section" class="options-section" style="display: none;">
+              <h4 class="section-header">Text Flows</h4>
+              <p class="hint">Text from your markdown flows through these regions in order.</p>
+              <div id="text-flows-list" class="text-flows-list">
+                <!-- Text flow items will be dynamically added here -->
+              </div>
+              <div class="text-flows-actions">
+                <button id="btn-add-text-flow" class="btn btn-icon btn-small" title="Add Text Flow">+</button>
+                <button id="btn-remove-text-flow" class="btn btn-icon btn-small" title="Remove Selected Text Flow" disabled>−</button>
+              </div>
             </div>
 
             <!-- Placeholder when nothing is selected -->

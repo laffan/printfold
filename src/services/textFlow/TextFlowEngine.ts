@@ -15,6 +15,7 @@ import {
   createDefaultSignature
 } from './signatures';
 import { calculateImposition, ImpositionSheet } from './imposition';
+import { flowSectionsIntoRegions, RegionFlowResult } from './regionFlow';
 import type { FlowResult } from './types';
 import type { FontOptions, LayoutOptions, OutputOptions, HeaderFooterOptions, Signature } from '../../types';
 
@@ -33,6 +34,17 @@ export class TextFlowEngine {
     this.layoutOptions = appState.getProject().layoutOptions;
     this.outputOptions = appState.getProject().outputOptions;
     this.headerFooter = appState.getProject().headerFooter;
+  }
+
+  // Store the last region flow result for rendering
+  private lastRegionFlowResult: RegionFlowResult | null = null;
+
+  /**
+   * Get the content for a specific text flow region
+   */
+  getRegionContent(regionId: string): import('./types').MeasuredSection[] {
+    if (!this.lastRegionFlowResult) return [];
+    return this.lastRegionFlowResult.regionContent.get(regionId) || [];
   }
 
   /**
@@ -60,10 +72,19 @@ export class TextFlowEngine {
       this.headerFooter
     );
 
-    // Flow sections across pages
-    const textPages = flowSections(
+    // First, flow content into text flow regions (if any exist)
+    const regionFlowResult = flowSectionsIntoRegions(
       this.ctx,
       sections,
+      this.fontOptions,
+      this.layoutOptions
+    );
+    this.lastRegionFlowResult = regionFlowResult;
+
+    // Flow remaining sections across regular pages
+    const textPages = flowSections(
+      this.ctx,
+      regionFlowResult.remainingSections,
       pageDimensions,
       this.fontOptions,
       this.layoutOptions

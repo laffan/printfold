@@ -4,10 +4,11 @@
 
 import Konva from 'konva';
 import { appState } from '../../../services/state';
+import { textFlowEngine } from '../../../services/textFlow';
 import { switchToSelectedTab } from '../../OptionsPanel/editPage';
 import { applyFillToShape } from './fill';
 import { startTextEditing } from './textEditing';
-import type { PageItem, TextPageItem, ShapePageItem, ImagePageItem } from '../../../types';
+import type { PageItem, TextPageItem, ShapePageItem, ImagePageItem, TextFlowPageItem } from '../../../types';
 
 /**
  * Create a Konva node for a page item
@@ -180,6 +181,123 @@ export function createItemNode(
 
       node = konvaImage;
     }
+  } else if (item.type === 'textflow') {
+    const textFlowItem = item as TextFlowPageItem;
+    // Text flow regions are shown as dashed rectangles in the editor
+    // They indicate where markdown content will flow through
+
+    // Get the flow region info
+    const flowRegion = appState.getTextFlowByItemId(item.id);
+    const label = flowRegion?.name || 'Text Flow';
+
+    // Get flowed content for this region
+    const regionContent = flowRegion ? textFlowEngine.getRegionContent(flowRegion.id) : [];
+
+    // Create a group to hold the border, label, and flowed text
+    const group = new Konva.Group({
+      x: xOffset + item.x,
+      y: item.y,
+      rotation: item.rotation || 0,
+      opacity,
+      draggable: true,
+    });
+
+    // Add the dashed border rectangle
+    const rect = new Konva.Rect({
+      x: 0,
+      y: 0,
+      width: item.width,
+      height: item.height,
+      stroke: '#3b82f6', // Blue color for visibility
+      strokeWidth: 1.5,
+      dash: [6, 4], // Dashed border
+      fill: 'rgba(59, 130, 246, 0.03)', // Very light blue background
+    });
+    group.add(rect);
+
+    // Add a text label in the top-left corner
+    const labelText = new Konva.Text({
+      x: 4,
+      y: 4,
+      text: label,
+      fontSize: 10,
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      fill: '#3b82f6',
+      listening: false,
+    });
+    group.add(labelText);
+
+    // Render the flowed content
+    if (regionContent.length > 0) {
+      let yPos = 20; // Start below the label
+      const project = appState.getProject();
+      const fontOptions = project.fontOptions;
+      const layoutOptions = project.layoutOptions;
+
+      for (const section of regionContent) {
+        // Get font settings for this section type
+        let fontSize = fontOptions.body.fontSize;
+        let fontFamily = fontOptions.body.fontFamily;
+        let fontWeight = fontOptions.body.fontWeight;
+
+        if (section.type === 'heading' && section.level) {
+          if (section.level === 1) {
+            fontSize = fontOptions.h1.fontSize;
+            fontFamily = fontOptions.h1.fontFamily;
+            fontWeight = fontOptions.h1.fontWeight;
+          } else if (section.level === 2) {
+            fontSize = fontOptions.h2.fontSize;
+            fontFamily = fontOptions.h2.fontFamily;
+            fontWeight = fontOptions.h2.fontWeight;
+          } else if (section.level === 3) {
+            fontSize = fontOptions.h3.fontSize;
+            fontFamily = fontOptions.h3.fontFamily;
+            fontWeight = fontOptions.h3.fontWeight;
+          }
+        }
+
+        const lineHeight = layoutOptions.lineHeight * fontSize;
+
+        // Render each line
+        for (const line of section.lines) {
+          if (yPos + lineHeight > item.height - 4) break; // Don't overflow
+
+          const lineText = new Konva.Text({
+            x: 4,
+            y: yPos,
+            width: item.width - 8,
+            text: line,
+            fontSize: fontSize,
+            fontFamily: fontFamily,
+            fontStyle: fontWeight === 'bold' ? 'bold' : 'normal',
+            fill: '#1e293b', // Dark text
+            listening: false,
+          });
+          group.add(lineText);
+          yPos += lineHeight;
+        }
+
+        // Add spacing between sections
+        yPos += layoutOptions.paragraphSpacing;
+      }
+    } else {
+      // Show placeholder text when no content
+      const placeholder = new Konva.Text({
+        x: 4,
+        y: item.height / 2 - 10,
+        width: item.width - 8,
+        text: 'Text will flow here...',
+        fontSize: 11,
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        fontStyle: 'italic',
+        fill: '#94a3b8', // Light gray
+        align: 'center',
+        listening: false,
+      });
+      group.add(placeholder);
+    }
+
+    node = group as unknown as Konva.Shape;
   }
 
   if (node) {

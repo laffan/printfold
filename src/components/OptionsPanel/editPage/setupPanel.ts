@@ -4,9 +4,10 @@
 
 import { appState } from '../../../services/state';
 import { switchToSelectedTab } from './shared';
-import { addItemToCurrentPage, addImageToCurrentPage } from './itemCreation';
+import { addItemToCurrentPage, addImageToCurrentPage, addTextFlowToCurrentPage } from './itemCreation';
 import { setupEditPropertyInputs } from './propertyInputs';
 import { setupCustomBackgroundHandlers } from './customBackground';
+import { setupTextFlowsListHandlers } from './textFlowsList';
 import type { PageItem } from '../../../types';
 
 /**
@@ -56,6 +57,11 @@ export function setupEditPagePanel(updateEditSelectedSectionFn: () => void): voi
       }
     };
     input.click();
+  });
+
+  // Add Text Flow button
+  document.getElementById('btn-add-textflow')?.addEventListener('click', () => {
+    addTextFlowToCurrentPage();
   });
 
   // Duplicate item button
@@ -124,6 +130,9 @@ export function setupEditPagePanel(updateEditSelectedSectionFn: () => void): voi
 
   // Custom background handlers
   setupCustomBackgroundHandlers();
+
+  // Text flows list handlers
+  setupTextFlowsListHandlers();
 
   // Property input handlers
   setupEditPropertyInputs(updateEditSelectedSectionFn);
