@@ -202,7 +202,15 @@ export function updateEditSelectedSection(): void {
     return;
   }
 
-  // Hide page background sections and text flows if item is selected
+  // Get the selected item to check if it's a text flow item
+  const selectedItemId = editorState.selectedItemIds[0];
+  const selectedItem = selectedCount === 1 && editorState.selectedPageNumber
+    ? appState.getItemFromPage(editorState.selectedPageNumber, selectedItemId)
+    : null;
+  const isTextFlowItem = selectedItem?.type === 'textflow';
+
+  // Hide page background sections if item is selected
+  // But keep text flows list visible if the selected item is a text flow
   if (pageBackgroundSection) {
     pageBackgroundSection.style.display = 'none';
   }
@@ -210,7 +218,13 @@ export function updateEditSelectedSection(): void {
     customBackgroundSection.style.display = 'none';
   }
   if (textFlowsSection) {
-    textFlowsSection.style.display = 'none';
+    // Keep text flows section visible if a text flow item is selected
+    if (isTextFlowItem) {
+      textFlowsSection.style.display = 'block';
+      updateTextFlowsList();
+    } else {
+      textFlowsSection.style.display = 'none';
+    }
   }
 
   // Hide if no item selected
@@ -232,11 +246,20 @@ export function updateEditSelectedSection(): void {
   if (noSelectionMessage) noSelectionMessage.style.display = 'none';
 
   // Get the selected item (single selection case)
-  const selectedItemId = editorState.selectedItemIds[0];
-  const item = appState.getItemFromPage(editorState.selectedPageNumber, selectedItemId);
+  const item = selectedItem;
   if (!item) {
     section.style.display = 'none';
     if (panel) panel.style.display = 'none';
+    return;
+  }
+
+  // For text flow items, hide the edit selected section (no properties to edit)
+  // Just show the text flows list
+  if (isTextFlowItem) {
+    section.style.display = 'none';
+    const effectsSection = document.getElementById('effects-section');
+    if (effectsSection) effectsSection.style.display = 'none';
+    if (panel) panel.style.display = 'block';
     return;
   }
 

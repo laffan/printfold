@@ -10,11 +10,31 @@ let selectedFlowId: string | null = null;
 let draggedItem: HTMLElement | null = null;
 
 /**
+ * Sync the selected flow ID with what's selected on the canvas
+ */
+function syncSelectionWithCanvas(): void {
+  const editorState = appState.getEditor();
+  const selectedItemId = editorState.selectedItemIds[0];
+
+  if (!selectedItemId) {
+    selectedFlowId = null;
+    return;
+  }
+
+  // Find if there's a text flow with this item ID
+  const flow = appState.getTextFlowByItemId(selectedItemId);
+  selectedFlowId = flow?.id || null;
+}
+
+/**
  * Update the text flows list in the UI
  */
 export function updateTextFlowsList(): void {
   const listContainer = document.getElementById('text-flows-list');
   if (!listContainer) return;
+
+  // Sync selection with what's selected on canvas
+  syncSelectionWithCanvas();
 
   const textFlows = appState.getTextFlows();
   listContainer.innerHTML = '';
