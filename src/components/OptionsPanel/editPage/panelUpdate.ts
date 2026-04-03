@@ -58,7 +58,7 @@ export function updateEditPagePanel(): void {
 
   // Panel visibility is now controlled by item selection (updateEditSelectedSection)
   // For text pages without selected items, we can still show the panel for page background
-  const isBlankOrStatic = selectedPage?.isBlank || selectedPage?.isStatic;
+  const isBlankOrStatic = selectedPage?.isBlank || selectedPage?.isStatic || selectedPage?.blockTextFlow;
   if (panel && !isBlankOrStatic && editorState.selectedItemIds.length === 0) {
     // Text pages without items selected - panel will be shown by updateEditSelectedSection if needed
   }
@@ -112,7 +112,7 @@ function isEntireSpreadStatic(pageNumber: number): boolean {
   }
 
   const isPageStatic = (p: import('../../../types').PageContent | undefined): boolean =>
-    p?.pageState === 'static' || p?.isStatic === true;
+    p?.blockTextFlow === true || p?.pageState === 'static' || p?.isStatic === true;
 
   // Page 1 is recto of first spread [null|1] - only need page 1 to be static
   if (pageNumber === 1) {
@@ -154,7 +154,7 @@ export function updateEditSelectedSection(): void {
   const deleteStaticPageSection = document.getElementById('delete-static-page-section');
   const noSelectionMessage = document.getElementById('no-selection-message');
   const selectedPage = findSelectedPage();
-  const isStaticPage = selectedPage?.pageState === 'static' || selectedPage?.isStatic;
+  const isStaticPage = selectedPage?.blockTextFlow || selectedPage?.pageState === 'static' || selectedPage?.isStatic;
 
   // If multiple items selected, only show multi-select controls
   if (selectedCount > 1) {
@@ -169,9 +169,19 @@ export function updateEditSelectedSection(): void {
     return;
   }
 
-  // If page selected but no item, show custom background, page fill, and delete (if static)
+  // If page selected but no item, show block text flow toggle, custom background, page fill, and delete (if blocked)
   if (editorState.selectedPageNumber && selectedCount === 0) {
     section.style.display = 'none';
+
+    // Update block text flow toggle
+    const blockTextFlowCheckbox = document.getElementById('page-block-text-flow') as HTMLInputElement;
+    const blockTextFlowSection = document.getElementById('block-text-flow-section');
+    if (blockTextFlowCheckbox && selectedPage) {
+      blockTextFlowCheckbox.checked = !!selectedPage.blockTextFlow || selectedPage.pageState === 'static';
+    }
+    if (blockTextFlowSection) {
+      blockTextFlowSection.style.display = 'block';
+    }
 
     // Show custom background section for ALL pages (not just static)
     updateCustomBackgroundSection();
@@ -182,7 +192,7 @@ export function updateEditSelectedSection(): void {
       setupPageBackgroundPicker(editorState.selectedPageNumber);
     }
 
-    // Show delete section only for static pages
+    // Show delete section only for pages with blocked text flow
     if (deleteStaticPageSection) {
       deleteStaticPageSection.style.display = isStaticPage ? 'block' : 'none';
     }
@@ -358,6 +368,20 @@ export function updateEditSelectedSection(): void {
       });
       setItemFillPicker(picker);
     }
+  }
+
+  // Update displacement controls
+  const displaceTextCheckbox = document.getElementById('item-displace-text') as HTMLInputElement;
+  const displaceTextPaddingInput = document.getElementById('item-displace-padding') as HTMLInputElement;
+  const displaceTextSection = document.getElementById('item-displace-text-section');
+  if (displaceTextCheckbox) {
+    displaceTextCheckbox.checked = item.displaceText !== false; // Default true
+  }
+  if (displaceTextPaddingInput) {
+    displaceTextPaddingInput.value = (item.displaceTextPadding ?? 8).toString();
+  }
+  if (displaceTextSection) {
+    displaceTextSection.style.display = item.displaceText !== false ? 'block' : 'none';
   }
 
   // Show/hide type-specific properties

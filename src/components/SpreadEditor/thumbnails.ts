@@ -363,7 +363,7 @@ function setupPageDragDrop(
 ): void {
   const pageState = page.pageState || 'available';
   const hasItems = page.items && page.items.length > 0;
-  const isDraggable = pageState === 'static' || hasItems;
+  const isDraggable = page.blockTextFlow || pageState === 'static' || hasItems;
 
   if (isDraggable) {
     element.setAttribute('draggable', 'true');
@@ -586,11 +586,16 @@ function createPageLabel(
   label.title = `Page ${page.pageNumber}`;
 
   const pageState = page.pageState || 'available';
-  label.classList.add(`page-state-${pageState}`);
+  // Use 'blocked' style for pages with blockTextFlow, otherwise use pageState
+  if (page.blockTextFlow) {
+    label.classList.add('page-state-blocked');
+  } else {
+    label.classList.add(`page-state-${pageState}`);
+  }
 
   // Indicate if this page is draggable (for visual feedback)
   const hasItems = page.items && page.items.length > 0;
-  const isDraggable = pageState === 'static' || hasItems;
+  const isDraggable = page.blockTextFlow || pageState === 'static' || hasItems;
   if (isDraggable) {
     label.classList.add('draggable');
   }
@@ -606,7 +611,7 @@ function createPageLabel(
 }
 
 /**
- * Create "Make Static?" prompt container
+ * Create "Block text?" prompt container for pages with items that don't block text flow
  */
 function createStaticPromptContainer(
   vSpread: { verso: PageContent | null; recto: PageContent | null },
@@ -625,22 +630,22 @@ function createStaticPromptContainer(
   if (versoNeedsPrompt && vSpread.verso) {
     const versoBtn = document.createElement('button');
     versoBtn.className = 'make-static-btn';
-    versoBtn.textContent = 'Static?';
-    versoBtn.title = `Make page ${vSpread.verso.pageNumber} static (removes from text flow)`;
+    versoBtn.textContent = 'Block text?';
+    versoBtn.title = `Block text flow on page ${vSpread.verso.pageNumber}`;
     versoBtn.style.cssText = `
       flex: 1;
       font-size: 8px;
       padding: 1px 2px;
-      border: 1px solid #ea580c;
-      background: #fff7ed;
-      color: #ea580c;
+      border: 1px solid #6366f1;
+      background: #eef2ff;
+      color: #6366f1;
       border-radius: 2px;
       cursor: pointer;
     `;
     const pageNum = vSpread.verso.pageNumber;
     versoBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      appState.makePageStatic(pageNum);
+      appState.setBlockTextFlow(pageNum, true);
     });
     promptContainer.appendChild(versoBtn);
   } else {
@@ -652,22 +657,22 @@ function createStaticPromptContainer(
   if (rectoNeedsPrompt && vSpread.recto) {
     const rectoBtn = document.createElement('button');
     rectoBtn.className = 'make-static-btn';
-    rectoBtn.textContent = 'Static?';
-    rectoBtn.title = `Make page ${vSpread.recto.pageNumber} static (removes from text flow)`;
+    rectoBtn.textContent = 'Block text?';
+    rectoBtn.title = `Block text flow on page ${vSpread.recto.pageNumber}`;
     rectoBtn.style.cssText = `
       flex: 1;
       font-size: 8px;
       padding: 1px 2px;
-      border: 1px solid #ea580c;
-      background: #fff7ed;
-      color: #ea580c;
+      border: 1px solid #6366f1;
+      background: #eef2ff;
+      color: #6366f1;
       border-radius: 2px;
       cursor: pointer;
     `;
     const pageNum = vSpread.recto.pageNumber;
     rectoBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      appState.makePageStatic(pageNum);
+      appState.setBlockTextFlow(pageNum, true);
     });
     promptContainer.appendChild(rectoBtn);
   } else if (versoNeedsPrompt) {

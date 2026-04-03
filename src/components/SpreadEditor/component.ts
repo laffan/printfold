@@ -159,7 +159,7 @@ export class SpreadEditor {
         const spread = this.getCurrentSpread();
         if (spread) {
           const page = isRecto ? spread.recto : spread.verso;
-          if (page && (page.isBlank || page.isStatic)) {
+          if (page) {
             // Import and dispatch event to add image
             this.addImageToPage(fileId, page.pageNumber, isRecto ? 'recto' : 'verso');
           }
@@ -192,7 +192,7 @@ export class SpreadEditor {
       if (targetPage) break;
     }
 
-    if (!targetPage || (!targetPage.isBlank && !targetPage.isStatic)) return;
+    if (!targetPage) return;
 
     // Select the page
     appState.updateEditor({
@@ -1414,5 +1414,38 @@ export class SpreadEditor {
 
     // Draw content
     drawPageContent(pageContent, contentX, contentY, contentWidth, contentHeight, this.layer);
+
+    // Draw "No Text" indicator for pages with blocked text flow
+    if (pageContent.blockTextFlow || pageContent.pageState === 'static') {
+      const badgeWidth = 52;
+      const badgeHeight = 16;
+      const badgeX = contentX + contentWidth - badgeWidth - 4;
+      const badgeY = contentY + 4;
+
+      const badgeBg = new Konva.Rect({
+        x: badgeX,
+        y: badgeY,
+        width: badgeWidth,
+        height: badgeHeight,
+        fill: '#6366f1',
+        cornerRadius: 3,
+        opacity: 0.8,
+        listening: false,
+      });
+      this.layer.add(badgeBg);
+
+      const badgeText = new Konva.Text({
+        x: badgeX,
+        y: badgeY + 2,
+        width: badgeWidth,
+        height: badgeHeight,
+        text: 'No Text',
+        fontSize: 10,
+        fill: '#ffffff',
+        align: 'center',
+        listening: false,
+      });
+      this.layer.add(badgeText);
+    }
   }
 }

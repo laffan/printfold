@@ -50,10 +50,11 @@ export function updateSelectedPagePanel(): void {
   }
 
   // Determine page type
-  const isBlankOrStatic = selectedPage?.isBlank || selectedPage?.isStatic;
-  const pageType = isBlankOrStatic ? 'Static' : 'Content';
+  const isBlockedOrStatic = selectedPage?.blockTextFlow || selectedPage?.isStatic;
+  const hasContent = selectedPage?.sections && selectedPage.sections.length > 0;
+  const pageType = isBlockedOrStatic ? 'No Text' : hasContent ? 'Content' : 'Available';
   const position = editorState.selectedPagePosition === 'verso' ? 'Left (verso)' : 'Right (recto)';
 
-  // Update condensed summary: "Page 2 | Left (verso) | Static"
+  // Update condensed summary: "Page 2 | Left (verso) | No Text"
   summaryEl.textContent = `Page ${editorState.selectedPageNumber} | ${position} | ${pageType}`;
 }

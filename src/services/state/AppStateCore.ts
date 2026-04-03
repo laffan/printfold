@@ -161,10 +161,11 @@ declare module './AppStateCore' {
     getMeasurementUnit(): MarginUnit;
     setMeasurementUnit(unit: MarginUnit): void;
 
-    // Blank pages and static pages
+    // Blank pages and page operations
     addBlankPage(afterPageNumber: number): void;
     removeBlankPage(pageNumber: number): void;
-    makePageStatic(pageNumber: number): void;
+    setBlockTextFlow(pageNumber: number, blocked: boolean): void;
+    makePageStatic(pageNumber: number): void; // @deprecated Use setBlockTextFlow
     pageNeedsStaticPrompt(pageNumber: number): boolean;
     insertStaticPageAtSelection(): void;
     moveStaticPage(fromPageNumber: number, toPageNumber: number): void;

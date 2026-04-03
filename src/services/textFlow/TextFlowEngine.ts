@@ -8,12 +8,13 @@ import { parseMarkdown } from './parsing';
 import { flowSections, insertBlankPages } from './pagination';
 import { calculatePageDimensions } from './dimensions';
 import {
-  captureStaticPages,
-  mergeStaticPagesInPlace,
+  captureBlockedPages,
+  mergeBlockedPagesInPlace,
   padPagesToCompleteSignature,
   createSignaturesFromPages,
   createDefaultSignature
 } from './signatures';
+import { collectDisplacementZones } from './displacement';
 import { calculateImposition, ImpositionSheet } from './imposition';
 import type { FlowResult } from './types';
 import type { FontOptions, LayoutOptions, OutputOptions, HeaderFooterOptions, Signature } from '../../types';
@@ -37,7 +38,7 @@ export class TextFlowEngine {
 
   /**
    * Main entry point - reflow content based on current state
-   * Static pages are preserved in place and text flows around them
+   * Pages with blockTextFlow are preserved in place, text flows around items on other pages
    */
   reflow(markdown: string): FlowResult {
     // Refresh options from state
@@ -47,8 +48,18 @@ export class TextFlowEngine {
     this.outputOptions = project.outputOptions;
     this.headerFooter = project.headerFooter;
 
-    // Capture existing static pages from current signatures
-    const staticPagesByNumber = captureStaticPages(project.signatures);
+    // Capture pages with blocked text flow from current signatures
+    const blockedPagesByNumber = captureBlockedPages(project.signatures);
+
+    // Collect displacement zones from items on non-blocked pages
+    const displacementsByPage = collectDisplacementZones(
+      project.signatures,
+      {
+        top: this.layoutOptions.margins.top,
+        inner: this.layoutOptions.margins.inner,
+        outer: this.layoutOptions.margins.outer,
+      }
+    );
 
     // Parse markdown into sections
     const sections = parseMarkdown(markdown);
@@ -60,20 +71,21 @@ export class TextFlowEngine {
       this.headerFooter
     );
 
-    // Flow sections across pages
+    // Flow sections across pages (with displacement awareness)
     const textPages = flowSections(
       this.ctx,
       sections,
       pageDimensions,
       this.fontOptions,
-      this.layoutOptions
+      this.layoutOptions,
+      displacementsByPage
     );
 
     // Insert blank pages (user-specified)
     const textPagesWithBlanks = insertBlankPages(textPages, project.blankPages);
 
-    // If there's no content and no static pages, preserve the existing signature structure
-    if (textPagesWithBlanks.length === 0 && staticPagesByNumber.size === 0) {
+    // If there's no content and no blocked pages, preserve the existing signature structure
+    if (textPagesWithBlanks.length === 0 && blockedPagesByNumber.size === 0) {
       if (project.signatures.length > 0) {
         const allPages: import('../../types').PageContent[] = [];
         for (const sig of project.signatures) {
@@ -92,8 +104,8 @@ export class TextFlowEngine {
       return createDefaultSignature(this.outputOptions.pagesPerSignature);
     }
 
-    // Merge text pages with static pages
-    const allPages = mergeStaticPagesInPlace(textPagesWithBlanks, staticPagesByNumber);
+    // Merge text pages with blocked pages
+    const allPages = mergeBlockedPagesInPlace(textPagesWithBlanks, blockedPagesByNumber);
 
     // Pad pages to complete signatures
     const paddedPages = padPagesToCompleteSignature(allPages, this.outputOptions.pagesPerSignature);

@@ -36,8 +36,8 @@ export async function embedImages(
         if (page?.customBackgroundImageId) {
           imageFileIds.add(page.customBackgroundImageId);
         }
-        // Collect image items from static pages
-        if ((page?.isBlank || page?.isStatic) && page?.items) {
+        // Collect image items from pages with items
+        if (page?.items) {
           for (const item of page.items) {
             if (item.type === 'image') {
               const imageItem = item as ImagePageItem;
@@ -168,7 +168,8 @@ export async function preRenderStaticPages(
         const hasOwnItems = page.items && page.items.length > 0;
         const hasBackgroundFill = !!page.backgroundFill;
         const hasCustomBackground = !!page.customBackgroundImageId;
-        const isStaticOrAvailable = page.pageState === 'static' ||
+        const isStaticOrAvailable = page.blockTextFlow ||
+                                     page.pageState === 'static' ||
                                      page.pageState === 'available' ||
                                      page.isBlank || page.isStatic;
 

@@ -88,7 +88,7 @@
               </div>
               <div class="toolbar-group">
                 <button id="btn-add-signature" class="btn btn-secondary btn-small" title="Add available pages at end of booklet">+ Signature</button>
-                <button id="btn-add-single-page" class="btn btn-secondary btn-small" title="Add a static page at current position">+ Static Page</button>
+                <button id="btn-add-single-page" class="btn btn-secondary btn-small" title="Add a page with blocked text flow at current position">+ Page</button>
               </div>
               <div class="toolbar-group">
                 <label class="toolbar-label">
@@ -408,6 +408,22 @@
                 </div>
               </div>
 
+              <!-- Text Displacement -->
+              <div class="form-group toggle-section">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="item-displace-text" checked>
+                  <span>Displace Text</span>
+                </label>
+                <div id="item-displace-text-section">
+                  <div class="inline-sizes">
+                    <label>
+                      <span>Padding</span>
+                      <input type="number" id="item-displace-padding" value="8" min="0" max="200" step="1">
+                    </label>
+                  </div>
+                </div>
+              </div>
+
               <!-- Actions -->
               <div class="edit-actions">
                 <button id="btn-duplicate-item" class="btn btn-secondary btn-small">Duplicate</button>
@@ -445,6 +461,17 @@
               </div>
             </div>
 
+            <!-- Block Text Flow Section (shown when page selected, no item) -->
+            <div id="block-text-flow-section" class="options-section" style="display: none;">
+              <div class="form-group toggle-section">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="page-block-text-flow">
+                  <span>Block Text Flow</span>
+                </label>
+                <p class="hint">Text will skip this page entirely when enabled.</p>
+              </div>
+            </div>
+
             <!-- Page Background Fill Section (separate from custom background image) -->
             <div id="page-background-section" class="options-section" style="display: none;">
               <h4 class="section-header">Page Fill</h4>
@@ -453,17 +480,17 @@
               </div>
             </div>
 
-            <!-- Delete Static Page Section (shown when static page is selected) -->
+            <!-- Delete Page Section (shown when page with blocked text flow is selected) -->
             <div id="delete-static-page-section" class="options-section" style="display: none;">
               <div class="button-group-vertical">
-                <button id="btn-delete-static-page" class="btn btn-secondary btn-small btn-danger">Delete Static Page</button>
+                <button id="btn-delete-static-page" class="btn btn-secondary btn-small btn-danger">Delete Page</button>
               </div>
               <p class="hint">Removes this page and restores it to text flow.</p>
             </div>
 
             <!-- Placeholder when nothing is selected -->
             <div id="no-selection-message" class="options-section">
-              <p class="hint">Select a static page to add items, or select an item to edit its properties.</p>
+              <p class="hint">Select a page to add items, or select an item to edit its properties.</p>
             </div>
           </div>
 

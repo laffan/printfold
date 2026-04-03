@@ -1,15 +1,16 @@
 /**
- * Static page operations for AppState
+ * Page operations for AppState
+ * Handles blockTextFlow toggle, page insertion, movement, and deletion
  */
 
 import type { PageContent, Spread, Signature, PageState, FillConfig } from '../../types';
 import { AppState } from './AppStateCore';
 
 /**
- * Explicitly make a page static (removes it from text flow)
- * Used when user confirms they want to claim a page for static content
+ * Set the blockTextFlow flag for a page
+ * When true, text flow skips this page entirely
  */
-AppState.prototype.makePageStatic = function(pageNumber: number): void {
+AppState.prototype.setBlockTextFlow = function(pageNumber: number, blocked: boolean): void {
   const prevState = this.getProject();
 
   const signatures = prevState.signatures.map(sig => ({
@@ -17,10 +18,10 @@ AppState.prototype.makePageStatic = function(pageNumber: number): void {
     spreads: sig.spreads.map(spread => ({
       ...spread,
       verso: spread.verso?.pageNumber === pageNumber
-        ? { ...spread.verso, pageState: 'static' as const, isStatic: true }
+        ? { ...spread.verso, blockTextFlow: blocked, pageState: (blocked ? 'available' : spread.verso.pageState) as PageState, isStatic: blocked }
         : spread.verso,
       recto: spread.recto?.pageNumber === pageNumber
-        ? { ...spread.recto, pageState: 'static' as const, isStatic: true }
+        ? { ...spread.recto, blockTextFlow: blocked, pageState: (blocked ? 'available' : spread.recto.pageState) as PageState, isStatic: blocked }
         : spread.recto,
     })),
   }));
@@ -28,12 +29,21 @@ AppState.prototype.makePageStatic = function(pageNumber: number): void {
   this.setProject({ ...prevState, signatures });
   this.notifyProjectListeners(prevState);
 
-  // Trigger reflow - text will now flow around this static page
+  // Trigger reflow - text will now flow around/through this page
   this.requestReflow();
 };
 
 /**
- * Check if a page has items but is not static (needs "make static?" prompt)
+ * @deprecated Use setBlockTextFlow instead.
+ * Explicitly make a page static (removes it from text flow)
+ */
+AppState.prototype.makePageStatic = function(pageNumber: number): void {
+  this.setBlockTextFlow(pageNumber, true);
+};
+
+/**
+ * Check if a page has items but is not blocking text flow
+ * (may want to suggest blocking text flow)
  */
 AppState.prototype.pageNeedsStaticPrompt = function(pageNumber: number): boolean {
   const project = this.getProject();
@@ -42,7 +52,7 @@ AppState.prototype.pageNeedsStaticPrompt = function(pageNumber: number): boolean
       const page = spread.verso?.pageNumber === pageNumber ? spread.verso
         : spread.recto?.pageNumber === pageNumber ? spread.recto
         : null;
-      if (page && page.pageState !== 'static' && page.items && page.items.length > 0) {
+      if (page && !page.blockTextFlow && page.pageState !== 'static' && page.items && page.items.length > 0) {
         return true;
       }
     }
@@ -51,7 +61,7 @@ AppState.prototype.pageNeedsStaticPrompt = function(pageNumber: number): boolean
 };
 
 /**
- * Insert a static page at the currently selected position
+ * Insert a page at the currently selected position
  * Pushes existing pages forward by 1
  * Automatically adds available pages to maintain signature boundaries
  */
@@ -83,15 +93,16 @@ AppState.prototype.insertStaticPageAtSelection = function(): void {
   const insertIndex = allPages.findIndex(p => p.pageNumber >= selectedPageNumber);
   const actualInsertIndex = insertIndex === -1 ? allPages.length : insertIndex;
 
-  // Create new static page
+  // Create new page with blockTextFlow enabled
   const newPage: PageContent = {
     id: crypto.randomUUID(),
     pageNumber: selectedPageNumber, // Will be renumbered
-    pageState: 'static',
+    pageState: 'available',
     sections: [],
     isBlank: true,
     isRecto: selectedPageNumber % 2 === 1,
-    isStatic: true,
+    isStatic: true, // backward compat
+    blockTextFlow: true,
     items: [],
   };
 
@@ -102,17 +113,16 @@ AppState.prototype.insertStaticPageAtSelection = function(): void {
   const currentTotal = allPages.length;
   const remainder = currentTotal % pagesPerSig;
   if (remainder !== 0) {
-    // Need to add (pagesPerSig - remainder) available pages at the end
     const pagesToAdd = pagesPerSig - remainder;
-    const maxPageNum = currentTotal; // Will be renumbered, but need unique starting point
+    const maxPageNum = currentTotal;
     for (let i = 0; i < pagesToAdd; i++) {
       allPages.push({
         id: crypto.randomUUID(),
-        pageNumber: maxPageNum + 1 + i, // Will be renumbered
+        pageNumber: maxPageNum + 1 + i,
         pageState: 'available',
         sections: [],
         isBlank: true,
-        isRecto: false, // Will be recalculated
+        isRecto: false,
         isStatic: false,
         items: [],
       });
@@ -154,21 +164,20 @@ AppState.prototype.insertStaticPageAtSelection = function(): void {
   this.setProject({ ...prevState, signatures: newSignatures });
   this.notifyProjectListeners(prevState);
 
-  // Select the new static page (its position after renumbering is actualInsertIndex + 1)
+  // Select the new page
   const newPageNum = actualInsertIndex + 1;
   this.updateEditor({
     selectedPageNumber: newPageNum,
     selectedPagePosition: newPageNum % 2 === 1 ? 'recto' : 'verso',
   });
 
-  // Trigger reflow to adjust text around new static page
+  // Trigger reflow
   this.requestReflow();
 };
 
 /**
- * Move a static page from one position to another
+ * Move a page from one position to another
  * The page at fromPageNumber is moved to toPageNumber, shifting other pages
- * The dragged page will end up AT the target position (1-based page number)
  */
 AppState.prototype.moveStaticPage = function(fromPageNumber: number, toPageNumber: number): void {
   if (fromPageNumber === toPageNumber) return;
@@ -195,34 +204,23 @@ AppState.prototype.moveStaticPage = function(fromPageNumber: number, toPageNumbe
   }
 
   const pageToMove = allPages[fromIndex];
-  // Allow moving static pages or pages with items
+  // Allow moving pages with blockTextFlow or items
   const hasItems = pageToMove.items && pageToMove.items.length > 0;
-  if (pageToMove.pageState !== 'static' && !hasItems) {
-    console.warn('Can only move static pages or pages with items');
+  if (!pageToMove.blockTextFlow && pageToMove.pageState !== 'static' && !hasItems) {
+    console.warn('Can only move pages with blocked text flow or items');
     return;
   }
 
   // Remove page from current position
   allPages.splice(fromIndex, 1);
 
-  // Calculate target index (0-based) for the desired position (1-based)
-  // After removal, we need to account for the shift in indices
   let toIndex: number;
-
   if (fromPageNumber < toPageNumber) {
-    // Moving forward: the page should end up at toPageNumber position
-    // After removal, indices after fromIndex shift down by 1
-    // We want to insert so the page ends up at position toPageNumber
-    // toPageNumber - 1 is the 0-based index, but since we removed one element before,
-    // the actual insert index is toPageNumber - 1 - 1 = toPageNumber - 2
-    // But we want it AT that position, so we insert AFTER the preceding element
     toIndex = toPageNumber - 1;
     if (toIndex > allPages.length) {
       toIndex = allPages.length;
     }
   } else {
-    // Moving backward: insert at the target position directly
-    // toPageNumber - 1 is the 0-based index
     toIndex = toPageNumber - 1;
     if (toIndex < 0) {
       toIndex = 0;
@@ -232,7 +230,7 @@ AppState.prototype.moveStaticPage = function(fromPageNumber: number, toPageNumbe
   // Insert at new position
   allPages.splice(toIndex, 0, pageToMove);
 
-  // Renumber all pages (1-based page numbers)
+  // Renumber all pages
   allPages.forEach((page, index) => {
     const pageNum = index + 1;
     page.pageNumber = pageNum;
@@ -268,20 +266,18 @@ AppState.prototype.moveStaticPage = function(fromPageNumber: number, toPageNumbe
   this.setProject({ ...prevState, signatures: newSignatures });
   this.notifyProjectListeners(prevState);
 
-  // Select the moved page at its new position (1-based)
+  // Select the moved page at its new position
   const newPageNum = toIndex + 1;
   this.updateEditor({
     selectedPageNumber: newPageNum,
     selectedPagePosition: newPageNum % 2 === 1 ? 'recto' : 'verso',
   });
 
-  // Trigger reflow to adjust text around moved page
   this.requestReflow();
 };
 
 /**
- * Delete a static page and reflow text to fill the gap
- * This removes a page from the booklet and shifts remaining pages
+ * Delete a page with blocked text flow and reflow text to fill the gap
  */
 AppState.prototype.deleteStaticPage = function(pageNumber: number): void {
   const prevState = this.getProject();
@@ -307,22 +303,18 @@ AppState.prototype.deleteStaticPage = function(pageNumber: number): void {
   }
 
   const pageToDelete = allPages[pageIndex];
-  // Only allow deleting static pages
-  if (pageToDelete.pageState !== 'static') {
-    console.warn('Can only delete static pages');
+  // Allow deleting pages with blockTextFlow or legacy static
+  if (!pageToDelete.blockTextFlow && pageToDelete.pageState !== 'static') {
+    console.warn('Can only delete pages with blocked text flow');
     return;
   }
 
   // Remove the page
   allPages.splice(pageIndex, 1);
 
-  // If we now have fewer pages than a full signature, don't remove pages
-  // (we always need at least one full signature worth of pages)
-  // Instead, add an available page at the end to replace the deleted one
+  // Fill to maintain complete signatures
   const remainder = allPages.length % pagesPerSig;
   if (remainder !== 0 || allPages.length === 0) {
-    // We need to fill to maintain complete signatures
-    // Add available pages to the end
     const pagesToAdd = remainder === 0 ? pagesPerSig : pagesPerSig - remainder;
     const maxPageNum = allPages.length > 0
       ? Math.max(...allPages.map(p => p.pageNumber))
@@ -334,14 +326,14 @@ AppState.prototype.deleteStaticPage = function(pageNumber: number): void {
         pageState: 'available',
         sections: [],
         isBlank: true,
-        isRecto: false, // Will be recalculated
+        isRecto: false,
         isStatic: false,
         items: [],
       });
     }
   }
 
-  // Renumber all pages (1-based)
+  // Renumber all pages
   allPages.forEach((page, index) => {
     const pageNum = index + 1;
     page.pageNumber = pageNum;
@@ -382,7 +374,6 @@ AppState.prototype.deleteStaticPage = function(pageNumber: number): void {
     selectedPagePosition: null,
   });
 
-  // Trigger reflow to fill the gap with text content
   this.requestReflow();
 };
 
@@ -398,10 +389,22 @@ AppState.prototype.setPageState = function(pageNumber: number, state: PageState)
     spreads: sig.spreads.map(spread => ({
       ...spread,
       verso: spread.verso?.pageNumber === pageNumber
-        ? { ...spread.verso, pageState: state, isBlank: state === 'available', isStatic: state === 'static' }
+        ? {
+            ...spread.verso,
+            pageState: state === 'static' ? 'available' as PageState : state,
+            isBlank: state === 'available',
+            isStatic: state === 'static',
+            blockTextFlow: state === 'static' ? true : spread.verso.blockTextFlow,
+          }
         : spread.verso,
       recto: spread.recto?.pageNumber === pageNumber
-        ? { ...spread.recto, pageState: state, isBlank: state === 'available', isStatic: state === 'static' }
+        ? {
+            ...spread.recto,
+            pageState: state === 'static' ? 'available' as PageState : state,
+            isBlank: state === 'available',
+            isStatic: state === 'static',
+            blockTextFlow: state === 'static' ? true : spread.recto.blockTextFlow,
+          }
         : spread.recto,
     })),
   }));
@@ -412,7 +415,6 @@ AppState.prototype.setPageState = function(pageNumber: number, state: PageState)
 
 /**
  * Set the background fill for a specific page
- * Used when restoring saved projects and by the UI
  */
 AppState.prototype.setPageBackgroundFill = function(pageNumber: number, fill: FillConfig | undefined): void {
   const prevState = this.getProject();

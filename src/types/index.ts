@@ -99,7 +99,8 @@ export interface DocumentSection {
   imageRef?: string; // Reference to uploaded image
 }
 
-// Page state for the three-state model
+// Page state (two-state model: available or has text content)
+// Note: 'static' is accepted for backward compatibility during migration but should not be used for new pages
 export type PageState = 'available' | 'text' | 'static';
 
 // Page layout
@@ -111,14 +112,15 @@ export interface PageContent {
   overflow?: DocumentSection[]; // Content that didn't fit
   isBlank: boolean; // Deprecated: use pageState === 'available'
   isRecto: boolean; // Right-hand page
-  isStatic: boolean; // Deprecated: use pageState === 'static'
+  isStatic: boolean; // Deprecated: use blockTextFlow
   isBackCover?: boolean; // Special back cover page (verso of first spread)
-  items?: PageItem[]; // Items placed on static pages
+  blockTextFlow?: boolean; // When true, text flow skips this page entirely
+  items?: PageItem[]; // Items placed on pages
   backgroundFill?: FillConfig; // Optional background fill for the page
   customBackgroundImageId?: string; // Optional custom background image (sits above backgroundFill, below items)
 }
 
-// Items that can be placed on static pages
+// Items that can be placed on pages
 export type PageItemType = 'text' | 'shape' | 'image';
 
 export interface PageItemBase {
@@ -140,6 +142,9 @@ export interface PageItemBase {
   shadowOpacity?: number;
   // Array duplication - multi-dimensional support
   arrayDimensions?: ArrayDimension[]; // Each dimension creates copies with its own offset
+  // Text displacement - item pushes flowing text around it
+  displaceText?: boolean;        // Default: true. Text wraps around this item.
+  displaceTextPadding?: number;  // Padding around item's displacement zone (default 8pt)
 }
 
 // Array dimension configuration

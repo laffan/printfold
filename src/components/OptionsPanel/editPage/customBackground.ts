@@ -125,7 +125,7 @@ export function updateCustomBackgroundSection(): void {
 
   // Hide "Download Current" for text pages (pages with text content)
   const isTextPage = selectedPage?.pageState === 'text' ||
-    (selectedPage?.sections && selectedPage.sections.length > 0 && selectedPage?.pageState !== 'static');
+    (selectedPage?.sections && selectedPage.sections.length > 0 && !selectedPage?.blockTextFlow && selectedPage?.pageState !== 'static');
   if (downloadCurrentBtn) {
     downloadCurrentBtn.style.display = isTextPage ? 'none' : 'block';
   }

@@ -38,6 +38,7 @@ interface StaticPageContent {
 interface StaticPageData {
   pageNumber: number;
   pageState: 'static' | 'available' | 'text';
+  blockTextFlow?: boolean;
   items: PageItem[];
   backgroundFill?: import('../types').FillConfig;
   customBackgroundImageId?: string;
@@ -306,8 +307,11 @@ export class ZipHandler {
    */
   private applyStaticPageData(): void {
     for (const [pageNumber, pageData] of this.pendingStaticPages) {
-      // Apply page state if not 'text' (static or available)
-      if (pageData.pageState !== 'text') {
+      // Migrate: if pageState is 'static' or blockTextFlow is true, use setBlockTextFlow
+      const shouldBlockText = pageData.blockTextFlow || pageData.pageState === 'static';
+      if (shouldBlockText) {
+        appState.setBlockTextFlow(pageNumber, true);
+      } else if (pageData.pageState !== 'text') {
         appState.setPageState(pageNumber, pageData.pageState);
       }
 
@@ -337,28 +341,14 @@ export class ZipHandler {
 
     for (const sig of project.signatures) {
       for (const spread of sig.spreads) {
-        // Check verso page
-        if (spread.verso) {
-          const page = spread.verso;
-          // Save page data if it has non-text state, items, background fill, or custom background
-          if (page.pageState !== 'text' || (page.items && page.items.length > 0) || page.backgroundFill || page.customBackgroundImageId) {
+        for (const page of [spread.verso, spread.recto]) {
+          if (!page) continue;
+          // Save page data if it has blocked text flow, non-text state, items, background fill, or custom background
+          if (page.blockTextFlow || page.pageState !== 'text' || (page.items && page.items.length > 0) || page.backgroundFill || page.customBackgroundImageId) {
             result.set(page.pageNumber, {
               pageNumber: page.pageNumber,
-              pageState: page.pageState,
-              items: page.items || [],
-              backgroundFill: page.backgroundFill,
-              customBackgroundImageId: page.customBackgroundImageId,
-            });
-          }
-        }
-        // Check recto page
-        if (spread.recto) {
-          const page = spread.recto;
-          // Save page data if it has non-text state, items, background fill, or custom background
-          if (page.pageState !== 'text' || (page.items && page.items.length > 0) || page.backgroundFill || page.customBackgroundImageId) {
-            result.set(page.pageNumber, {
-              pageNumber: page.pageNumber,
-              pageState: page.pageState,
+              pageState: page.blockTextFlow ? 'available' : page.pageState,
+              blockTextFlow: page.blockTextFlow,
               items: page.items || [],
               backgroundFill: page.backgroundFill,
               customBackgroundImageId: page.customBackgroundImageId,

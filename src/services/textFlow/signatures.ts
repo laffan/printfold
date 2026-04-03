@@ -8,32 +8,52 @@ import type { PageContent, Spread, Signature, OutputOptions } from '../../types'
 import { appState } from '../state';
 
 /**
- * Capture static and available pages from existing signatures
+ * Capture pages with blocked text flow from existing signatures
  * Returns a map of pageNumber -> PageContent for pages that should be preserved
+ * (text flow skips these pages entirely)
  */
-export function captureStaticPages(signatures: Signature[]): Map<number, PageContent> {
+export function captureBlockedPages(signatures: Signature[]): Map<number, PageContent> {
   const preservedPages = new Map<number, PageContent>();
 
   for (const sig of signatures) {
     for (const spread of sig.spreads) {
-      // Preserve static pages (explicitly claimed for static content)
-      if (spread.verso?.pageState === 'static') {
-        preservedPages.set(spread.verso.pageNumber, spread.verso);
-      }
-      if (spread.recto?.pageState === 'static') {
-        preservedPages.set(spread.recto.pageNumber, spread.recto);
-      }
-      // Also preserve available pages that have items
-      if (spread.verso?.pageState === 'available' && spread.verso.items?.length) {
-        preservedPages.set(spread.verso.pageNumber, spread.verso);
-      }
-      if (spread.recto?.pageState === 'available' && spread.recto.items?.length) {
-        preservedPages.set(spread.recto.pageNumber, spread.recto);
+      for (const page of [spread.verso, spread.recto]) {
+        if (!page) continue;
+        // Preserve pages with blockTextFlow flag
+        if (page.blockTextFlow) {
+          preservedPages.set(page.pageNumber, page);
+        }
+        // Legacy: preserve static pages (backward compatibility)
+        else if (page.pageState === 'static') {
+          preservedPages.set(page.pageNumber, {
+            ...page,
+            blockTextFlow: true,
+          });
+        }
+        // Preserve available pages that have items (they may have displacement)
+        else if (page.pageState === 'available' && page.items?.length) {
+          preservedPages.set(page.pageNumber, page);
+        }
       }
     }
   }
 
   return preservedPages;
+}
+
+/** @deprecated Use captureBlockedPages instead */
+export function captureStaticPages(signatures: Signature[]): Map<number, PageContent> {
+  return captureBlockedPages(signatures);
+}
+
+/**
+ * Merge text pages with blocked/preserved pages
+ */
+export function mergeBlockedPagesInPlace(
+  textPages: PageContent[],
+  preservedPages: Map<number, PageContent>
+): PageContent[] {
+  return mergeStaticPagesInPlace(textPages, preservedPages);
 }
 
 /**

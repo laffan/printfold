@@ -220,27 +220,38 @@
   background: #6b7280;
 }
 
-/* Static: orange - pages with shapes, draggable */
+/* Static (legacy): orange */
 .spread-thumbnail-page-label.page-state-static {
-  background: #ea580c;
+  background: #6366f1;
   color: white;
 }
 
 .spread-thumbnail-page-label.page-state-static:hover {
-  background: #c2410c;
+  background: #4f46e5;
+}
+
+/* Blocked text flow: indigo - pages where text is blocked */
+.spread-thumbnail-page-label.page-state-blocked {
+  background: #6366f1;
+  color: white;
+}
+
+.spread-thumbnail-page-label.page-state-blocked:hover {
+  background: #4f46e5;
 }
 
 /* Selected state overrides all page states */
 .spread-thumbnail-page-label.page-state-available.selected,
 .spread-thumbnail-page-label.page-state-text.selected,
-.spread-thumbnail-page-label.page-state-static.selected {
+.spread-thumbnail-page-label.page-state-static.selected,
+.spread-thumbnail-page-label.page-state-blocked.selected {
   background: #22c55e;
   color: white;
 }
 
 /* Legacy class for backward compatibility */
 .spread-thumbnail-page-label.static-page-label {
-  background: #ea580c;
+  background: #6366f1;
   color: white;
 }
 

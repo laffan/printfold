@@ -358,6 +358,7 @@ function renderTextContent(
     const measuredSection = section as MeasuredSection;
     const richLines = measuredSection.richLines;
     const plainLines = measuredSection.lines || [section.content];
+    const linePositions = measuredSection.linePositions;
     const textAlign = fontStyle.textAlign || layoutOptions.textAlign || 'left';
 
     // Build Konva fontStyle string
@@ -368,8 +369,14 @@ function renderTextContent(
 
     // If we have rich lines, render each span separately for styling
     if (richLines && richLines.length > 0) {
-      for (const richLine of richLines) {
+      for (let lineIdx = 0; lineIdx < richLines.length; lineIdx++) {
+        const richLine = richLines[lineIdx];
         if (currentY > contentY + contentHeight) break;
+
+        // Apply per-line displacement offset if available
+        const linePos = linePositions?.[lineIdx];
+        const lineBaseX = contentX + (linePos?.xOffset ?? 0) * scale;
+        const lineContentWidth = (linePos?.width ?? contentWidth / scale) * scale;
 
         // Pre-calculate line width for alignment by measuring each span
         let lineWidth = 0;
@@ -392,11 +399,11 @@ function renderTextContent(
           measureNode.destroy();
         }
 
-        let spanX = contentX;
+        let spanX = lineBaseX;
         if (textAlign === 'center') {
-          spanX = contentX + (contentWidth - lineWidth) / 2;
+          spanX = lineBaseX + (lineContentWidth - lineWidth) / 2;
         } else if (textAlign === 'right') {
-          spanX = contentX + contentWidth - lineWidth;
+          spanX = lineBaseX + lineContentWidth - lineWidth;
         }
 
         for (const span of richLine.spans) {
@@ -458,13 +465,19 @@ function renderTextContent(
       }
     } else {
       // Fallback to plain text rendering
-      for (const line of plainLines) {
+      for (let lineIdx = 0; lineIdx < plainLines.length; lineIdx++) {
+        const line = plainLines[lineIdx];
         if (currentY > contentY + contentHeight) break;
 
+        // Apply per-line displacement offset if available
+        const linePos = linePositions?.[lineIdx];
+        const lineBaseX = contentX + (linePos?.xOffset ?? 0) * scale;
+        const lineContentWidth = (linePos?.width ?? contentWidth / scale) * scale;
+
         const textNode = new Konva.Text({
-          x: contentX,
+          x: lineBaseX,
           y: currentY,
-          width: contentWidth,
+          width: lineContentWidth,
           text: line,
           fontSize: fontSize,
           fontFamily: fontStyle.fontFamily,

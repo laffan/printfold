@@ -29,16 +29,21 @@ AppState.prototype.addItemToPage = function(pageNumber: number, item: PageItem):
     if (targetSpreadId) break;
   }
 
+  // Set displaceText to true by default if not explicitly set
+  const itemWithDefaults = {
+    ...item,
+    displaceText: item.displaceText ?? true,
+  };
+
   // Helper to update a page by page number (for signatures)
   // Items can be added to any page type - pageState is not changed automatically
   const updatePageByNumber = (page: PageContent | null) => {
     if (!page || page.pageNumber !== pageNumber) return page;
     return {
       ...page,
-      items: [...(page.items || []), item],
-      // Don't auto-claim - user must explicitly make page static
-      // Keep isStatic in sync with pageState for backward compatibility
-      isStatic: page.pageState === 'static',
+      items: [...(page.items || []), itemWithDefaults],
+      // Keep isStatic in sync with pageState/blockTextFlow for backward compatibility
+      isStatic: page.pageState === 'static' || !!page.blockTextFlow,
     };
   };
 

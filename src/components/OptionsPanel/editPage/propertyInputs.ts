@@ -161,4 +161,42 @@ export function setupEditPropertyInputs(updateEditSelectedSectionFn: () => void)
 
     if (itemArraySection) itemArraySection.style.display = itemHasArray.checked ? 'block' : 'none';
   });
+
+  // === Text Displacement Controls ===
+
+  // Displace Text toggle
+  const displaceTextCheckbox = document.getElementById('item-displace-text') as HTMLInputElement;
+  const displaceTextSection = document.getElementById('item-displace-text-section');
+  displaceTextCheckbox?.addEventListener('change', () => {
+    const editorState = appState.getEditor();
+    if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+    appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, {
+      displaceText: displaceTextCheckbox.checked,
+    });
+    if (displaceTextSection) displaceTextSection.style.display = displaceTextCheckbox.checked ? 'block' : 'none';
+    appState.requestReflow();
+  });
+
+  // Displacement padding
+  const displacePaddingInput = document.getElementById('item-displace-padding') as HTMLInputElement;
+  displacePaddingInput?.addEventListener('input', () => {
+    const editorState = appState.getEditor();
+    if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+    const value = parseFloat(displacePaddingInput.value);
+    if (!isNaN(value) && value >= 0) {
+      appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, {
+        displaceTextPadding: value,
+      });
+      appState.requestReflow();
+    }
+  });
+
+  // === Block Text Flow (Page Level) ===
+
+  const blockTextFlowCheckbox = document.getElementById('page-block-text-flow') as HTMLInputElement;
+  blockTextFlowCheckbox?.addEventListener('change', () => {
+    const editorState = appState.getEditor();
+    if (!editorState.selectedPageNumber) return;
+    appState.setBlockTextFlow(editorState.selectedPageNumber, blockTextFlowCheckbox.checked);
+  });
 }

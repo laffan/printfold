@@ -267,7 +267,8 @@ export class PDFGenerator {
     // A page is a text page if its pageState is 'text' - these pages need text content rendered
     const isTextPage = pageContent.pageState === 'text';
     // Check for static/available pages using pageState (prefer) or deprecated flags (fallback)
-    const isStaticOrAvailable = pageContent.pageState === 'static' ||
+    const isStaticOrAvailable = pageContent.blockTextFlow ||
+                                 pageContent.pageState === 'static' ||
                                  pageContent.pageState === 'available' ||
                                  pageContent.isBlank || pageContent.isStatic;
     // Check if "render text as images" mode is enabled
@@ -392,24 +393,31 @@ export class PDFGenerator {
       const measuredSection = section as MeasuredSection;
       const lines = measuredSection.lines || [section.content];
       const richLines = measuredSection.richLines;
+      const linePositions = measuredSection.linePositions;
       // Use per-element textAlign if set, otherwise fall back to layoutOptions
       const textAlign = fontStyle.textAlign || layoutOptions.textAlign || 'left';
 
       // Use rich lines if available (for paragraphs and blockquotes with inline styling)
       if (richLines && richLines.length > 0) {
-        for (const richLine of richLines) {
+        for (let lineIdx = 0; lineIdx < richLines.length; lineIdx++) {
+          const richLine = richLines[lineIdx];
           if (currentY < contentY) break;
+
+          // Apply per-line displacement offset if available
+          const linePos = linePositions?.[lineIdx];
+          const lineX = contentX + (linePos?.xOffset ?? 0);
+          const lineWidth = linePos?.width ?? contentWidth;
 
           // Draw the rich line with all its styled spans
           drawRichLine(
             pdfPage,
             richLine,
-            contentX,
+            lineX,
             currentY - fontStyle.fontSize,
             fontStyle,
             fontOptions,
             this.fontCache,
-            contentWidth,
+            lineWidth,
             textAlign
           );
 
@@ -417,18 +425,24 @@ export class PDFGenerator {
         }
       } else {
         // Fallback to plain text rendering
-        for (const line of lines) {
+        for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+          const line = lines[lineIdx];
           if (currentY < contentY) break;
+
+          // Apply per-line displacement offset if available
+          const linePos = linePositions?.[lineIdx];
+          const lineBaseX = contentX + (linePos?.xOffset ?? 0);
+          const lineWidth = linePos?.width ?? contentWidth;
 
           const sanitizedLine = sanitizeText(line);
           const textWidth = font.widthOfTextAtSize(sanitizedLine, fontStyle.fontSize);
 
           // Calculate x position based on alignment
-          let lineX = contentX;
+          let lineX = lineBaseX;
           if (textAlign === 'center') {
-            lineX = contentX + (contentWidth - textWidth) / 2;
+            lineX = lineBaseX + (lineWidth - textWidth) / 2;
           } else if (textAlign === 'right') {
-            lineX = contentX + contentWidth - textWidth;
+            lineX = lineBaseX + lineWidth - textWidth;
           }
 
           // Draw inline background color (highlight) if set

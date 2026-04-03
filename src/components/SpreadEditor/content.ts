@@ -6,7 +6,7 @@
 import Konva from 'konva';
 import { appState } from '../../services/state';
 import type { PageContent, FontStyle, TextSpan, RichTextLine, FontOptions } from '../../types';
-import type { MeasuredSection } from '../../services/textFlow/types';
+import type { MeasuredSection, LinePosition } from '../../services/textFlow/types';
 
 /**
  * Draw page content (text sections, images, headings)
@@ -138,20 +138,29 @@ export function drawPageContent(
     // Use per-element textAlign if set, otherwise fall back to layoutOptions
     const textAlign = fontStyle.textAlign || project.layoutOptions.textAlign;
 
+    // Get per-line positions for text displacement (if any)
+    const linePositions = measuredSection.linePositions;
+
     // Use rich lines if available (for paragraphs and blockquotes with inline styling)
     if (richLines && richLines.length > 0) {
-      for (const richLine of richLines) {
+      for (let lineIdx = 0; lineIdx < richLines.length; lineIdx++) {
+        const richLine = richLines[lineIdx];
         if (currentY > y + height) break;
+
+        // Apply per-line displacement offset if available
+        const linePos = linePositions?.[lineIdx];
+        const lineX = x + (linePos?.xOffset ?? 0);
+        const lineWidth = linePos?.width ?? width;
 
         // Draw the rich line with all its styled spans
         drawRichLineKonva(
           layer,
           richLine,
-          x,
+          lineX,
           currentY,
           fontStyle,
           project.fontOptions,
-          width,
+          lineWidth,
           lineHeight,
           textAlign
         );
@@ -164,6 +173,11 @@ export function drawPageContent(
         const line = lines[lineIndex];
         if (currentY > y + height) break;
 
+        // Apply per-line displacement offset if available
+        const linePos = linePositions?.[lineIndex];
+        const lineX = x + (linePos?.xOffset ?? 0);
+        const lineWidth = linePos?.width ?? width;
+
         // Combine fontWeight and fontStyle for Konva
         let combinedFontStyle = '';
         if (fontStyle.fontWeight === 'bold') combinedFontStyle += 'bold';
@@ -173,14 +187,14 @@ export function drawPageContent(
         if (!combinedFontStyle) combinedFontStyle = 'normal';
 
         const text = new Konva.Text({
-          x,
+          x: lineX,
           y: currentY,
           text: line,
           fontSize: fontStyle.fontSize,
           fontFamily: fontStyle.fontFamily,
           fontStyle: combinedFontStyle,
           fill: fontStyle.color,
-          width,
+          width: lineWidth,
           // For justify, we need wrap enabled; for left align, disable wrap to use pre-wrapped lines
           wrap: textAlign === 'justify' ? 'word' : 'none',
           align: textAlign,
@@ -193,7 +207,7 @@ export function drawPageContent(
           const textWidth = text.width();
           const textHeight = lineHeight;
           const bgRect = new Konva.Rect({
-            x,
+            x: lineX,
             y: currentY,
             width: textWidth,
             height: textHeight,
