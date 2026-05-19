@@ -47,9 +47,7 @@ export function setupEditPropertyInputs(updateEditSelectedSectionFn: () => void)
   // Shape stroke properties
   setupColorInput('item-stroke', 'strokeColor');
   setupPropInput('item-stroke-width', 'strokeWidth');
-
-  // Text-flow text-color override
-  setupColorInput('item-text-color', 'textColor');
+  setupPropInput('item-stroke-offset', 'strokeOffset');
 
   // Text properties - use items font dropdown (Google Fonts + web-safe for static page items)
   const fontDropdown = createItemsFontDropdown('item-font-family', (value) => {

@@ -322,13 +322,12 @@
                     <span>Fill</span>
                   </label>
                   <div id="item-fill-section">
+                    <label class="form-label">Fill Color</label>
                     <div id="item-fill-picker"></div>
                     <!-- Text-flow items only: override color applied to flowed text -->
-                    <div id="item-text-color-section" style="display: none;">
-                      <label>
-                        <span>Text Color</span>
-                        <input type="color" id="item-text-color" value="#000000">
-                      </label>
+                    <div id="item-text-color-section" style="display: none; margin-top: 8px;">
+                      <label class="form-label">Text Color</label>
+                      <div id="item-text-color-picker"></div>
                     </div>
                   </div>
                 </div>
@@ -339,7 +338,7 @@
                     <span>Stroke</span>
                   </label>
                   <div id="item-stroke-section" style="display: none;">
-                    <div class="inline-sizes">
+                    <div class="inline-sizes three-col">
                       <label>
                         <span>Color</span>
                         <input type="color" id="item-stroke" value="#000000">
@@ -349,6 +348,13 @@
                         <div class="input-with-cap">
                           <input type="number" id="item-stroke-width" step="0.5" min="0" value="1">
                           <span class="input-cap" data-for="item-stroke-width">px</span>
+                        </div>
+                      </label>
+                      <label>
+                        <span>Offset</span>
+                        <div class="input-with-cap">
+                          <input type="number" id="item-stroke-offset" step="0.5" value="0">
+                          <span class="input-cap" data-for="item-stroke-offset">px</span>
                         </div>
                       </label>
                     </div>

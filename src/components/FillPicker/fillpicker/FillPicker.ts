@@ -10,10 +10,20 @@ import { renderGradientTab, drawGradientCanvas, interpolateGradientColor } from 
 import { renderPatternTab } from './patternTab';
 import type { FillConfig, FillType, GradientStop } from '../../../types';
 
+export interface FillPickerOptions {
+  /**
+   * Restrict the picker to a subset of fill types. When omitted, all three
+   * tabs (color / gradient / pattern) are shown. With a single entry the
+   * tab strip is hidden entirely.
+   */
+  allowedTabs?: FillType[];
+}
+
 export class FillPicker {
   private container: HTMLElement;
   private fill: FillConfig;
   private onChange: (fill: FillConfig) => void;
+  private options: FillPickerOptions;
   private isOpen = false;
   private activeTab: FillType = 'color';
 
@@ -42,11 +52,13 @@ export class FillPicker {
   constructor(
     container: HTMLElement,
     initialFill: FillConfig,
-    onChange: (fill: FillConfig) => void
+    onChange: (fill: FillConfig) => void,
+    options: FillPickerOptions = {}
   ) {
     this.container = container;
     this.fill = initialFill;
     this.onChange = onChange;
+    this.options = options;
     this.initFromFill(initialFill);
     this.render();
   }
@@ -112,29 +124,36 @@ export class FillPicker {
         e.stopPropagation();
       });
 
-      // Tabs
-      const tabs = document.createElement('div');
-      tabs.className = 'fill-tabs';
-
-      const tabTypes: { type: FillType; label: string }[] = [
+      // Tabs — filtered by the allowedTabs option. With a single allowed
+      // tab the strip is hidden so the picker just shows that tab's UI.
+      const allTabTypes: { type: FillType; label: string }[] = [
         { type: 'color', label: 'Color' },
         { type: 'linearGradient', label: 'Gradient' },
         { type: 'pattern', label: 'Pattern' }
       ];
+      const allowedTabs = this.options.allowedTabs;
+      const tabTypes = allowedTabs
+        ? allTabTypes.filter(t => allowedTabs.includes(t.type) ||
+            (t.type === 'linearGradient' && allowedTabs.includes('radialGradient')))
+        : allTabTypes;
 
-      tabTypes.forEach(({ type, label }) => {
-        const tab = document.createElement('button');
-        tab.className = 'fill-tab' + (this.activeTab === type || (this.activeTab === 'radialGradient' && type === 'linearGradient') ? ' active' : '');
-        tab.textContent = label;
-        tab.addEventListener('click', (e) => {
-          e.stopPropagation();
-          e.preventDefault();
-          this.activeTab = type;
-          this.renderTabContent(panel);
+      if (tabTypes.length > 1) {
+        const tabs = document.createElement('div');
+        tabs.className = 'fill-tabs';
+        tabTypes.forEach(({ type, label }) => {
+          const tab = document.createElement('button');
+          tab.className = 'fill-tab' + (this.activeTab === type || (this.activeTab === 'radialGradient' && type === 'linearGradient') ? ' active' : '');
+          tab.textContent = label;
+          tab.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            this.activeTab = type;
+            this.renderTabContent(panel);
+          });
+          tabs.appendChild(tab);
         });
-        tabs.appendChild(tab);
-      });
-      panel.appendChild(tabs);
+        panel.appendChild(tabs);
+      }
 
       // Tab content container
       const content = document.createElement('div');

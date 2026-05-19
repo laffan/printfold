@@ -584,6 +584,28 @@ function renderTextContent(
 }
 
 /**
+ * Push every vertex of `points` outward by `offset` along the radial
+ * direction from the polygon's centroid. Used by the stroke-offset
+ * effect for text-flow polygons.
+ */
+function offsetPolygonOutwardScaled(
+  points: { x: number; y: number }[],
+  offset: number
+): { x: number; y: number }[] {
+  if (points.length === 0) return points;
+  const cx = points.reduce((s, p) => s + p.x, 0) / points.length;
+  const cy = points.reduce((s, p) => s + p.y, 0) / points.length;
+  return points.map(p => {
+    const dx = p.x - cx;
+    const dy = p.y - cy;
+    const dist = Math.hypot(dx, dy);
+    if (dist === 0) return p;
+    const factor = (dist + offset) / dist;
+    return { x: cx + dx * factor, y: cy + dy * factor };
+  });
+}
+
+/**
  * Render a text-flow page item into the supplied layer at scale, so the
  * flowed content shows up in pre-rendered page images (and therefore in
  * the exported PDF).
@@ -629,33 +651,54 @@ function renderTextFlowItem(
   });
 
   // Fill and stroke (only when enabled by the user). Editor-only dashed
-  // border isn't rendered here.
+  // border isn't rendered here. Stroke with a non-zero offset is drawn as
+  // a separate outline shape so it sits at the offset position.
   const hasFill = item.hasFill === true;
   const hasStroke = item.hasStroke === true;
   const fillColor = hasFill
     ? (item.fill?.type === 'color' ? (item.fill?.color || '#ffffff') : '#ffffff')
     : undefined;
-  if (hasFill || hasStroke) {
+  const strokeOffset = (item.strokeOffset ?? 0) * scale;
+  const strokeOnPath = hasStroke && strokeOffset === 0;
+  if (hasFill || strokeOnPath) {
     if (polygonAbsScaled) {
-      const outline = new Konva.Line({
+      group.add(new Konva.Line({
         points: polygonAbsScaled.flatMap(p => [p.x, p.y]),
         closed: true,
         fill: fillColor,
-        stroke: hasStroke ? (item.strokeColor || '#000000') : undefined,
-        strokeWidth: hasStroke ? (item.strokeWidth ?? 1) * scale : 0,
-      });
-      group.add(outline);
+        stroke: strokeOnPath ? (item.strokeColor || '#000000') : undefined,
+        strokeWidth: strokeOnPath ? (item.strokeWidth ?? 1) * scale : 0,
+      }));
     } else {
-      const rect = new Konva.Rect({
+      group.add(new Konva.Rect({
         x: 0,
         y: 0,
         width: scaledWidth,
         height: scaledHeight,
         fill: fillColor,
-        stroke: hasStroke ? (item.strokeColor || '#000000') : undefined,
-        strokeWidth: hasStroke ? (item.strokeWidth ?? 1) * scale : 0,
-      });
-      group.add(rect);
+        stroke: strokeOnPath ? (item.strokeColor || '#000000') : undefined,
+        strokeWidth: strokeOnPath ? (item.strokeWidth ?? 1) * scale : 0,
+      }));
+    }
+  }
+  if (hasStroke && strokeOffset !== 0) {
+    if (polygonAbsScaled) {
+      const offsetPts = offsetPolygonOutwardScaled(polygonAbsScaled, strokeOffset);
+      group.add(new Konva.Line({
+        points: offsetPts.flatMap(p => [p.x, p.y]),
+        closed: true,
+        stroke: item.strokeColor || '#000000',
+        strokeWidth: (item.strokeWidth ?? 1) * scale,
+      }));
+    } else {
+      group.add(new Konva.Rect({
+        x: -strokeOffset,
+        y: -strokeOffset,
+        width: scaledWidth + strokeOffset * 2,
+        height: scaledHeight + strokeOffset * 2,
+        stroke: item.strokeColor || '#000000',
+        strokeWidth: (item.strokeWidth ?? 1) * scale,
+      }));
     }
   }
 

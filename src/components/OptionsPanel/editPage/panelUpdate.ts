@@ -8,7 +8,9 @@ import {
   switchToSelectedTab,
   itemFontDropdown,
   itemFillPicker,
-  setItemFillPicker
+  setItemFillPicker,
+  textFillPicker,
+  setTextFillPicker
 } from './shared';
 import { updateMultiSelectControls } from './multiSelect';
 import { updateArrayDimensionsList, setupAddDimensionButton } from './arrayInstances';
@@ -277,6 +279,7 @@ export function updateEditSelectedSection(): void {
   if (itemStrokeSection) itemStrokeSection.style.display = hasStroke ? 'block' : 'none';
   setInputValue('item-stroke', strokeColor);
   setInputValue('item-stroke-width', strokeWidth.toString());
+  setInputValue('item-stroke-offset', (item.strokeOffset ?? 0).toString());
 
   // Update shadow toggle and properties. Hidden entirely for text-flow
   // items — shadow doesn't make sense on a region of flowed text.
@@ -294,14 +297,34 @@ export function updateEditSelectedSection(): void {
   setInputValue('item-shadow-offset-y', (item.shadowOffsetY ?? 3).toString());
   setInputValue('item-shadow-opacity', (item.shadowOpacity ?? 0.5).toString());
 
-  // Text-color picker for text-flow items: shown alongside the fill picker
-  // and applied to every flowed line.
+  // Text-color picker for text-flow items: same FillPicker chrome as the
+  // Fill picker, but the value is stored as a plain string on `textColor`
+  // (only solid colors are honored — non-color fills are ignored).
   const itemTextColorSection = document.getElementById('item-text-color-section');
   if (itemTextColorSection) {
     itemTextColorSection.style.display = isTextFlow ? 'block' : 'none';
   }
   if (isTextFlow) {
-    setInputValue('item-text-color', item.textColor || '#000000');
+    const textColorContainer = document.getElementById('item-text-color-picker');
+    const currentTextFill: FillConfig = {
+      type: 'color',
+      color: item.textColor || '#000000',
+    };
+    if (textColorContainer) {
+      if (textFillPicker) {
+        textFillPicker.setFill(currentTextFill);
+      } else {
+        const picker = createFillPicker(textColorContainer, currentTextFill, (fill) => {
+          const editorState = appState.getEditor();
+          if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+          if (fill.type !== 'color') return;
+          appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, {
+            textColor: fill.color || '#000000',
+          });
+        }, { allowedTabs: ['color'] });
+        setTextFillPicker(picker);
+      }
+    }
   }
 
   // Update array toggle and properties (multi-dimensional)

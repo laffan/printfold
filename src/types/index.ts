@@ -138,6 +138,11 @@ export interface PageItemBase {
   shadowOffsetX?: number;
   shadowOffsetY?: number;
   shadowOpacity?: number;
+  // Stroke offset — perpendicular distance the stroke sits from the path.
+  // Positive expands the stroke outward, negative pulls it inward; 0 keeps
+  // the stroke centered on the path (default). Only applies when stroke
+  // is enabled.
+  strokeOffset?: number;
   // Array duplication - multi-dimensional support
   arrayDimensions?: ArrayDimension[]; // Each dimension creates copies with its own offset
 }

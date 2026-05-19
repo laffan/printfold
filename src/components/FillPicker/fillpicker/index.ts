@@ -9,7 +9,7 @@ export { renderColorTab, drawSatValCanvas } from './colorTab';
 export { renderGradientTab, drawGradientCanvas, interpolateGradientColor } from './gradientTab';
 export { renderPatternTab } from './patternTab';
 
-import { FillPicker } from './FillPicker';
+import { FillPicker, FillPickerOptions } from './FillPicker';
 import type { FillConfig } from '../../../types';
 
 /**
@@ -18,7 +18,8 @@ import type { FillConfig } from '../../../types';
 export function createFillPicker(
   container: HTMLElement,
   initialFill: FillConfig,
-  onChange: (fill: FillConfig) => void
+  onChange: (fill: FillConfig) => void,
+  options?: FillPickerOptions
 ): FillPicker {
-  return new FillPicker(container, initialFill, onChange);
+  return new FillPicker(container, initialFill, onChange, options);
 }

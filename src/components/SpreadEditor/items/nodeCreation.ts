@@ -13,6 +13,29 @@ import { drawTextFlowItemContent } from './textFlowRendering';
 import { addPolygonVertexHandles } from './vertexHandles';
 
 /**
+ * Move every vertex of a polygon outward (or inward, for negative offsets)
+ * by the given distance, measured radially from the polygon's centroid.
+ * Simple approximation that works cleanly for convex polygons — enough for
+ * the stroke-offset effect; not a true polygon-offset (Minkowski sum).
+ */
+function offsetPolygonOutward(
+  points: { x: number; y: number }[],
+  offset: number
+): { x: number; y: number }[] {
+  if (points.length === 0) return points;
+  const cx = points.reduce((s, p) => s + p.x, 0) / points.length;
+  const cy = points.reduce((s, p) => s + p.y, 0) / points.length;
+  return points.map(p => {
+    const dx = p.x - cx;
+    const dy = p.y - cy;
+    const dist = Math.hypot(dx, dy);
+    if (dist === 0) return p;
+    const factor = (dist + offset) / dist;
+    return { x: cx + dx * factor, y: cy + dy * factor };
+  });
+}
+
+/**
  * Create a Konva node for a page item
  */
 export function createItemNode(
@@ -183,18 +206,23 @@ export function createItemNode(
     const fillColor = userHasFill
       ? (flowItem.fill?.type === 'color' ? (flowItem.fill?.color || '#ffffff') : '#ffffff')
       : 'rgba(0,0,0,0.001)';
-    const strokeColor = userHasStroke ? (flowItem.strokeColor || '#000000') : '#888888';
-    const strokeWidth = userHasStroke ? (flowItem.strokeWidth ?? 1) : 1;
-    const strokeDash = userHasStroke ? undefined : [4, 4];
+    const userStrokeColor = flowItem.strokeColor || '#000000';
+    const userStrokeWidth = flowItem.strokeWidth ?? 1;
+    const strokeOffset = userHasStroke ? (flowItem.strokeOffset ?? 0) : 0;
+    // Fill node = original shape. Stroke is on it only when stroke is
+    // enabled AND no offset (offset != 0 needs a separate stroke shape).
+    const fillNodeStroke = userHasStroke && strokeOffset === 0 ? userStrokeColor : '#888888';
+    const fillNodeStrokeWidth = userHasStroke && strokeOffset === 0 ? userStrokeWidth : 1;
+    const fillNodeDash = userHasStroke ? undefined : [4, 4];
 
     let polygonOutline: Konva.Line | null = null;
     if (polygonAbs) {
       polygonOutline = new Konva.Line({
         points: polygonAbs.flatMap(p => [p.x, p.y]),
         closed: true,
-        stroke: strokeColor,
-        strokeWidth,
-        dash: strokeDash,
+        stroke: fillNodeStroke,
+        strokeWidth: fillNodeStrokeWidth,
+        dash: fillNodeDash,
         fill: fillColor,
         listening: true,
       });
@@ -205,13 +233,38 @@ export function createItemNode(
         y: 0,
         width: item.width,
         height: item.height,
-        stroke: strokeColor,
-        strokeWidth,
-        dash: strokeDash,
+        stroke: fillNodeStroke,
+        strokeWidth: fillNodeStrokeWidth,
+        dash: fillNodeDash,
         fill: fillColor,
         listening: true,
       });
       outerGroup.add(bgRect);
+    }
+
+    // Offset stroke: drawn as a separate outline shape sized at the offset
+    // position so the stroke literally floats outside (or inside) the path.
+    if (userHasStroke && strokeOffset !== 0) {
+      if (polygonAbs) {
+        const offsetPts = offsetPolygonOutward(polygonAbs, strokeOffset);
+        outerGroup.add(new Konva.Line({
+          points: offsetPts.flatMap(p => [p.x, p.y]),
+          closed: true,
+          stroke: userStrokeColor,
+          strokeWidth: userStrokeWidth,
+          listening: false,
+        }));
+      } else {
+        outerGroup.add(new Konva.Rect({
+          x: -strokeOffset,
+          y: -strokeOffset,
+          width: item.width + strokeOffset * 2,
+          height: item.height + strokeOffset * 2,
+          stroke: userStrokeColor,
+          strokeWidth: userStrokeWidth,
+          listening: false,
+        }));
+      }
     }
 
     // Inner group: clips the flowed text to the item's shape. Polygons
