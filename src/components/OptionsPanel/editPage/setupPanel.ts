@@ -43,14 +43,9 @@ export function setupEditPagePanel(updateEditSelectedSectionFn: () => void): voi
     addItemToCurrentPage('arrow');
   });
 
-  // Add Text Flow Square button
-  document.getElementById('btn-add-text-flow-square')?.addEventListener('click', () => {
-    addItemToCurrentPage('textFlowSquare');
-  });
-
-  // Add Text Flow Polygon button
-  document.getElementById('btn-add-text-flow-polygon')?.addEventListener('click', () => {
-    addItemToCurrentPage('textFlowPolygon');
+  // Add Text Flow region (polygon, defaults to a rectangle the user can reshape)
+  document.getElementById('btn-add-text-flow')?.addEventListener('click', () => {
+    addItemToCurrentPage('textFlow');
   });
 
   // Add Image button

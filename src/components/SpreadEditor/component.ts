@@ -451,7 +451,16 @@ export class SpreadEditor {
                            targetLayer === this.marginLayer ||
                            targetLayer === this.itemsLayer ||
                            targetLayer === this.selectionLayer;
-      const isItem = target.getAttr?.('itemId') !== undefined;
+      // Walk the ancestor chain — composite items (text-flow groups) carry
+      // itemId on the outer group, not on the child shape that catches the
+      // click. Without this walk, clicking on a polygon outline or vertex
+      // handle would be treated as a background click and clear selection.
+      let isItem = false;
+      let node: Konva.Node | null = target;
+      while (node) {
+        if (node.getAttr?.('itemId') !== undefined) { isItem = true; break; }
+        node = node.getParent?.() ?? null;
+      }
       const isTransformer = target.getParent?.()?.getClassName?.() === 'Transformer';
 
       if (isOnAnyLayer && !isItem && !isTransformer && !this.isMarqueeSelecting) {
@@ -470,7 +479,14 @@ export class SpreadEditor {
       if (e.evt.shiftKey) return; // Shift+click is for panning
 
       const target = e.target;
-      const isItem = target.getAttr?.('itemId') !== undefined;
+      // Walk ancestor chain so composite items (text-flow groups) aren't
+      // mistaken for background and trigger a marquee.
+      let isItem = false;
+      let n: Konva.Node | null = target;
+      while (n) {
+        if (n.getAttr?.('itemId') !== undefined) { isItem = true; break; }
+        n = n.getParent?.() ?? null;
+      }
       const isTransformer = target.getParent?.()?.getClassName?.() === 'Transformer';
 
       // Only start marquee when clicking on background layers

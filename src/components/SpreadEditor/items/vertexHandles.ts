@@ -114,14 +114,62 @@ export function addPolygonVertexHandles(
 /**
  * Insert a new vertex when the user clicks near an edge of the polygon
  * outline. Plain clicks on the interior fall through to the standard
- * select-item behavior.
+ * select-item behavior. Listens for the click event rather than mousedown
+ * so a drag in progress isn't interrupted (Konva suppresses the click
+ * when significant movement is detected).
  */
 function setupEdgeInsertHandler(
   outline: Konva.Line,
   item: TextFlowPageItem,
   pageNumber: number
 ): void {
-  outline.on('mousedown touchstart', (e) => {
+  // Ghost vertex preview: shown when the pointer is near an edge so the
+  // user can see where a click would create a new vertex.
+  const layer = outline.getLayer();
+  const parent = outline.getParent();
+  const ghost = new Konva.Circle({
+    radius: HANDLE_RADIUS,
+    fill: HANDLE_FILL,
+    stroke: HANDLE_STROKE,
+    strokeWidth: HANDLE_STROKE_WIDTH,
+    opacity: 0.5,
+    listening: false,
+    visible: false,
+  });
+  if (parent) parent.add(ghost);
+
+  const updateGhost = () => {
+    const stage = outline.getStage();
+    if (!stage) return hideGhost();
+    const pointer = stage.getPointerPosition();
+    if (!pointer) return hideGhost();
+    const local = outline.getAbsoluteTransform().copy().invert().point(pointer);
+    const absPoints = item.polygonPoints!.map(p => ({
+      x: p.x * item.width,
+      y: p.y * item.height,
+    }));
+    const nearest = findNearestEdge(absPoints, local.x, local.y);
+    if (!nearest || nearest.distance > EDGE_CLICK_THRESHOLD) return hideGhost();
+    const isAtExistingVertex = absPoints.some(p =>
+      Math.abs(p.x - nearest.projX) < 2 && Math.abs(p.y - nearest.projY) < 2
+    );
+    if (isAtExistingVertex) return hideGhost();
+    ghost.x(nearest.projX);
+    ghost.y(nearest.projY);
+    ghost.visible(true);
+    layer?.batchDraw();
+  };
+  const hideGhost = () => {
+    if (ghost.visible()) {
+      ghost.visible(false);
+      layer?.batchDraw();
+    }
+  };
+
+  outline.on('mousemove', updateGhost);
+  outline.on('mouseleave', hideGhost);
+
+  outline.on('click tap', (e) => {
     if (!e.evt || ('altKey' in e.evt && (e.evt as MouseEvent).altKey)) return;
     const stage = outline.getStage();
     if (!stage) return;
