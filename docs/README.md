@@ -397,14 +397,31 @@ Items can be placed on any page type (static, available, or text pages):
 | Text | Content, font, size, fill (color/gradient/pattern), alignment, stroke |
 | Shape | Rectangle, ellipse, circle, line, arrow with fill and stroke |
 | Image | Reference to project image file |
+| Text Flow | Polygon-shaped region (corner + smooth vertices) that pulls a slice of the markdown flow through it — see [Text Flow Items](#text-flow-items) |
 
 **Common Properties:** Position (x, y), size, rotation, opacity
 
 **Effects (available for all items):**
-- **Fill** - Solid color, linear gradient, radial gradient, or pattern
-- **Stroke** - Border with customizable color and width
-- **Shadow** - Drop shadow with color, blur, offset, and opacity
+- **Fill** - Solid color, linear gradient, radial gradient, or pattern, plus an **Offset** that extends or shrinks the filled region perpendicular to the path
+- **Stroke** - Border with customizable color, width, and **Offset** (positive = outside the path, negative = inside)
+- **Shadow** - Drop shadow with color, blur, offset, and opacity (text-flow items skip this)
 - **Array** - Create multiple copies with multi-dimensional offset support
+
+### Text Flow Items
+
+A Text Flow item is a polygon-shaped region on a static page that receives a slice of the surrounding markdown flow — like a mini-page embedded in the spread.
+
+**Creating:** Toolbar "Text Flow Region" button (above the spread editor). The initial shape is a rectangle that can be reshaped into any polygon.
+
+**Vertex editing (when item is selected):**
+- Drag an anchor handle to move that vertex; the item's bounding box reframes on release so the polygon stays fully contained.
+- Click within ~8pt of an edge to insert a new vertex; a faint ghost dot previews the position.
+- Alt/Option + click on an anchor to remove it (minimum 3 vertices).
+- Cmd/Ctrl + click on an anchor toggles between **corner** and **smooth** (cubic-bezier). Smooth points show two draggable tangent handles connected by dashed lines.
+
+**Text flow:** Built by `textFlow/slotFlow.ts`. When any static page has text-flow items, the engine builds a sequence of slots (full text pages + per-region mini-slots) and pours markdown sections into them in document order. For polygon regions it lays out lines individually, using the polygon's horizontal extent at each y as the per-line width — so wrapping follows the silhouette, including curved edges. Curved polygons are flattened (~24 samples per edge) for the scanline intersection.
+
+**Effects:** Background **Fill** (solid color) plus a **Text Color** override that recolors every flowed line. Stroke follows the polygon path. Both Fill and Stroke have **Offset** controls that maintain constant perpendicular distance from the original path (proper miter-joined polygon offset, clamped at 8× the offset distance for very sharp corners). Curved polygons are flattened before offsetting, so the offset outline is a fine polyline that hugs the original curve.
 
 ### Fill System
 
@@ -415,7 +432,7 @@ Text, shapes, and page backgrounds support multiple fill types:
 3. **Radial Gradient**: Center, radius, color stops
 4. **Pattern**: Image-based repeating pattern
 
-All fill types render correctly in both the canvas editor and PDF export (using Konva pre-rendering for complex fills).
+All fill types render correctly in both the canvas editor and PDF export (using Konva pre-rendering for complex fills). Text-flow items currently use solid color only.
 
 ### Array Feature
 
@@ -483,7 +500,9 @@ src/
 │       │   ├── textEditing.ts
 │       │   ├── nodeCreation.ts
 │       │   ├── arrayItems.ts
-│       │   └── rendering.ts
+│       │   ├── rendering.ts
+│       │   ├── textFlowRendering.ts # Konva nodes for text-flow content
+│       │   └── vertexHandles.ts     # Polygon vertex/tangent UI
 │       ├── selection.ts
 │       ├── content.ts
 │       ├── margins.ts
@@ -509,6 +528,8 @@ src/
 │   │   ├── parsing.ts        # Markdown parsing
 │   │   ├── measurement.ts    # Text measurement
 │   │   ├── pagination.ts     # Page break logic
+│   │   ├── slotFlow.ts       # Slot-based flow (text-flow items)
+│   │   ├── polygonPath.ts    # Polygon path + offset utilities
 │   │   ├── signatures.ts     # Signature creation
 │   │   ├── dimensions.ts     # Size calculations
 │   │   └── imposition.ts     # Print imposition
@@ -595,6 +616,7 @@ npm run build       # Production build
 | Feature | Files |
 |---------|-------|
 | Text Layout | `textFlow/` (parsing, measurement, pagination, imposition) |
+| Text-Flow Items | `textFlow/slotFlow.ts`, `textFlow/polygonPath.ts`, `SpreadEditor/items/textFlowRendering.ts`, `SpreadEditor/items/vertexHandles.ts` |
 | PDF Export | `pdfGenerator/`, `pageRenderer.ts` (pre-rendering, fonts, images, itemDrawing) |
 | Page Export | `pageExport.ts` (PNG export, image replacement for static pages) |
 | Canvas Editor | `SpreadEditor/component.ts`, `SpreadEditor/items/` |

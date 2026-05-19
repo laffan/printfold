@@ -163,7 +163,7 @@ interface Signature {
 ### PageItemType
 
 ```typescript
-type PageItemType = 'text' | 'shape' | 'image';
+type PageItemType = 'text' | 'shape' | 'image' | 'textFlow';
 ```
 
 ### PageItemBase
@@ -186,6 +186,11 @@ interface PageItemBase {
   shadowOffsetX?: number;
   shadowOffsetY?: number;
   shadowOpacity?: number;
+  // Stroke/fill offset (perpendicular distance from the path).
+  // Positive expands outward, negative pulls inward, 0 keeps the stroke /
+  // fill on the path. Only applies when stroke / fill is enabled.
+  strokeOffset?: number;
+  fillOffset?: number;
   // Array duplication - multi-dimensional support
   arrayDimensions?: ArrayDimension[];  // Each dimension creates copies with its own offset
 }
@@ -252,10 +257,69 @@ interface ImagePageItem extends PageItemBase {
 }
 ```
 
+### TextFlowPageItem
+
+A region on a static page that pulls a slice of the surrounding
+markdown flow through it (a "mini-page"). Always rendered as a polygon
+internally — `flowShape: 'square'` exists for backward compatibility
+with older serialized projects; new items are created with
+`flowShape: 'polygon'` and a rectangular `polygonPoints` set.
+
+```typescript
+interface TextFlowPageItem extends PageItemBase {
+  type: 'textFlow';
+  flowShape: 'square' | 'polygon';
+  padding?: number;              // Inner padding (points) for square mode
+  fill?: FillConfig;             // Background fill (solid color used)
+  hasFill?: boolean;
+  hasStroke?: boolean;
+  strokeColor?: string;
+  strokeWidth?: number;
+  textColor?: string;            // Overrides per-section color on flowed text
+  polygonPoints?: PolygonPoint[]; // Required for flowShape === 'polygon'
+  // Populated by the text-flow engine on every reflow:
+  flowedSections?: DocumentSection[]; // Square: same shape as PageContent.sections
+  flowedPolygonLines?: PolygonFlowLine[]; // Polygon: pre-positioned lines
+}
+```
+
+### PolygonPoint
+
+Normalized vertex (x, y in [0, 1] relative to the item's bounding box).
+A vertex may be a sharp corner (default) or a smooth cubic-bezier
+point with tangent handles; handles are stored in the same normalized
+space as the anchor itself.
+
+```typescript
+interface PolygonPoint {
+  x: number;
+  y: number;
+  cornerType?: 'corner' | 'smooth';
+  handleIn?: { x: number; y: number };
+  handleOut?: { x: number; y: number };
+}
+```
+
+### PolygonFlowLine
+
+One laid-out line of text inside a polygon-shaped text-flow region.
+The polygon flow algorithm positions each line individually because
+the available width changes with vertical position.
+
+```typescript
+interface PolygonFlowLine {
+  text: string;
+  x: number;                       // Item-local top-left
+  y: number;
+  sectionType: DocumentSection['type'];
+  sectionLevel?: number;
+}
+```
+
 ### PageItem
 
 ```typescript
-type PageItem = TextPageItem | ShapePageItem | ImagePageItem;
+type PageItem = TextPageItem | ShapePageItem | ImagePageItem | TextFlowPageItem;
 ```
 
 ---

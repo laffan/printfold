@@ -21,7 +21,18 @@ OptionsPanel/
 ├── fontOptions.ts      # Typography settings
 ├── headerFooterOptions.ts  # Header/footer configuration
 ├── selectedPage.ts     # Selected page info display
-├── editPage.ts         # Page item editing controls
+├── editPage/           # Modular item-editing controls
+│   ├── index.ts
+│   ├── shared.ts            # Picker / dropdown singletons + tab helpers
+│   ├── itemCreation.ts      # Toolbar "add item" actions
+│   ├── setupPanel.ts        # Toolbar + delete/z-order/background wiring
+│   ├── panelUpdate.ts       # Reflects selected-item state into inputs
+│   ├── propertyInputs.ts    # Bidirectional input → state binding
+│   ├── multiSelect.ts       # Align/distribute/group helpers
+│   ├── arrayInstances.ts    # Array dimension UI
+│   ├── pageBackground.ts    # Page background fill picker
+│   ├── customBackground.ts  # Custom background image management
+│   └── applyRangeModal.ts   # "Apply to range" prompt
 ├── stylesTab.ts        # Dynamic styles tab
 └── index.ts            # Barrel export
 ```
@@ -32,7 +43,7 @@ OptionsPanel/
 
 Contains:
 - **Edit Selected Section** - Properties for selected items (position, size, type-specific options)
-- **Effects Section** - Fill, stroke, shadow, and array effects
+- **Effects Section** - Fill (with offset + text-color override for text-flow), stroke (with offset), shadow, and array effects. Shadow is hidden for text-flow items.
 - **Page Background Section** - Background fill for static pages
 - **Download / Replace Section** - Export and replace static page content (static pages only)
 - **Delete Static Page** - Remove static page and restore to text flow (static pages only)

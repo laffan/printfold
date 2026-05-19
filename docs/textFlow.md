@@ -18,17 +18,24 @@ Markdown Content
   DocumentSection[]
        │
        ▼
-   flowSections()
-       │
-       ▼
-    PageContent[]
+   ┌───┴───┐
+   │       │
+   ▼       ▼  (only when a static page has text-flow items)
+flowSections()    flowSectionsIntoSlots()
+   │                       │
+   │                       ▼
+   │             text-page slots + per-region mini-slots
+   │                       │
+   │                       ▼
+   │                 materializeSlots()
+   │                       │
+   ▼                       ▼
+  PageContent[]  ───►  PageContent[] + updated static pages
        │
        ├──▶ insertBlankPages()
        │
        ▼
-    createSpreads()
-       │
-       ├──▶ mergeStaticSpreads()
+   mergeStaticPagesInPlace()
        │
        ▼
    createSignatures()
@@ -116,6 +123,73 @@ Distributes sections across pages with:
 #### `getMarginsForPage(pageNumber: number): Margins`
 
 Returns margins for a specific page, applying page-specific overrides if configured.
+
+### Slot-Based Flow (`slotFlow.ts`)
+
+Used when at least one static page hosts a text-flow item. The engine
+builds a sequence of slots (full text pages + per-item mini-slots) and
+fills them with sections in document order, so the embedded text-flow
+regions receive the appropriate slice of the markdown.
+
+#### `buildInitialSlots(staticPages, fullPageDim): FlowSlot[]`
+
+Walks from page 1 up to the highest static page number. For each
+position it adds either a full-page text slot or, when a static page
+hosts text-flow items, one slot per item (sorted top-to-bottom).
+Polygon items contribute `polygonItem` slots carrying the flattened
+silhouette; rectangular items contribute regular `item` slots.
+
+#### `flowSectionsIntoSlots(ctx, sections, initialSlots, fullPageDim, staticPages, fontOptions, layoutOptions): FlowSlot[]`
+
+Pours sections through the slot sequence in order. For text-page slots
+the algorithm matches `flowSections` (paragraph splitting, H1 page
+breaks, etc.). For polygon slots it lays out lines one at a time:
+at each y position the polygon's horizontal extent (left → right
+intersections) becomes the line's available width, so wrapping
+respects the silhouette — including curved edges, which are flattened
+ahead of time via `polygonPath.flattenPolygon`. The slot list
+auto-extends with text-page slots as long as content remains.
+
+#### `materializeSlots(filledSlots, staticPages): { textPages, updatedStaticPages }`
+
+Turns text-page slots into `PageContent` entries and writes per-item
+flowed content back onto the host static pages — `flowedSections` for
+rectangular items and `flowedPolygonLines` for polygons.
+
+### Polygon Path Utilities (`polygonPath.ts`)
+
+Geometry helpers shared by the editor, the pre-renderer, and the
+slot-based flow.
+
+#### `buildPolygonPath(points: PolygonPoint[], width, height): string`
+
+Builds an SVG path string (`M ... L ... C ... Z`) for a polygon whose
+vertices may be sharp corners (straight `L`) or smooth bezier points
+(`C` with `handleIn` / `handleOut`).
+
+#### `flattenPolygon(points: PolygonPoint[], width, height): { x; y }[]`
+
+Samples each bezier edge into ~24 line segments, yielding a dense
+polyline that approximates the original curve. Used by the flow
+engine for scanline intersection without solving cubics analytically,
+and by the offset helpers below.
+
+#### `offsetFlatPolygon(points: { x; y }[], offset, miterLimit = 8): { x; y }[]`
+
+True Minkowski-style polygon offset: every edge is shifted along its
+outward normal by `offset`, and adjacent shifted edges meet on the
+vertex's angle bisector (so the perpendicular distance stays constant
+regardless of vertex angle). Winding is detected from the signed area
+so both CW and CCW polygons work; very sharp miters are clamped at
+`miterLimit × |offset|` from the vertex. This is what the **Fill
+Offset** and **Stroke Offset** controls call into.
+
+#### `defaultSmoothHandles(prev, cur, next): { handleIn, handleOut }`
+
+Synthesizes natural tangent handles when a corner is toggled to a
+smooth point (Cmd/Ctrl + click in the editor). Direction is parallel
+to the line from the previous to the next neighbor; magnitude is
+~1/3 of the edge length on each side.
 
 ### Page Organization
 

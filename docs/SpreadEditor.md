@@ -17,7 +17,14 @@ The SpreadEditor provides:
 ```
 SpreadEditor/
 ├── component.ts   # Main SpreadEditor class
-├── items.ts       # Page item rendering and interaction
+├── items/
+│   ├── nodeCreation.ts       # Konva node per page item (incl. text-flow groups)
+│   ├── rendering.ts          # Iterates page items, hands off to nodeCreation
+│   ├── textEditing.ts        # In-place text item editing
+│   ├── arrayItems.ts         # Array-effect copy positioning
+│   ├── fill.ts               # Fill application
+│   ├── textFlowRendering.ts  # Konva nodes for flowed text inside text-flow items
+│   └── vertexHandles.ts      # Polygon vertex + bezier-handle UI
 ├── selection.ts   # Marquee selection and context menu
 ├── content.ts     # Page content rendering
 ├── margins.ts     # Margin guides and dragging
@@ -194,7 +201,7 @@ container.addEventListener('drop', (e) => {
 });
 ```
 
-## Items Module (`items.ts`)
+## Items Module (`items/`)
 
 ### Item Creation
 
@@ -212,6 +219,40 @@ Creates Konva nodes for page items:
 **Other Types:**
 - `text` → `Konva.Text`
 - `image` → `Konva.Image`
+- `textFlow` → `Konva.Group` containing (in z-order): optional offset
+  fill `Konva.Path`, outline `Konva.Path` (or `Konva.Rect` for the
+  rectangular case), optional offset stroke `Konva.Path`, inner content
+  group with the flowed text, then vertex/tangent handles when selected.
+
+### Text-Flow Rendering (`textFlowRendering.ts`)
+
+`drawTextFlowItemContent(group, item)` populates a text-flow item's
+inner content group with Konva nodes — for polygons it walks
+`item.flowedPolygonLines` and draws one `Konva.Text` per laid-out line
+at its pre-computed `(x, y)`; for rectangular items it walks
+`item.flowedSections` and renders heading spacing, plain lines, and
+rich-text spans, honoring `item.textColor` when set.
+
+### Vertex Handles (`vertexHandles.ts`)
+
+`addPolygonVertexHandles(group, outline, item, pageNumber)` is invoked
+from `nodeCreation` whenever a polygon text-flow item is selected. It
+attaches:
+
+- An anchor `Konva.Circle` per vertex. Solid blue interior marks a
+  smooth vertex; hollow marks a corner.
+- For smooth vertices, two smaller tangent dots connected to the
+  anchor by dashed lines.
+- A ghost vertex that tracks the pointer along the edge, previewing
+  where a click would insert a new anchor.
+- Anchor `dragmove`/`dragend` rebuilds the outline path live via
+  `buildPolygonPath` and reframes the item bounding box on release.
+- `mousedown` modifiers on anchors: **Cmd/Ctrl** toggles
+  corner ↔ smooth (synthesizing handles via `defaultSmoothHandles`),
+  **Alt/Option** removes the vertex.
+- A click-near-edge handler on the outline inserts a new vertex at the
+  projection point (debounced through the click event so it doesn't
+  fire mid-drag).
 
 ### Fill Application
 

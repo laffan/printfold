@@ -65,11 +65,20 @@ preRenderStaticPages()
       │                   │
       │                   ├──▶ Draw background (if any)
       │                   ├──▶ Draw page items with gradients/fonts
+      │                   │     – text-flow items go through
+      │                   │       renderTextFlowItem() for fill/stroke
+      │                   │       (with offset polygons) + flowed text
       │                   ├──▶ Draw crossing items (offset and clipped)
       │                   └──▶ Export as PNG at 300 DPI
       │
       └──▶ Cache as PDFImage for each page number
 ```
+
+Text-flow items are rendered as part of the page image (rasterized at
+300 DPI). The fallback path `drawTextFlowItem` inside
+`pdfGenerator/itemDrawing.ts` produces native PDF text instead, and
+is used only when pre-rendering is skipped (no items on the page or
+pre-render failure).
 
 ## Key Methods
 
