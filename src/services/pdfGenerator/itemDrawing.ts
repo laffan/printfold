@@ -25,6 +25,11 @@ export function drawTextFlowItem(
   layoutOptions: LayoutOptions,
   fontCache: FontCache
 ): void {
+  if (item.flowShape === 'polygon') {
+    drawPolygonFlowItem(pdfPage, item, pageX, itemPdfY, fontOptions, fontCache);
+    return;
+  }
+
   const sections = (item.flowedSections as MeasuredSection[] | undefined) || [];
   if (sections.length === 0) return;
 
@@ -128,6 +133,38 @@ export function spanningItemToPageItem(item: SpanningItem): PageItem | null {
     } as ImagePageItem;
   }
   return null;
+}
+
+/**
+ * Draw a polygon-shaped text-flow item: render each pre-positioned line at
+ * its computed (x, y) in item-local coordinates.
+ */
+function drawPolygonFlowItem(
+  pdfPage: PDFPage,
+  item: TextFlowPageItem,
+  pageX: number,
+  itemPdfY: number,
+  fontOptions: FontOptions,
+  fontCache: FontCache
+): void {
+  const lines = item.flowedPolygonLines || [];
+  if (lines.length === 0) return;
+
+  for (const line of lines) {
+    const fontStyle = getFontStyleForSection(line.sectionType, line.sectionLevel, fontOptions);
+    const font = getFont(fontStyle, fontCache);
+    // PDF y is bottom-up. itemPdfY is item bottom; item.height - line.y is
+    // distance from item bottom up to the top of the line; subtract fontSize
+    // to land on the baseline (pdf-lib draws from baseline upward).
+    const baselineY = itemPdfY + (item.height - line.y) - fontStyle.fontSize;
+    pdfPage.drawText(sanitizeText(line.text), {
+      x: pageX + item.x + line.x,
+      y: baselineY,
+      size: fontStyle.fontSize,
+      font,
+      color: parseColor(fontStyle.color),
+    });
+  }
 }
 
 /**

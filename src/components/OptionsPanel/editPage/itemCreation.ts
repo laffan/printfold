@@ -45,13 +45,25 @@ export function addItemToCurrentPage(
       textAlign: 'left',
     } as TextPageItem;
   } else if (isTextFlow) {
+    const flowShape = itemType === 'textFlowSquare' ? 'square' : 'polygon';
     item = {
       ...baseItem,
       type: 'textFlow',
-      flowShape: itemType === 'textFlowSquare' ? 'square' : 'polygon',
+      flowShape,
       padding: 8,
       borderColor: '#888888',
       borderWidth: 1,
+      // Default polygon = regular hexagon inscribed in the bounding box.
+      polygonPoints: flowShape === 'polygon'
+        ? [
+            { x: 0.5, y: 0 },
+            { x: 1.0, y: 0.25 },
+            { x: 1.0, y: 0.75 },
+            { x: 0.5, y: 1 },
+            { x: 0, y: 0.75 },
+            { x: 0, y: 0.25 },
+          ]
+        : undefined,
     } as TextFlowPageItem;
   } else {
     item = {

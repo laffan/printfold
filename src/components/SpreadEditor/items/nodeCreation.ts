@@ -147,8 +147,20 @@ export function createItemNode(
 
     node = textNode;
   } else if (item.type === 'textFlow') {
-    // Group container for the dashed outline + the flowed content drawn inside it.
     const flowItem = item as TextFlowPageItem;
+    const isPolygon =
+      flowItem.flowShape === 'polygon' &&
+      flowItem.polygonPoints &&
+      flowItem.polygonPoints.length >= 3;
+
+    // Absolute (item-local) polygon coords, used for both clipping and outline.
+    const polygonAbs = isPolygon
+      ? flowItem.polygonPoints!.map(p => ({
+          x: p.x * item.width,
+          y: p.y * item.height,
+        }))
+      : null;
+
     const group = new Konva.Group({
       x: xOffset + item.x,
       y: item.y,
@@ -158,24 +170,46 @@ export function createItemNode(
       width: item.width,
       height: item.height,
       clipFunc: (ctx) => {
-        ctx.rect(0, 0, item.width, item.height);
+        if (polygonAbs) {
+          ctx.beginPath();
+          ctx.moveTo(polygonAbs[0].x, polygonAbs[0].y);
+          for (let i = 1; i < polygonAbs.length; i++) {
+            ctx.lineTo(polygonAbs[i].x, polygonAbs[i].y);
+          }
+          ctx.closePath();
+        } else {
+          ctx.rect(0, 0, item.width, item.height);
+        }
       },
     });
 
-    // Background rect serves as the hit target for the group; its near-zero
-    // alpha fill keeps the whole interior pointer-active without being visible.
-    const bgRect = new Konva.Rect({
-      x: 0,
-      y: 0,
-      width: item.width,
-      height: item.height,
-      stroke: flowItem.borderColor ?? '#888888',
-      strokeWidth: flowItem.borderWidth ?? 1,
-      dash: [4, 4],
-      fill: 'rgba(0,0,0,0.001)',
-      listening: true,
-    });
-    group.add(bgRect);
+    // Hit-area shape: either the polygon or a square. Near-zero alpha fill so
+    // the whole interior catches pointer events while staying invisible.
+    if (polygonAbs) {
+      const polyShape = new Konva.Line({
+        points: polygonAbs.flatMap(p => [p.x, p.y]),
+        closed: true,
+        stroke: flowItem.borderColor ?? '#888888',
+        strokeWidth: flowItem.borderWidth ?? 1,
+        dash: [4, 4],
+        fill: 'rgba(0,0,0,0.001)',
+        listening: true,
+      });
+      group.add(polyShape);
+    } else {
+      const bgRect = new Konva.Rect({
+        x: 0,
+        y: 0,
+        width: item.width,
+        height: item.height,
+        stroke: flowItem.borderColor ?? '#888888',
+        strokeWidth: flowItem.borderWidth ?? 1,
+        dash: [4, 4],
+        fill: 'rgba(0,0,0,0.001)',
+        listening: true,
+      });
+      group.add(bgRect);
+    }
 
     drawTextFlowItemContent(group, flowItem);
 

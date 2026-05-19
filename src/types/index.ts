@@ -192,11 +192,25 @@ export interface TextFlowPageItem extends PageItemBase {
   padding?: number; // Inner padding in points (acts like mini-margins)
   borderColor?: string; // Optional outline (mostly for editor visibility)
   borderWidth?: number;
-  // Polygon-specific (future): points relative to (x, y)
-  points?: { x: number; y: number }[];
+  // Normalized polygon vertices (each x,y in [0,1] relative to the item's
+  // bounding box). Only used when flowShape === 'polygon'.
+  polygonPoints?: { x: number; y: number }[];
   // Flowed content (populated by the text flow engine).
-  // Sections are MeasuredSection at runtime (DocumentSection plus measured lines).
+  // For 'square': MeasuredSection at runtime (DocumentSection plus measured lines).
+  // For 'polygon': use `flowedPolygonLines` instead.
   flowedSections?: DocumentSection[];
+  flowedPolygonLines?: PolygonFlowLine[];
+}
+
+// One laid-out line of text inside a polygon-shaped text-flow region.
+// The polygon flow algorithm positions each line individually because the
+// available width changes with vertical position.
+export interface PolygonFlowLine {
+  text: string;
+  x: number; // From item top-left
+  y: number; // From item top-left (top of line)
+  sectionType: DocumentSection['type'];
+  sectionLevel?: number;
 }
 
 export type PageItem = TextPageItem | ShapePageItem | ImagePageItem | TextFlowPageItem;

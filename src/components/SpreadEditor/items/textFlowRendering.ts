@@ -17,12 +17,17 @@ import type {
 import type { MeasuredSection } from '../../../services/textFlow/types';
 
 /**
- * Render flowed sections into the supplied group at (padding, padding).
+ * Render flowed content into the supplied group. Square text-flow items use
+ * MeasuredSection layout; polygon items render pre-positioned lines.
  */
 export function drawTextFlowItemContent(
   group: Konva.Group,
   item: TextFlowPageItem
 ): void {
+  if (item.flowShape === 'polygon') {
+    drawPolygonFlowLines(group, item);
+    return;
+  }
   const sections = (item.flowedSections as MeasuredSection[] | undefined) || [];
   if (sections.length === 0) {
     // Placeholder hint when nothing has flowed in yet.
@@ -104,6 +109,46 @@ export function drawTextFlowItemContent(
     }
 
     cursorY += project.layoutOptions.paragraphSpacing;
+  }
+}
+
+function drawPolygonFlowLines(group: Konva.Group, item: TextFlowPageItem): void {
+  const lines = item.flowedPolygonLines;
+  if (!lines || lines.length === 0) {
+    const hint = new Konva.Text({
+      x: 0,
+      y: item.height / 2 - 7,
+      width: item.width,
+      text: 'Text flow',
+      fontSize: 11,
+      fill: '#999999',
+      align: 'center',
+      listening: false,
+    });
+    group.add(hint);
+    return;
+  }
+
+  for (const line of lines) {
+    const fontStyle = getFontStyleForSection(line.sectionType, line.sectionLevel);
+    let combined = '';
+    if (fontStyle.fontWeight === 'bold') combined += 'bold';
+    if (fontStyle.fontStyle === 'italic') {
+      combined += (combined ? ' ' : '') + 'italic';
+    }
+    if (!combined) combined = 'normal';
+
+    const text = new Konva.Text({
+      x: line.x,
+      y: line.y,
+      text: line.text,
+      fontSize: fontStyle.fontSize,
+      fontFamily: fontStyle.fontFamily,
+      fontStyle: combined,
+      fill: fontStyle.color,
+      listening: false,
+    });
+    group.add(text);
   }
 }
 
