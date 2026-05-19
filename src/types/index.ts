@@ -205,8 +205,10 @@ export interface TextFlowPageItem extends PageItemBase {
   // Override color applied to all flowed text inside the region.
   textColor?: string;
   // Normalized polygon vertices (each x,y in [0,1] relative to the item's
-  // bounding box). Only used when flowShape === 'polygon'.
-  polygonPoints?: { x: number; y: number }[];
+  // bounding box). Only used when flowShape === 'polygon'. Each vertex
+  // may be a sharp corner (default) or a smooth point with bezier
+  // tangent handles.
+  polygonPoints?: PolygonPoint[];
   // Flowed content (populated by the text flow engine).
   // For 'square': MeasuredSection at runtime (DocumentSection plus measured lines).
   // For 'polygon': use `flowedPolygonLines` instead.
@@ -223,6 +225,18 @@ export interface PolygonFlowLine {
   y: number; // From item top-left (top of line)
   sectionType: DocumentSection['type'];
   sectionLevel?: number;
+}
+
+// A single vertex on a text-flow polygon. Defaults to a sharp corner;
+// when cornerType is 'smooth' the two normalized handle positions
+// describe cubic-bezier tangents in/out of the vertex (absolute
+// normalized coordinates, same space as the vertex itself).
+export interface PolygonPoint {
+  x: number;
+  y: number;
+  cornerType?: 'corner' | 'smooth';
+  handleIn?: { x: number; y: number };
+  handleOut?: { x: number; y: number };
 }
 
 export type PageItem = TextPageItem | ShapePageItem | ImagePageItem | TextFlowPageItem;

@@ -9,6 +9,7 @@ import { calculateArrayPositions, getTotalArrayInstances } from '../components/S
 import { applyTextTransform } from './textFlow';
 import type { PageContent, PageItem, TextPageItem, ShapePageItem, ImagePageItem, TextFlowPageItem, FillConfig, FontStyle, RichTextLine, TextSpan } from '../types';
 import type { MeasuredSection } from './textFlow/types';
+import { buildPolygonPath } from './textFlow/polygonPath';
 
 // Target DPI for print-quality rendering
 const PRINT_DPI = 300;
@@ -584,24 +585,44 @@ function renderTextContent(
 }
 
 /**
- * Push every vertex of `points` outward by `offset` along the radial
- * direction from the polygon's centroid. Used by the stroke-offset
- * effect for text-flow polygons.
+ * Build a stroke-offset version of a polygon by pushing every anchor (and
+ * bezier handle, for smooth points) outward from the centroid by the
+ * given offset, in normalized space. Smooth/curved edges keep their shape.
  */
-function offsetPolygonOutwardScaled(
-  points: { x: number; y: number }[],
-  offset: number
-): { x: number; y: number }[] {
+function offsetSmoothPolygonOutward(
+  points: import('../types').PolygonPoint[],
+  offsetScaled: number,
+  scaledWidth: number,
+  scaledHeight: number
+): import('../types').PolygonPoint[] {
   if (points.length === 0) return points;
   const cx = points.reduce((s, p) => s + p.x, 0) / points.length;
   const cy = points.reduce((s, p) => s + p.y, 0) / points.length;
-  return points.map(p => {
-    const dx = p.x - cx;
-    const dy = p.y - cy;
+  // Convert offset (in scaled units) back to normalized along the larger
+  // axis so the radial push reads naturally regardless of scale.
+  const offNorm = offsetScaled / Math.max(scaledWidth, scaledHeight);
+
+  const pushOut = (px: number, py: number) => {
+    const dx = px - cx;
+    const dy = py - cy;
     const dist = Math.hypot(dx, dy);
-    if (dist === 0) return p;
-    const factor = (dist + offset) / dist;
+    if (dist === 0) return { x: px, y: py };
+    const factor = (dist + offNorm) / dist;
     return { x: cx + dx * factor, y: cy + dy * factor };
+  };
+
+  return points.map(p => {
+    const anchor = pushOut(p.x, p.y);
+    if (p.cornerType !== 'smooth') {
+      return { ...p, x: anchor.x, y: anchor.y };
+    }
+    return {
+      ...p,
+      x: anchor.x,
+      y: anchor.y,
+      handleIn: p.handleIn ? pushOut(p.handleIn.x, p.handleIn.y) : undefined,
+      handleOut: p.handleOut ? pushOut(p.handleOut.x, p.handleOut.y) : undefined,
+    };
   });
 }
 
@@ -652,7 +673,8 @@ function renderTextFlowItem(
 
   // Fill and stroke (only when enabled by the user). Editor-only dashed
   // border isn't rendered here. Stroke with a non-zero offset is drawn as
-  // a separate outline shape so it sits at the offset position.
+  // a separate outline shape so it sits at the offset position. Polygons
+  // use Konva.Path so smooth (bezier) vertices render correctly.
   const hasFill = item.hasFill === true;
   const hasStroke = item.hasStroke === true;
   const fillColor = hasFill
@@ -661,10 +683,9 @@ function renderTextFlowItem(
   const strokeOffset = (item.strokeOffset ?? 0) * scale;
   const strokeOnPath = hasStroke && strokeOffset === 0;
   if (hasFill || strokeOnPath) {
-    if (polygonAbsScaled) {
-      group.add(new Konva.Line({
-        points: polygonAbsScaled.flatMap(p => [p.x, p.y]),
-        closed: true,
+    if (item.polygonPoints && item.polygonPoints.length >= 3) {
+      group.add(new Konva.Path({
+        data: buildPolygonPath(item.polygonPoints, scaledWidth, scaledHeight),
         fill: fillColor,
         stroke: strokeOnPath ? (item.strokeColor || '#000000') : undefined,
         strokeWidth: strokeOnPath ? (item.strokeWidth ?? 1) * scale : 0,
@@ -682,11 +703,10 @@ function renderTextFlowItem(
     }
   }
   if (hasStroke && strokeOffset !== 0) {
-    if (polygonAbsScaled) {
-      const offsetPts = offsetPolygonOutwardScaled(polygonAbsScaled, strokeOffset);
-      group.add(new Konva.Line({
-        points: offsetPts.flatMap(p => [p.x, p.y]),
-        closed: true,
+    if (item.polygonPoints && item.polygonPoints.length >= 3) {
+      const offsetPts = offsetSmoothPolygonOutward(item.polygonPoints, strokeOffset, scaledWidth, scaledHeight);
+      group.add(new Konva.Path({
+        data: buildPolygonPath(offsetPts, scaledWidth, scaledHeight),
         stroke: item.strokeColor || '#000000',
         strokeWidth: (item.strokeWidth ?? 1) * scale,
       }));

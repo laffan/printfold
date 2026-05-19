@@ -10,6 +10,7 @@
 
 import { measureSection, getFontStyleForSection, measureTextWidth } from './measurement';
 import { applyTextTransform } from './parsing';
+import { flattenPolygon } from './polygonPath';
 import type { MeasuredSection, PageDimensions } from './types';
 import type {
   DocumentSection,
@@ -64,11 +65,10 @@ export function buildInitialSlots(
       for (const item of textFlowItems) {
         const padding = item.padding ?? 0;
         if (item.flowShape === 'polygon' && item.polygonPoints && item.polygonPoints.length >= 3) {
-          // Convert normalized polygon to absolute item-local coords.
-          const absPoints = item.polygonPoints.map(p => ({
-            x: p.x * item.width,
-            y: p.y * item.height,
-          }));
+          // Flatten the polygon (sampling any smooth bezier edges) so the
+          // scanline intersection logic below can stay simple — line/segment
+          // intersection over a dense polyline that still hugs the curve.
+          const absPoints = flattenPolygon(item.polygonPoints, item.width, item.height);
           slots.push({
             kind: 'polygonItem',
             contentWidth: item.width,

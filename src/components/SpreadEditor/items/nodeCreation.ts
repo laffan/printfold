@@ -8,30 +8,52 @@ import { switchToSelectedTab } from '../../OptionsPanel/editPage';
 import { applyFillToShape } from './fill';
 import { startTextEditing } from './textEditing';
 import { applyTextTransform } from '../../../services/textFlow';
-import type { PageItem, TextPageItem, ShapePageItem, ImagePageItem, TextFlowPageItem } from '../../../types';
+import type { PageItem, TextPageItem, ShapePageItem, ImagePageItem, TextFlowPageItem, PolygonPoint } from '../../../types';
 import { drawTextFlowItemContent } from './textFlowRendering';
 import { addPolygonVertexHandles } from './vertexHandles';
+import { buildPolygonPath } from '../../../services/textFlow/polygonPath';
 
 /**
- * Move every vertex of a polygon outward (or inward, for negative offsets)
- * by the given distance, measured radially from the polygon's centroid.
- * Simple approximation that works cleanly for convex polygons — enough for
- * the stroke-offset effect; not a true polygon-offset (Minkowski sum).
+ * Build a stroke-offset version of a polygon by pushing every anchor (and
+ * bezier handles, for smooth points) outward from the centroid by the
+ * given offset. Simple radial scaling — clean for convex polygons.
  */
-function offsetPolygonOutward(
-  points: { x: number; y: number }[],
-  offset: number
-): { x: number; y: number }[] {
+function offsetPolygonOutwardPoints(
+  points: PolygonPoint[],
+  offset: number,
+  width: number,
+  height: number
+): PolygonPoint[] {
   if (points.length === 0) return points;
+  // Compute centroid in normalized (pre-anchor-multiply) coords.
   const cx = points.reduce((s, p) => s + p.x, 0) / points.length;
   const cy = points.reduce((s, p) => s + p.y, 0) / points.length;
-  return points.map(p => {
-    const dx = p.x - cx;
-    const dy = p.y - cy;
+  // Convert offset (in points) to normalized space along the larger axis
+  // so the radial push reads naturally.
+  const radiusUnit = Math.max(width, height);
+  const offNorm = offset / radiusUnit;
+
+  const pushOut = (px: number, py: number) => {
+    const dx = px - cx;
+    const dy = py - cy;
     const dist = Math.hypot(dx, dy);
-    if (dist === 0) return p;
-    const factor = (dist + offset) / dist;
+    if (dist === 0) return { x: px, y: py };
+    const factor = (dist + offNorm) / dist;
     return { x: cx + dx * factor, y: cy + dy * factor };
+  };
+
+  return points.map(p => {
+    const anchor = pushOut(p.x, p.y);
+    if (p.cornerType !== 'smooth') {
+      return { ...p, x: anchor.x, y: anchor.y };
+    }
+    return {
+      ...p,
+      x: anchor.x,
+      y: anchor.y,
+      handleIn: p.handleIn ? pushOut(p.handleIn.x, p.handleIn.y) : undefined,
+      handleOut: p.handleOut ? pushOut(p.handleOut.x, p.handleOut.y) : undefined,
+    };
   });
 }
 
@@ -215,11 +237,14 @@ export function createItemNode(
     const fillNodeStrokeWidth = userHasStroke && strokeOffset === 0 ? userStrokeWidth : 1;
     const fillNodeDash = userHasStroke ? undefined : [4, 4];
 
-    let polygonOutline: Konva.Line | null = null;
-    if (polygonAbs) {
-      polygonOutline = new Konva.Line({
-        points: polygonAbs.flatMap(p => [p.x, p.y]),
-        closed: true,
+    // The polygon outline supports curved (bezier) edges when any vertex
+    // is smooth, so it's rendered via Konva.Path. Straight all-corner
+    // polygons still go through the same path renderer for simplicity.
+    let polygonOutline: Konva.Path | Konva.Line | null = null;
+    if (polygonAbs && flowItem.polygonPoints) {
+      const pathData = buildPolygonPath(flowItem.polygonPoints, item.width, item.height);
+      polygonOutline = new Konva.Path({
+        data: pathData,
         stroke: fillNodeStroke,
         strokeWidth: fillNodeStrokeWidth,
         dash: fillNodeDash,
@@ -245,11 +270,11 @@ export function createItemNode(
     // Offset stroke: drawn as a separate outline shape sized at the offset
     // position so the stroke literally floats outside (or inside) the path.
     if (userHasStroke && strokeOffset !== 0) {
-      if (polygonAbs) {
-        const offsetPts = offsetPolygonOutward(polygonAbs, strokeOffset);
-        outerGroup.add(new Konva.Line({
-          points: offsetPts.flatMap(p => [p.x, p.y]),
-          closed: true,
+      if (polygonAbs && flowItem.polygonPoints) {
+        const offsetPts = offsetPolygonOutwardPoints(flowItem.polygonPoints, strokeOffset, item.width, item.height);
+        const offsetPath = buildPolygonPath(offsetPts, item.width, item.height);
+        outerGroup.add(new Konva.Path({
+          data: offsetPath,
           stroke: userStrokeColor,
           strokeWidth: userStrokeWidth,
           listening: false,
