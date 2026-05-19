@@ -162,6 +162,8 @@ export function createItemNode(
       },
     });
 
+    // Background rect serves as the hit target for the group; its near-zero
+    // alpha fill keeps the whole interior pointer-active without being visible.
     const bgRect = new Konva.Rect({
       x: 0,
       y: 0,
@@ -170,8 +172,8 @@ export function createItemNode(
       stroke: flowItem.borderColor ?? '#888888',
       strokeWidth: flowItem.borderWidth ?? 1,
       dash: [4, 4],
-      fill: 'transparent',
-      listening: false,
+      fill: 'rgba(0,0,0,0.001)',
+      listening: true,
     });
     group.add(bgRect);
 
