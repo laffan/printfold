@@ -622,17 +622,9 @@ function renderTextFlowItem(
     height: scaledHeight,
     rotation: item.rotation || 0,
     opacity: item.opacity ?? 1,
-    clipFunc: (ctx) => {
-      if (polygonAbsScaled) {
-        ctx.beginPath();
-        ctx.moveTo(polygonAbsScaled[0].x, polygonAbsScaled[0].y);
-        for (let i = 1; i < polygonAbsScaled.length; i++) {
-          ctx.lineTo(polygonAbsScaled[i].x, polygonAbsScaled[i].y);
-        }
-        ctx.closePath();
-      } else {
-        ctx.rect(0, 0, scaledWidth, scaledHeight);
-      }
+    // Polygon items skip the clip — wrapping already follows the silhouette.
+    clipFunc: polygonAbsScaled ? undefined : (ctx) => {
+      ctx.rect(0, 0, scaledWidth, scaledHeight);
     },
   });
 

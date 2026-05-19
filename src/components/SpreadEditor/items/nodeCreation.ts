@@ -174,24 +174,17 @@ export function createItemNode(
       height: item.height,
     });
 
-    // Inner group: clips the flowed text to the item's shape.
+    // Inner group: clips the flowed text to the item's shape. Polygons
+    // skip the clip — wrapping already respects the polygon's silhouette,
+    // and descenders / ascenders should be free to extend past the edge.
     const contentGroup = new Konva.Group({
       x: 0,
       y: 0,
       width: item.width,
       height: item.height,
       listening: false,
-      clipFunc: (ctx) => {
-        if (polygonAbs) {
-          ctx.beginPath();
-          ctx.moveTo(polygonAbs[0].x, polygonAbs[0].y);
-          for (let i = 1; i < polygonAbs.length; i++) {
-            ctx.lineTo(polygonAbs[i].x, polygonAbs[i].y);
-          }
-          ctx.closePath();
-        } else {
-          ctx.rect(0, 0, item.width, item.height);
-        }
+      clipFunc: polygonAbs ? undefined : (ctx) => {
+        ctx.rect(0, 0, item.width, item.height);
       },
     });
     drawTextFlowItemContent(contentGroup, flowItem);
