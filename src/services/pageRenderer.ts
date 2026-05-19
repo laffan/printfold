@@ -9,7 +9,7 @@ import { calculateArrayPositions, getTotalArrayInstances } from '../components/S
 import { applyTextTransform } from './textFlow';
 import type { PageContent, PageItem, TextPageItem, ShapePageItem, ImagePageItem, TextFlowPageItem, FillConfig, FontStyle, RichTextLine, TextSpan } from '../types';
 import type { MeasuredSection } from './textFlow/types';
-import { buildPolygonPath } from './textFlow/polygonPath';
+import { buildPolygonPath, flattenPolygon, offsetFlatPolygon, buildFlatPath } from './textFlow/polygonPath';
 
 // Target DPI for print-quality rendering
 const PRINT_DPI = 300;
@@ -585,48 +585,6 @@ function renderTextContent(
 }
 
 /**
- * Build a stroke-offset version of a polygon by pushing every anchor (and
- * bezier handle, for smooth points) outward from the centroid by the
- * given offset, in normalized space. Smooth/curved edges keep their shape.
- */
-function offsetSmoothPolygonOutward(
-  points: import('../types').PolygonPoint[],
-  offsetScaled: number,
-  scaledWidth: number,
-  scaledHeight: number
-): import('../types').PolygonPoint[] {
-  if (points.length === 0) return points;
-  const cx = points.reduce((s, p) => s + p.x, 0) / points.length;
-  const cy = points.reduce((s, p) => s + p.y, 0) / points.length;
-  // Convert offset (in scaled units) back to normalized along the larger
-  // axis so the radial push reads naturally regardless of scale.
-  const offNorm = offsetScaled / Math.max(scaledWidth, scaledHeight);
-
-  const pushOut = (px: number, py: number) => {
-    const dx = px - cx;
-    const dy = py - cy;
-    const dist = Math.hypot(dx, dy);
-    if (dist === 0) return { x: px, y: py };
-    const factor = (dist + offNorm) / dist;
-    return { x: cx + dx * factor, y: cy + dy * factor };
-  };
-
-  return points.map(p => {
-    const anchor = pushOut(p.x, p.y);
-    if (p.cornerType !== 'smooth') {
-      return { ...p, x: anchor.x, y: anchor.y };
-    }
-    return {
-      ...p,
-      x: anchor.x,
-      y: anchor.y,
-      handleIn: p.handleIn ? pushOut(p.handleIn.x, p.handleIn.y) : undefined,
-      handleOut: p.handleOut ? pushOut(p.handleOut.x, p.handleOut.y) : undefined,
-    };
-  });
-}
-
-/**
  * Render a text-flow page item into the supplied layer at scale, so the
  * flowed content shows up in pre-rendered page images (and therefore in
  * the exported PDF).
@@ -688,9 +646,10 @@ function renderTextFlowItem(
   // Offset fill comes first so it sits behind everything else.
   if (hasFill && fillOffset !== 0 && fillColor !== undefined) {
     if (item.polygonPoints && item.polygonPoints.length >= 3) {
-      const offsetPts = offsetSmoothPolygonOutward(item.polygonPoints, fillOffset, scaledWidth, scaledHeight);
+      const flat = flattenPolygon(item.polygonPoints, scaledWidth, scaledHeight);
+      const offsetPts = offsetFlatPolygon(flat, fillOffset);
       group.add(new Konva.Path({
-        data: buildPolygonPath(offsetPts, scaledWidth, scaledHeight),
+        data: buildFlatPath(offsetPts),
         fill: fillColor,
       }));
     } else {
@@ -726,9 +685,10 @@ function renderTextFlowItem(
   }
   if (hasStroke && strokeOffset !== 0) {
     if (item.polygonPoints && item.polygonPoints.length >= 3) {
-      const offsetPts = offsetSmoothPolygonOutward(item.polygonPoints, strokeOffset, scaledWidth, scaledHeight);
+      const flat = flattenPolygon(item.polygonPoints, scaledWidth, scaledHeight);
+      const offsetPts = offsetFlatPolygon(flat, strokeOffset);
       group.add(new Konva.Path({
-        data: buildPolygonPath(offsetPts, scaledWidth, scaledHeight),
+        data: buildFlatPath(offsetPts),
         stroke: item.strokeColor || '#000000',
         strokeWidth: (item.strokeWidth ?? 1) * scale,
       }));

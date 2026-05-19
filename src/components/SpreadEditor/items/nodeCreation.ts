@@ -8,54 +8,11 @@ import { switchToSelectedTab } from '../../OptionsPanel/editPage';
 import { applyFillToShape } from './fill';
 import { startTextEditing } from './textEditing';
 import { applyTextTransform } from '../../../services/textFlow';
-import type { PageItem, TextPageItem, ShapePageItem, ImagePageItem, TextFlowPageItem, PolygonPoint } from '../../../types';
+import type { PageItem, TextPageItem, ShapePageItem, ImagePageItem, TextFlowPageItem } from '../../../types';
 import { drawTextFlowItemContent } from './textFlowRendering';
 import { addPolygonVertexHandles } from './vertexHandles';
-import { buildPolygonPath } from '../../../services/textFlow/polygonPath';
+import { buildPolygonPath, flattenPolygon, offsetFlatPolygon, buildFlatPath } from '../../../services/textFlow/polygonPath';
 
-/**
- * Build a stroke-offset version of a polygon by pushing every anchor (and
- * bezier handles, for smooth points) outward from the centroid by the
- * given offset. Simple radial scaling — clean for convex polygons.
- */
-function offsetPolygonOutwardPoints(
-  points: PolygonPoint[],
-  offset: number,
-  width: number,
-  height: number
-): PolygonPoint[] {
-  if (points.length === 0) return points;
-  // Compute centroid in normalized (pre-anchor-multiply) coords.
-  const cx = points.reduce((s, p) => s + p.x, 0) / points.length;
-  const cy = points.reduce((s, p) => s + p.y, 0) / points.length;
-  // Convert offset (in points) to normalized space along the larger axis
-  // so the radial push reads naturally.
-  const radiusUnit = Math.max(width, height);
-  const offNorm = offset / radiusUnit;
-
-  const pushOut = (px: number, py: number) => {
-    const dx = px - cx;
-    const dy = py - cy;
-    const dist = Math.hypot(dx, dy);
-    if (dist === 0) return { x: px, y: py };
-    const factor = (dist + offNorm) / dist;
-    return { x: cx + dx * factor, y: cy + dy * factor };
-  };
-
-  return points.map(p => {
-    const anchor = pushOut(p.x, p.y);
-    if (p.cornerType !== 'smooth') {
-      return { ...p, x: anchor.x, y: anchor.y };
-    }
-    return {
-      ...p,
-      x: anchor.x,
-      y: anchor.y,
-      handleIn: p.handleIn ? pushOut(p.handleIn.x, p.handleIn.y) : undefined,
-      handleOut: p.handleOut ? pushOut(p.handleOut.x, p.handleOut.y) : undefined,
-    };
-  });
-}
 
 /**
  * Create a Konva node for a page item
@@ -252,9 +209,12 @@ export function createItemNode(
     // Placed BEFORE the outline so the text and outline render on top.
     if (userHasFill && fillOffset !== 0 && realFillColor) {
       if (polygonAbs && flowItem.polygonPoints) {
-        const offsetPts = offsetPolygonOutwardPoints(flowItem.polygonPoints, fillOffset, item.width, item.height);
+        // Flatten any bezier edges, then run a true polygon offset so the
+        // padding stays at uniform perpendicular distance from every edge.
+        const flat = flattenPolygon(flowItem.polygonPoints, item.width, item.height);
+        const offsetPts = offsetFlatPolygon(flat, fillOffset);
         outerGroup.add(new Konva.Path({
-          data: buildPolygonPath(offsetPts, item.width, item.height),
+          data: buildFlatPath(offsetPts),
           fill: realFillColor,
           listening: true,
         }));
@@ -304,10 +264,10 @@ export function createItemNode(
     // position so the stroke literally floats outside (or inside) the path.
     if (userHasStroke && strokeOffset !== 0) {
       if (polygonAbs && flowItem.polygonPoints) {
-        const offsetPts = offsetPolygonOutwardPoints(flowItem.polygonPoints, strokeOffset, item.width, item.height);
-        const offsetPath = buildPolygonPath(offsetPts, item.width, item.height);
+        const flat = flattenPolygon(flowItem.polygonPoints, item.width, item.height);
+        const offsetPts = offsetFlatPolygon(flat, strokeOffset);
         outerGroup.add(new Konva.Path({
-          data: offsetPath,
+          data: buildFlatPath(offsetPts),
           stroke: userStrokeColor,
           strokeWidth: userStrokeWidth,
           listening: false,

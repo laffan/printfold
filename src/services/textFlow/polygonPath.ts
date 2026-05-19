@@ -145,3 +145,99 @@ export function defaultSmoothHandles(
     handleOut: { x: cur.x + ux * outDist, y: cur.y + uy * outDist },
   };
 }
+
+/**
+ * True polygon offset (Minkowski-style): every edge is shifted along its
+ * outward normal by `offset`, and adjacent shifted edges meet on the
+ * vertex's angle bisector. This maintains constant perpendicular distance
+ * from every edge, regardless of vertex angle — unlike a centroid-radial
+ * scale, which distorts irregular shapes.
+ *
+ * Operates on a flat polyline (so callers should run `flattenPolygon`
+ * first when the source has curved edges). Winding is detected
+ * automatically. The miter join is clamped at `miterLimit * |offset|`
+ * from the vertex so very sharp corners don't spike infinitely.
+ */
+export function offsetFlatPolygon(
+  points: { x: number; y: number }[],
+  offset: number,
+  miterLimit = 8
+): { x: number; y: number }[] {
+  const n = points.length;
+  if (n < 3 || offset === 0) return points.map(p => ({ ...p }));
+
+  // Signed area decides winding so we know which perpendicular is outward.
+  // In screen coords (y-down), positive shoelace = clockwise.
+  let signedArea = 0;
+  for (let i = 0; i < n; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % n];
+    signedArea += a.x * b.y - b.x * a.y;
+  }
+  const isCW = signedArea > 0;
+  // Outward perpendicular of a direction (dx, dy):
+  //   CW polygon in screen coords ⇒ (dy, -dx)
+  //   CCW polygon              ⇒ (-dy, dx)
+  const perpOutward = (dx: number, dy: number) =>
+    isCW ? { x: dy, y: -dx } : { x: -dy, y: dx };
+
+  const maxBisectorDist = Math.abs(offset) * miterLimit;
+  const result: { x: number; y: number }[] = [];
+
+  for (let i = 0; i < n; i++) {
+    const prev = points[(i - 1 + n) % n];
+    const cur = points[i];
+    const next = points[(i + 1) % n];
+
+    const inDx = cur.x - prev.x;
+    const inDy = cur.y - prev.y;
+    const inLen = Math.hypot(inDx, inDy) || 1;
+    const inUx = inDx / inLen;
+    const inUy = inDy / inLen;
+
+    const outDx = next.x - cur.x;
+    const outDy = next.y - cur.y;
+    const outLen = Math.hypot(outDx, outDy) || 1;
+    const outUx = outDx / outLen;
+    const outUy = outDy / outLen;
+
+    const inN = perpOutward(inUx, inUy);
+    const outN = perpOutward(outUx, outUy);
+
+    let bx = inN.x + outN.x;
+    let by = inN.y + outN.y;
+    const bLen = Math.hypot(bx, by);
+
+    if (bLen < 1e-6) {
+      // Anti-parallel edges (straight-through vertex) — just shift along
+      // the incoming normal.
+      result.push({ x: cur.x + inN.x * offset, y: cur.y + inN.y * offset });
+      continue;
+    }
+    bx /= bLen;
+    by /= bLen;
+
+    // Distance along the bisector that places the offset point exactly
+    // `offset` units perpendicular from each adjoining edge.
+    const cosHalf = bx * inN.x + by * inN.y; // = bisector · inNormal
+    let d = offset / (cosHalf || 1);
+    if (Math.abs(d) > maxBisectorDist) {
+      d = Math.sign(d) * maxBisectorDist;
+    }
+
+    result.push({ x: cur.x + bx * d, y: cur.y + by * d });
+  }
+
+  return result;
+}
+
+/** Build a closed SVG path (straight edges only) from flat polygon points. */
+export function buildFlatPath(points: { x: number; y: number }[]): string {
+  if (points.length === 0) return '';
+  const cmds: string[] = [`M ${points[0].x} ${points[0].y}`];
+  for (let i = 1; i < points.length; i++) {
+    cmds.push(`L ${points[i].x} ${points[i].y}`);
+  }
+  cmds.push('Z');
+  return cmds.join(' ');
+}
