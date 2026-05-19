@@ -231,11 +231,44 @@ export function createItemNode(
     const userStrokeColor = flowItem.strokeColor || '#000000';
     const userStrokeWidth = flowItem.strokeWidth ?? 1;
     const strokeOffset = userHasStroke ? (flowItem.strokeOffset ?? 0) : 0;
+    const fillOffset = userHasFill ? (flowItem.fillOffset ?? 0) : 0;
+    // Real fill color value (used either on the outline path itself or on
+    // a separate offset fill shape below it).
+    const realFillColor = userHasFill
+      ? (flowItem.fill?.type === 'color' ? (flowItem.fill?.color || '#ffffff') : '#ffffff')
+      : null;
+    // Offset fill renders separately. The main outline keeps a near-zero
+    // alpha fill so it still catches clicks (and isn't visually filled twice).
+    const outlineFill = fillOffset !== 0 && realFillColor !== null
+      ? 'rgba(0,0,0,0.001)'
+      : fillColor;
     // Fill node = original shape. Stroke is on it only when stroke is
     // enabled AND no offset (offset != 0 needs a separate stroke shape).
     const fillNodeStroke = userHasStroke && strokeOffset === 0 ? userStrokeColor : '#888888';
     const fillNodeStrokeWidth = userHasStroke && strokeOffset === 0 ? userStrokeWidth : 1;
     const fillNodeDash = userHasStroke ? undefined : [4, 4];
+
+    // Offset fill: draws colored padding (or inset) around the polygon path.
+    // Placed BEFORE the outline so the text and outline render on top.
+    if (userHasFill && fillOffset !== 0 && realFillColor) {
+      if (polygonAbs && flowItem.polygonPoints) {
+        const offsetPts = offsetPolygonOutwardPoints(flowItem.polygonPoints, fillOffset, item.width, item.height);
+        outerGroup.add(new Konva.Path({
+          data: buildPolygonPath(offsetPts, item.width, item.height),
+          fill: realFillColor,
+          listening: true,
+        }));
+      } else {
+        outerGroup.add(new Konva.Rect({
+          x: -fillOffset,
+          y: -fillOffset,
+          width: item.width + fillOffset * 2,
+          height: item.height + fillOffset * 2,
+          fill: realFillColor,
+          listening: true,
+        }));
+      }
+    }
 
     // The polygon outline supports curved (bezier) edges when any vertex
     // is smooth, so it's rendered via Konva.Path. Straight all-corner
@@ -248,7 +281,7 @@ export function createItemNode(
         stroke: fillNodeStroke,
         strokeWidth: fillNodeStrokeWidth,
         dash: fillNodeDash,
-        fill: fillColor,
+        fill: outlineFill,
         listening: true,
       });
       outerGroup.add(polygonOutline);
@@ -261,7 +294,7 @@ export function createItemNode(
         stroke: fillNodeStroke,
         strokeWidth: fillNodeStrokeWidth,
         dash: fillNodeDash,
-        fill: fillColor,
+        fill: outlineFill,
         listening: true,
       });
       outerGroup.add(bgRect);

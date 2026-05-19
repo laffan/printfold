@@ -143,6 +143,10 @@ export interface PageItemBase {
   // the stroke centered on the path (default). Only applies when stroke
   // is enabled.
   strokeOffset?: number;
+  // Fill offset — perpendicular distance the fill region extends past the
+  // path. Positive enlarges the fill (colored padding around the shape),
+  // negative pulls the fill inward. Only applies when fill is enabled.
+  fillOffset?: number;
   // Array duplication - multi-dimensional support
   arrayDimensions?: ArrayDimension[]; // Each dimension creates copies with its own offset
 }

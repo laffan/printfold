@@ -672,8 +672,8 @@ function renderTextFlowItem(
   });
 
   // Fill and stroke (only when enabled by the user). Editor-only dashed
-  // border isn't rendered here. Stroke with a non-zero offset is drawn as
-  // a separate outline shape so it sits at the offset position. Polygons
+  // border isn't rendered here. Stroke / fill with a non-zero offset are
+  // drawn as separate shapes so each sits at its offset position. Polygons
   // use Konva.Path so smooth (bezier) vertices render correctly.
   const hasFill = item.hasFill === true;
   const hasStroke = item.hasStroke === true;
@@ -681,12 +681,34 @@ function renderTextFlowItem(
     ? (item.fill?.type === 'color' ? (item.fill?.color || '#ffffff') : '#ffffff')
     : undefined;
   const strokeOffset = (item.strokeOffset ?? 0) * scale;
+  const fillOffset = (item.fillOffset ?? 0) * scale;
   const strokeOnPath = hasStroke && strokeOffset === 0;
-  if (hasFill || strokeOnPath) {
+  const fillOnPath = hasFill && fillOffset === 0;
+
+  // Offset fill comes first so it sits behind everything else.
+  if (hasFill && fillOffset !== 0 && fillColor !== undefined) {
+    if (item.polygonPoints && item.polygonPoints.length >= 3) {
+      const offsetPts = offsetSmoothPolygonOutward(item.polygonPoints, fillOffset, scaledWidth, scaledHeight);
+      group.add(new Konva.Path({
+        data: buildPolygonPath(offsetPts, scaledWidth, scaledHeight),
+        fill: fillColor,
+      }));
+    } else {
+      group.add(new Konva.Rect({
+        x: -fillOffset,
+        y: -fillOffset,
+        width: scaledWidth + fillOffset * 2,
+        height: scaledHeight + fillOffset * 2,
+        fill: fillColor,
+      }));
+    }
+  }
+
+  if (fillOnPath || strokeOnPath) {
     if (item.polygonPoints && item.polygonPoints.length >= 3) {
       group.add(new Konva.Path({
         data: buildPolygonPath(item.polygonPoints, scaledWidth, scaledHeight),
-        fill: fillColor,
+        fill: fillOnPath ? fillColor : undefined,
         stroke: strokeOnPath ? (item.strokeColor || '#000000') : undefined,
         strokeWidth: strokeOnPath ? (item.strokeWidth ?? 1) * scale : 0,
       }));
@@ -696,7 +718,7 @@ function renderTextFlowItem(
         y: 0,
         width: scaledWidth,
         height: scaledHeight,
-        fill: fillColor,
+        fill: fillOnPath ? fillColor : undefined,
         stroke: strokeOnPath ? (item.strokeColor || '#000000') : undefined,
         strokeWidth: strokeOnPath ? (item.strokeWidth ?? 1) * scale : 0,
       }));

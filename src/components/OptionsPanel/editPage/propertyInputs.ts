@@ -48,6 +48,7 @@ export function setupEditPropertyInputs(updateEditSelectedSectionFn: () => void)
   setupColorInput('item-stroke', 'strokeColor');
   setupPropInput('item-stroke-width', 'strokeWidth');
   setupPropInput('item-stroke-offset', 'strokeOffset');
+  setupPropInput('item-fill-offset', 'fillOffset');
 
   // Text properties - use items font dropdown (Google Fonts + web-safe for static page items)
   const fontDropdown = createItemsFontDropdown('item-font-family', (value) => {

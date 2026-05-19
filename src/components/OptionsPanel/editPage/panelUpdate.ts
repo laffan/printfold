@@ -280,6 +280,7 @@ export function updateEditSelectedSection(): void {
   setInputValue('item-stroke', strokeColor);
   setInputValue('item-stroke-width', strokeWidth.toString());
   setInputValue('item-stroke-offset', (item.strokeOffset ?? 0).toString());
+  setInputValue('item-fill-offset', (item.fillOffset ?? 0).toString());
 
   // Update shadow toggle and properties. Hidden entirely for text-flow
   // items — shadow doesn't make sense on a region of flowed text.
