@@ -307,6 +307,11 @@ export class SpreadEditor {
       const idsChanged = state.selectedItemIds.length !== prevState.selectedItemIds.length ||
         state.selectedItemIds.some((id, i) => id !== prevState.selectedItemIds[i]);
       if (idsChanged || state.selectedItemId !== prevState.selectedItemId) {
+        // Re-render if a polygon text-flow item gained or lost selection, so
+        // its vertex handles appear/disappear with the selection state.
+        if (this.selectionChangeAffectsPolygonItem(state, prevState)) {
+          this.render();
+        }
         this.updateTransformer();
       }
     });
@@ -1142,6 +1147,30 @@ export class SpreadEditor {
   /**
    * Update the transformer to attach to selected items
    */
+  /**
+   * Detect whether the selection delta involves a polygon text-flow item —
+   * those need a re-render so their vertex handles toggle with selection.
+   */
+  private selectionChangeAffectsPolygonItem(
+    nextState: import('../../types').EditorState,
+    prevState: import('../../types').EditorState
+  ): boolean {
+    const before = new Set(prevState.selectedItemIds);
+    const after = new Set(nextState.selectedItemIds);
+    const changed: string[] = [];
+    for (const id of before) if (!after.has(id)) changed.push(id);
+    for (const id of after) if (!before.has(id)) changed.push(id);
+    if (changed.length === 0) return false;
+
+    const pageNum = nextState.selectedPageNumber ?? prevState.selectedPageNumber;
+    if (pageNum === null) return false;
+    for (const id of changed) {
+      const item = appState.getItemFromPage(pageNum, id);
+      if (item?.type === 'textFlow' && item.flowShape === 'polygon') return true;
+    }
+    return false;
+  }
+
   private updateTransformer(): void {
     const editorState = appState.getEditor();
 

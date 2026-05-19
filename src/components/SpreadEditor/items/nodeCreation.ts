@@ -10,6 +10,7 @@ import { startTextEditing } from './textEditing';
 import { applyTextTransform } from '../../../services/textFlow';
 import type { PageItem, TextPageItem, ShapePageItem, ImagePageItem, TextFlowPageItem } from '../../../types';
 import { drawTextFlowItemContent } from './textFlowRendering';
+import { addPolygonVertexHandles } from './vertexHandles';
 
 /**
  * Create a Konva node for a page item
@@ -185,8 +186,9 @@ export function createItemNode(
 
     // Hit-area shape: either the polygon or a square. Near-zero alpha fill so
     // the whole interior catches pointer events while staying invisible.
+    let polygonOutline: Konva.Line | null = null;
     if (polygonAbs) {
-      const polyShape = new Konva.Line({
+      polygonOutline = new Konva.Line({
         points: polygonAbs.flatMap(p => [p.x, p.y]),
         closed: true,
         stroke: flowItem.borderColor ?? '#888888',
@@ -195,7 +197,7 @@ export function createItemNode(
         fill: 'rgba(0,0,0,0.001)',
         listening: true,
       });
-      group.add(polyShape);
+      group.add(polygonOutline);
     } else {
       const bgRect = new Konva.Rect({
         x: 0,
@@ -212,6 +214,12 @@ export function createItemNode(
     }
 
     drawTextFlowItemContent(group, flowItem);
+
+    // Vertex-editing handles for polygons — appear only when the item is
+    // selected (the editor re-renders on selection change).
+    if (polygonOutline && polygonAbs) {
+      addPolygonVertexHandles(group, polygonOutline, flowItem, pageNumber);
+    }
 
     // Konva.Group satisfies the structural methods used by the shared setup
     // path (x, y, on, setAttr, etc.); cast through unknown to appease TS.
