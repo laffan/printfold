@@ -46,6 +46,16 @@ export function flowSections(
   for (let i = 0; i < sections.length; i++) {
     const section = sections[i];
 
+    // Horizontal rule (---) acts as a page break
+    if (section.type === 'hr') {
+      if (currentPage.sections.length > 0) {
+        pages.push(currentPage);
+        currentPage = createEmptyPage(pages.length + 1);
+        currentHeight = 0;
+      }
+      continue;
+    }
+
     // Check for H1 page break
     if (section.type === 'heading' && section.level === 1 && layoutOptions.emptyPageBeforeH1 && currentPage.sections.length > 0) {
       // Finish current page
