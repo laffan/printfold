@@ -3,7 +3,7 @@
  */
 
 import { measurementCache } from './cache';
-import { parseInlineMarkdown, mergeAdjacentSpans } from './parsing';
+import { parseInlineMarkdown, mergeAdjacentSpans, applyTextTransform } from './parsing';
 import type { MeasuredSection, PageDimensions } from './types';
 import type { DocumentSection, FontStyle, FontOptions, LayoutOptions, TextSpan, RichTextLine } from '../../types';
 
@@ -136,8 +136,9 @@ export function measureSection(
     };
   }
 
-  // Wrap text content
-  const textLines = section.content.split('\n');
+  // Apply textTransform before wrapping so width measurements match render
+  const transformedContent = applyTextTransform(section.content, fontStyle.textTransform);
+  const textLines = transformedContent.split('\n');
   const wrappedLines: string[] = [];
 
   for (const textLine of textLines) {
@@ -328,7 +329,12 @@ export function wrapRichText(
         continue;
       }
 
-      const wrapped = wrapSpansToLines(ctx, spans, safeMaxWidth, baseStyle, fontOptions);
+      // Apply textTransform to every span before wrapping
+      const transformedSpans = baseStyle.textTransform && baseStyle.textTransform !== 'none'
+        ? spans.map(s => ({ ...s, text: applyTextTransform(s.text, baseStyle.textTransform) }))
+        : spans;
+
+      const wrapped = wrapSpansToLines(ctx, transformedSpans, safeMaxWidth, baseStyle, fontOptions);
       allLines.push(...wrapped);
     }
   }

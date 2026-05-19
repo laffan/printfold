@@ -5,7 +5,7 @@
 
 export { TextFlowEngine } from './TextFlowEngine';
 export { clearMeasurementCache } from './cache';
-export { parseMarkdown, parseInlineMarkdown, tokensToSpans, mergeAdjacentSpans, richLineToPlainText, plainTextToRichLine } from './parsing';
+export { parseMarkdown, parseInlineMarkdown, tokensToSpans, mergeAdjacentSpans, richLineToPlainText, plainTextToRichLine, applyTextTransform } from './parsing';
 export { getSpanFontStyle, measureSpanWidth, measureRichLineWidth, wrapRichText, getFontStyleForSection } from './measurement';
 export { flowSections, insertBlankPages, createEmptyPage } from './pagination';
 export { calculatePageDimensions, getMarginsForPage } from './dimensions';

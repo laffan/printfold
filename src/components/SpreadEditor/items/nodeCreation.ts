@@ -7,6 +7,7 @@ import { appState } from '../../../services/state';
 import { switchToSelectedTab } from '../../OptionsPanel/editPage';
 import { applyFillToShape } from './fill';
 import { startTextEditing } from './textEditing';
+import { applyTextTransform } from '../../../services/textFlow';
 import type { PageItem, TextPageItem, ShapePageItem, ImagePageItem } from '../../../types';
 
 /**
@@ -117,7 +118,7 @@ export function createItemNode(
       x: xOffset + item.x,
       y: item.y,
       width: item.width,
-      text: textItem.content,
+      text: applyTextTransform(textItem.content, textItem.textTransform),
       fontSize: textItem.fontSize,
       fontFamily: textItem.fontFamily,
       fontStyle: `${textItem.fontWeight === 'bold' ? 'bold' : ''} ${textItem.fontStyle === 'italic' ? 'italic' : ''}`.trim() || 'normal',

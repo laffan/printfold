@@ -6,5 +6,6 @@
 export {
   TextFlowEngine,
   textFlowEngine,
-  clearMeasurementCache
+  clearMeasurementCache,
+  applyTextTransform
 } from './textFlow/index';

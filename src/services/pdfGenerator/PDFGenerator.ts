@@ -6,7 +6,7 @@
 import { PDFDocument, PDFPage, PDFImage, PDFFont, rgb, StandardFonts, pushGraphicsState, popGraphicsState, moveTo, lineTo, closePath, clip, endPath } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import { appState } from '../state';
-import { textFlowEngine } from '../textFlow';
+import { textFlowEngine, applyTextTransform } from '../textFlow';
 import { fontService, FontFileData } from '../fontService';
 import type { Signature, Spread, PageContent, PageItem, SpanningItem, StaticSpread, RichTextLine } from '../../types';
 import { SHEET_SIZES, getOrientedSheetSize, calculateSpreadRowsPerSheet } from '../../types';
@@ -491,21 +491,23 @@ export class PDFGenerator {
       const footerContent = isRecto ? headerFooter.footer.recto : headerFooter.footer.verso;
       const footerFont = getFont(headerFooter.footer.font, this.fontCache);
       const footerSize = headerFooter.footer.font.fontSize;
+      const footerTransform = headerFooter.footer.font.textTransform;
       const pageNumStr = pageContent.pageNumber.toString();
+      const finalize = (raw: string) => sanitizeText(applyTextTransform(raw.replace('{{pageNumber}}', pageNumStr), footerTransform));
 
       if (footerContent.left) {
-        const text = sanitizeText(footerContent.left.replace('{{pageNumber}}', pageNumStr));
+        const text = finalize(footerContent.left);
         pdfPage.drawText(text, { x: contentX, y: footerY, size: footerSize, font: footerFont, color: rgb(0, 0, 0) });
       }
 
       if (footerContent.center) {
-        const text = sanitizeText(footerContent.center.replace('{{pageNumber}}', pageNumStr));
+        const text = finalize(footerContent.center);
         const textWidth = footerFont.widthOfTextAtSize(text, footerSize);
         pdfPage.drawText(text, { x: x + width / 2 - textWidth / 2, y: footerY, size: footerSize, font: footerFont, color: rgb(0, 0, 0) });
       }
 
       if (footerContent.right) {
-        const text = sanitizeText(footerContent.right.replace('{{pageNumber}}', pageNumStr));
+        const text = finalize(footerContent.right);
         const textWidth = footerFont.widthOfTextAtSize(text, footerSize);
         pdfPage.drawText(text, { x: x + width - outerMargin - textWidth, y: footerY, size: footerSize, font: footerFont, color: rgb(0, 0, 0) });
       }
@@ -522,21 +524,23 @@ export class PDFGenerator {
       const headerContent = isRecto ? headerFooter.header.recto : headerFooter.header.verso;
       const headerFont = getFont(headerFooter.header.font, this.fontCache);
       const headerSize = headerFooter.header.font.fontSize;
+      const headerTransform = headerFooter.header.font.textTransform;
       const pageNumStr = pageContent.pageNumber.toString();
+      const finalize = (raw: string) => sanitizeText(applyTextTransform(raw.replace('{{pageNumber}}', pageNumStr), headerTransform));
 
       if (headerContent.left) {
-        const text = sanitizeText(headerContent.left.replace('{{pageNumber}}', pageNumStr));
+        const text = finalize(headerContent.left);
         pdfPage.drawText(text, { x: contentX, y: headerY, size: headerSize, font: headerFont, color: rgb(0, 0, 0) });
       }
 
       if (headerContent.center) {
-        const text = sanitizeText(headerContent.center.replace('{{pageNumber}}', pageNumStr));
+        const text = finalize(headerContent.center);
         const textWidth = headerFont.widthOfTextAtSize(text, headerSize);
         pdfPage.drawText(text, { x: x + width / 2 - textWidth / 2, y: headerY, size: headerSize, font: headerFont, color: rgb(0, 0, 0) });
       }
 
       if (headerContent.right) {
-        const text = sanitizeText(headerContent.right.replace('{{pageNumber}}', pageNumStr));
+        const text = finalize(headerContent.right);
         const textWidth = headerFont.widthOfTextAtSize(text, headerSize);
         pdfPage.drawText(text, { x: x + width - outerMargin - textWidth, y: headerY, size: headerSize, font: headerFont, color: rgb(0, 0, 0) });
       }

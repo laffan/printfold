@@ -95,6 +95,36 @@ export function setupEditPropertyInputs(updateEditSelectedSectionFn: () => void)
     }
   });
 
+  // Case toggles — uppercase / lowercase are mutually exclusive
+  const setCase = (next: 'none' | 'uppercase' | 'lowercase') => {
+    const editorState = appState.getEditor();
+    if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+    appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, {
+      textTransform: next,
+    });
+    updateEditSelectedSectionFn();
+  };
+
+  document.getElementById('item-uppercase')?.addEventListener('click', () => {
+    const editorState = appState.getEditor();
+    if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+    const item = appState.getItemFromPage(editorState.selectedPageNumber, editorState.selectedItemId);
+    if (item && item.type === 'text') {
+      const textItem = item as TextPageItem;
+      setCase(textItem.textTransform === 'uppercase' ? 'none' : 'uppercase');
+    }
+  });
+
+  document.getElementById('item-lowercase')?.addEventListener('click', () => {
+    const editorState = appState.getEditor();
+    if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
+    const item = appState.getItemFromPage(editorState.selectedPageNumber, editorState.selectedItemId);
+    if (item && item.type === 'text') {
+      const textItem = item as TextPageItem;
+      setCase(textItem.textTransform === 'lowercase' ? 'none' : 'lowercase');
+    }
+  });
+
   // === Effects Section Handlers ===
 
   // Unified fill toggle (for all item types)

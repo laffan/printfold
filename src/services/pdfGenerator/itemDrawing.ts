@@ -9,6 +9,7 @@ import type { FontCache, ImageCacheType } from './types';
 import { parseColor, getFillColorFromConfig } from './colors';
 import { getTextItemFont } from './fonts';
 import { sanitizeText } from './textUtils';
+import { applyTextTransform } from '../textFlow';
 
 /**
  * Convert a SpanningItem to a PageItem for rendering
@@ -83,7 +84,7 @@ export function drawPageItemsClipped(
       const color = parseColor(textItem.color);
       const textY = itemPdfY + item.height - textItem.fontSize;
 
-      pdfPage.drawText(sanitizeText(textItem.content), {
+      pdfPage.drawText(sanitizeText(applyTextTransform(textItem.content, textItem.textTransform)), {
         x: pageX + adjustedX,
         y: textY,
         size: textItem.fontSize,
@@ -185,7 +186,7 @@ export function drawPageItems(
       const color = parseColor(textItem.color);
       const textY = itemPdfY + item.height - textItem.fontSize;
 
-      pdfPage.drawText(sanitizeText(textItem.content), {
+      pdfPage.drawText(sanitizeText(applyTextTransform(textItem.content, textItem.textTransform)), {
         x: pageX + item.x,
         y: textY,
         size: textItem.fontSize,

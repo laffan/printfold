@@ -6,6 +6,7 @@
 import Konva from 'konva';
 import { appState } from './state';
 import { calculateArrayPositions, getTotalArrayInstances } from '../components/SpreadEditor/items/arrayItems';
+import { applyTextTransform } from './textFlow';
 import type { PageContent, PageItem, TextPageItem, ShapePageItem, ImagePageItem, FillConfig, FontStyle, RichTextLine, TextSpan } from '../types';
 import type { MeasuredSection } from './textFlow/types';
 
@@ -227,7 +228,7 @@ function createRenderNode(
       y,
       width,
       height,
-      text: textItem.content,
+      text: applyTextTransform(textItem.content, textItem.textTransform),
       fontSize: textItem.fontSize * scale,
       fontFamily: textItem.fontFamily,
       fontStyle: textItem.fontStyle === 'italic' ? 'italic' : 'normal',

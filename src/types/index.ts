@@ -159,6 +159,7 @@ export interface TextPageItem extends PageItemBase {
   fontStyle: 'normal' | 'italic';
   color: string; // Deprecated: use fill instead
   textAlign: 'left' | 'center' | 'right';
+  textTransform?: 'none' | 'uppercase' | 'lowercase';
   // Fill and stroke properties (like shapes)
   fill?: FillConfig;
   hasFill?: boolean; // Whether fill is enabled (default: true)

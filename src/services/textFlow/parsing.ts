@@ -6,6 +6,24 @@ import { marked } from 'marked';
 import type { DocumentSection, TextSpan, RichTextLine } from '../../types';
 
 /**
+ * Apply textTransform to a string. Mirrors CSS text-transform values used
+ * in FontStyle.textTransform — applied at measurement/render time so the
+ * underlying content stays untouched.
+ */
+export function applyTextTransform(
+  text: string,
+  transform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize'
+): string {
+  if (!transform || transform === 'none') return text;
+  if (transform === 'uppercase') return text.toUpperCase();
+  if (transform === 'lowercase') return text.toLowerCase();
+  if (transform === 'capitalize') {
+    return text.replace(/\b\p{L}/gu, ch => ch.toUpperCase());
+  }
+  return text;
+}
+
+/**
  * Decode HTML entities back to normal characters
  */
 export function decodeHtmlEntities(text: string): string {

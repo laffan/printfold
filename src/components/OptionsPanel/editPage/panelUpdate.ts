@@ -390,6 +390,10 @@ export function updateEditSelectedSection(): void {
     // Update bold/italic button states
     document.getElementById('item-bold')?.classList.toggle('active', textItem.fontWeight === 'bold');
     document.getElementById('item-italic')?.classList.toggle('active', textItem.fontStyle === 'italic');
+
+    // Update case button states
+    document.getElementById('item-uppercase')?.classList.toggle('active', textItem.textTransform === 'uppercase');
+    document.getElementById('item-lowercase')?.classList.toggle('active', textItem.textTransform === 'lowercase');
   } else {
     shapeProps!.style.display = 'none';
     textProps!.style.display = 'none';

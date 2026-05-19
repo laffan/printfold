@@ -148,6 +148,13 @@ function generateTextFormatControls(prefix: string, options: {
           <button id="${prefix}-strikethrough" class="btn btn-icon btn-small" title="Strikethrough"><s>S</s></button>
         </div>
       </div>
+      <div class="control-group">
+        <span>Case</span>
+        <div class="btn-group">
+          <button id="${prefix}-uppercase" class="btn btn-icon btn-small" title="UPPERCASE">AA</button>
+          <button id="${prefix}-lowercase" class="btn btn-icon btn-small" title="lowercase">aa</button>
+        </div>
+      </div>
     </div>
     <div class="form-group style-controls-row">
       <label>
@@ -236,6 +243,13 @@ function createHeadingsSection(styles: DetectedStyles): HTMLElement {
           <button id="dyn-heading-italic" class="btn btn-icon btn-small" title="Italic"><i>I</i></button>
           <button id="dyn-heading-underline" class="btn btn-icon btn-small" title="Underline"><u>U</u></button>
           <button id="dyn-heading-strikethrough" class="btn btn-icon btn-small" title="Strikethrough"><s>S</s></button>
+        </div>
+      </div>
+      <div class="control-group">
+        <span>Case</span>
+        <div class="btn-group">
+          <button id="dyn-heading-uppercase" class="btn btn-icon btn-small" title="UPPERCASE">AA</button>
+          <button id="dyn-heading-lowercase" class="btn btn-icon btn-small" title="lowercase">aa</button>
         </div>
       </div>
     </div>
@@ -508,6 +522,43 @@ function setupTextFormatHandlers(
       updateStyle({ textDecoration: getTextDecoration(hasUnderline, isActive) });
     });
   }
+
+  // Case toggles (uppercase / lowercase — mutually exclusive)
+  setupCaseToggles(
+    prefix,
+    () => (getStyle() as { textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize' }).textTransform,
+    (value) => updateStyle({ textTransform: value } as Parameters<typeof updateStyle>[0])
+  );
+}
+
+/**
+ * Wire up uppercase/lowercase toggle buttons for a given prefix.
+ */
+function setupCaseToggles(
+  prefix: string,
+  getValue: () => 'none' | 'uppercase' | 'lowercase' | 'capitalize' | undefined,
+  setValue: (value: 'none' | 'uppercase' | 'lowercase') => void
+): void {
+  const upperBtn = document.getElementById(`${prefix}-uppercase`);
+  const lowerBtn = document.getElementById(`${prefix}-lowercase`);
+  const current = getValue() || 'none';
+
+  if (upperBtn && current === 'uppercase') upperBtn.classList.add('active');
+  if (lowerBtn && current === 'lowercase') lowerBtn.classList.add('active');
+
+  upperBtn?.addEventListener('click', () => {
+    const willActivate = !upperBtn.classList.contains('active');
+    upperBtn.classList.toggle('active', willActivate);
+    lowerBtn?.classList.remove('active');
+    setValue(willActivate ? 'uppercase' : 'none');
+  });
+
+  lowerBtn?.addEventListener('click', () => {
+    const willActivate = !lowerBtn.classList.contains('active');
+    lowerBtn.classList.toggle('active', willActivate);
+    upperBtn?.classList.remove('active');
+    setValue(willActivate ? 'lowercase' : 'none');
+  });
 }
 
 /**
@@ -693,6 +744,13 @@ function setupHeadingHandlers(): void {
     bgInput.value = fontOptions.h1.backgroundColor || '#ffffff';
     bgInput.addEventListener('change', () => updateAllHeadings({ backgroundColor: bgInput.value }));
   }
+
+  // Case toggles
+  setupCaseToggles(
+    'dyn-heading',
+    () => appState.getProject().fontOptions.h1.textTransform,
+    (value) => updateAllHeadings({ textTransform: value })
+  );
 
   function updateAllHeadings(updates: Partial<typeof fontOptions.h1>) {
     const fonts = appState.getProject().fontOptions;

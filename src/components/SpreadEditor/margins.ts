@@ -5,6 +5,7 @@
 
 import Konva from 'konva';
 import { appState } from '../../services/state';
+import { applyTextTransform } from '../../services/textFlow';
 import type { PageContent, Margins, FontStyle } from '../../types';
 import { formatMarginValue } from '../../types';
 import type { MarginLine, MarginLabel } from './types';
@@ -274,9 +275,10 @@ export function drawHeaderFooterContent(
   const positions = isRecto ? config.recto : config.verso;
   const font = config.font;
 
-  // Replace template variables
+  // Replace template variables, then apply textTransform
   const replaceVars = (text: string): string => {
-    return text.replace(/\{\{pageNumber\}\}/g, pageNumber.toString());
+    const expanded = text.replace(/\{\{pageNumber\}\}/g, pageNumber.toString());
+    return applyTextTransform(expanded, font.textTransform);
   };
 
   // Draw left-aligned text
