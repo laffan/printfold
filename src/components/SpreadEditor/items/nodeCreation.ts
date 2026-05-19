@@ -8,7 +8,8 @@ import { switchToSelectedTab } from '../../OptionsPanel/editPage';
 import { applyFillToShape } from './fill';
 import { startTextEditing } from './textEditing';
 import { applyTextTransform } from '../../../services/textFlow';
-import type { PageItem, TextPageItem, ShapePageItem, ImagePageItem } from '../../../types';
+import type { PageItem, TextPageItem, ShapePageItem, ImagePageItem, TextFlowPageItem } from '../../../types';
+import { drawTextFlowItemContent } from './textFlowRendering';
 
 /**
  * Create a Konva node for a page item
@@ -145,6 +146,40 @@ export function createItemNode(
     }
 
     node = textNode;
+  } else if (item.type === 'textFlow') {
+    // Group container for the dashed outline + the flowed content drawn inside it.
+    const flowItem = item as TextFlowPageItem;
+    const group = new Konva.Group({
+      x: xOffset + item.x,
+      y: item.y,
+      rotation: item.rotation || 0,
+      opacity,
+      draggable: true,
+      width: item.width,
+      height: item.height,
+      clipFunc: (ctx) => {
+        ctx.rect(0, 0, item.width, item.height);
+      },
+    });
+
+    const bgRect = new Konva.Rect({
+      x: 0,
+      y: 0,
+      width: item.width,
+      height: item.height,
+      stroke: flowItem.borderColor ?? '#888888',
+      strokeWidth: flowItem.borderWidth ?? 1,
+      dash: [4, 4],
+      fill: 'transparent',
+      listening: false,
+    });
+    group.add(bgRect);
+
+    drawTextFlowItemContent(group, flowItem);
+
+    // Konva.Group satisfies the structural methods used by the shared setup
+    // path (x, y, on, setAttr, etc.); cast through unknown to appease TS.
+    node = group as unknown as Konva.Shape;
   } else if (item.type === 'image') {
     const imageItem = item as ImagePageItem;
     const imageFile = appState.getProject().files.find(f => f.id === imageItem.imageFileId);
@@ -188,14 +223,16 @@ export function createItemNode(
     node.setAttr('pageNumber', pageNumber);
     node.setAttr('xOffset', xOffset);
 
-    // Apply shadow if enabled
-    if (item.hasShadow) {
-      node.shadowEnabled(true);
-      node.shadowColor(item.shadowColor || '#000000');
-      node.shadowBlur(item.shadowBlur ?? 5);
-      node.shadowOffsetX(item.shadowOffsetX ?? 3);
-      node.shadowOffsetY(item.shadowOffsetY ?? 3);
-      node.shadowOpacity(item.shadowOpacity ?? 0.5);
+    // Apply shadow if enabled (only Shape subclasses support shadows; the
+    // textFlow group is skipped — its children can carry their own shadow).
+    if (item.hasShadow && typeof (node as unknown as Konva.Shape).shadowEnabled === 'function') {
+      const shape = node as unknown as Konva.Shape;
+      shape.shadowEnabled(true);
+      shape.shadowColor(item.shadowColor || '#000000');
+      shape.shadowBlur(item.shadowBlur ?? 5);
+      shape.shadowOffsetX(item.shadowOffsetX ?? 3);
+      shape.shadowOffsetY(item.shadowOffsetY ?? 3);
+      shape.shadowOpacity(item.shadowOpacity ?? 0.5);
     }
 
     // Handle click to select item and its page

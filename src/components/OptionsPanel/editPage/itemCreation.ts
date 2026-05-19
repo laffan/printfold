@@ -4,25 +4,28 @@
 
 import { appState } from '../../../services/state';
 import { switchToSelectedTab } from './shared';
-import type { PageItem, TextPageItem, ShapePageItem, ImagePageItem, ProjectFile } from '../../../types';
+import type { PageItem, TextPageItem, ShapePageItem, ImagePageItem, TextFlowPageItem, ProjectFile } from '../../../types';
 
 /**
  * Add an item to the currently selected static page
  */
-export function addItemToCurrentPage(itemType: 'text' | 'rectangle' | 'ellipse' | 'circle' | 'line' | 'arrow'): void {
+export function addItemToCurrentPage(
+  itemType: 'text' | 'rectangle' | 'ellipse' | 'circle' | 'line' | 'arrow' | 'textFlowSquare' | 'textFlowPolygon'
+): void {
   const editorState = appState.getEditor();
   if (editorState.selectedPageNumber === null) return;
 
   // Determine dimensions based on shape type
   const isLinear = itemType === 'line' || itemType === 'arrow';
   const isCircular = itemType === 'circle';
+  const isTextFlow = itemType === 'textFlowSquare' || itemType === 'textFlowPolygon';
 
   const baseItem = {
     id: crypto.randomUUID(),
     x: 50,
     y: 50,
-    width: isLinear ? 100 : (isCircular ? 60 : 100),
-    height: isLinear ? 2 : (itemType === 'text' ? 30 : (isCircular ? 60 : 80)),
+    width: isLinear ? 100 : (isCircular ? 60 : (isTextFlow ? 200 : 100)),
+    height: isLinear ? 2 : (itemType === 'text' ? 30 : (isCircular ? 60 : (isTextFlow ? 200 : 80))),
     rotation: 0,
     opacity: 1,
   };
@@ -41,6 +44,15 @@ export function addItemToCurrentPage(itemType: 'text' | 'rectangle' | 'ellipse' 
       color: '#000000',
       textAlign: 'left',
     } as TextPageItem;
+  } else if (isTextFlow) {
+    item = {
+      ...baseItem,
+      type: 'textFlow',
+      flowShape: itemType === 'textFlowSquare' ? 'square' : 'polygon',
+      padding: 8,
+      borderColor: '#888888',
+      borderWidth: 1,
+    } as TextFlowPageItem;
   } else {
     item = {
       ...baseItem,
@@ -54,6 +66,10 @@ export function addItemToCurrentPage(itemType: 'text' | 'rectangle' | 'ellipse' 
 
   appState.addItemToPage(editorState.selectedPageNumber, item);
   appState.updateEditor({ selectedItemId: item.id });
+  // Trigger a reflow so the new text-flow region pulls content from the markdown flow.
+  if (isTextFlow) {
+    appState.requestReflow();
+  }
   switchToSelectedTab();
 }
 

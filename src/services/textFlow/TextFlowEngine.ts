@@ -7,6 +7,7 @@ import { appState } from '../state';
 import { parseMarkdown } from './parsing';
 import { flowSections, insertBlankPages } from './pagination';
 import { calculatePageDimensions } from './dimensions';
+import { buildInitialSlots, flowSectionsIntoSlots, materializeSlots } from './slotFlow';
 import {
   captureStaticPages,
   mergeStaticPagesInPlace,
@@ -14,6 +15,7 @@ import {
   createSignaturesFromPages,
   createDefaultSignature
 } from './signatures';
+import type { TextFlowPageItem } from '../../types';
 import { calculateImposition, ImpositionSheet } from './imposition';
 import type { FlowResult } from './types';
 import type { FontOptions, LayoutOptions, OutputOptions, HeaderFooterOptions, Signature } from '../../types';
@@ -60,14 +62,40 @@ export class TextFlowEngine {
       this.headerFooter
     );
 
-    // Flow sections across pages
-    const textPages = flowSections(
-      this.ctx,
-      sections,
-      pageDimensions,
-      this.fontOptions,
-      this.layoutOptions
+    // Determine whether any static page has text-flow item regions; if so,
+    // use slot-based flow so those regions receive their share of the
+    // markdown stream alongside the surrounding pages.
+    const hasTextFlowItems = [...staticPagesByNumber.values()].some(p =>
+      (p.items || []).some((it): it is TextFlowPageItem => it.type === 'textFlow')
     );
+
+    let textPages: import('../../types').PageContent[];
+    let effectiveStaticPages = staticPagesByNumber;
+
+    if (hasTextFlowItems) {
+      const initialSlots = buildInitialSlots(staticPagesByNumber, pageDimensions);
+      const filledSlots = flowSectionsIntoSlots(
+        this.ctx,
+        sections,
+        initialSlots,
+        pageDimensions,
+        staticPagesByNumber,
+        this.fontOptions,
+        this.layoutOptions
+      );
+      const materialized = materializeSlots(filledSlots, staticPagesByNumber);
+      textPages = materialized.textPages;
+      effectiveStaticPages = materialized.updatedStaticPages;
+    } else {
+      // Flow sections across pages (legacy path)
+      textPages = flowSections(
+        this.ctx,
+        sections,
+        pageDimensions,
+        this.fontOptions,
+        this.layoutOptions
+      );
+    }
 
     // Insert blank pages (user-specified)
     const textPagesWithBlanks = insertBlankPages(textPages, project.blankPages);
@@ -92,8 +120,9 @@ export class TextFlowEngine {
       return createDefaultSignature(this.outputOptions.pagesPerSignature);
     }
 
-    // Merge text pages with static pages
-    const allPages = mergeStaticPagesInPlace(textPagesWithBlanks, staticPagesByNumber);
+    // Merge text pages with static pages (use the updated static pages map
+    // when slot-based flow ran, so populated textFlow items are kept).
+    const allPages = mergeStaticPagesInPlace(textPagesWithBlanks, effectiveStaticPages);
 
     // Pad pages to complete signatures
     const paddedPages = padPagesToCompleteSignature(allPages, this.outputOptions.pagesPerSignature);

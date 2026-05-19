@@ -150,11 +150,23 @@ AppState.prototype.updateItemOnPage = function(pageNumber: number, itemId: strin
 
   this.setProject({ ...prevState, signatures, staticSpreads });
   this.notifyProjectListeners(prevState);
+
+  // Reflow if a text-flow item moved or resized — its content slot changed.
+  const affectsTextFlow =
+    'x' in updates || 'y' in updates || 'width' in updates ||
+    'height' in updates || 'padding' in updates;
+  if (affectsTextFlow) {
+    const item = this.getItemFromPage(pageNumber, itemId);
+    if (item?.type === 'textFlow') {
+      this.requestReflow();
+    }
+  }
 };
 
 AppState.prototype.deleteItemFromPage = function(pageNumber: number, itemId: string): void {
   const prevState = this.getProject();
   const editor = this.getEditor();
+  const deletedItem = this.getItemFromPage(pageNumber, itemId);
 
   // Find which spread and position (verso/recto) contains this page
   let targetSpreadId: string | null = null;
@@ -226,6 +238,11 @@ AppState.prototype.deleteItemFromPage = function(pageNumber: number, itemId: str
   // Clear selection if the deleted item was selected
   if (editor.selectedItemId === itemId) {
     this.updateEditor({ selectedItemId: null });
+  }
+
+  // Reflow if a text-flow item was removed — its content must spill back out.
+  if (deletedItem?.type === 'textFlow') {
+    this.requestReflow();
   }
 };
 

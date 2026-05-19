@@ -119,7 +119,7 @@ export interface PageContent {
 }
 
 // Items that can be placed on static pages
-export type PageItemType = 'text' | 'shape' | 'image';
+export type PageItemType = 'text' | 'shape' | 'image' | 'textFlow';
 
 export interface PageItemBase {
   id: string;
@@ -184,7 +184,22 @@ export interface ImagePageItem extends PageItemBase {
   imageFileId: string; // Reference to project file
 }
 
-export type PageItem = TextPageItem | ShapePageItem | ImagePageItem;
+// A region of a static page that receives a slice of the main markdown flow,
+// like a mini-page embedded in the static page.
+export interface TextFlowPageItem extends PageItemBase {
+  type: 'textFlow';
+  flowShape: 'square' | 'polygon';
+  padding?: number; // Inner padding in points (acts like mini-margins)
+  borderColor?: string; // Optional outline (mostly for editor visibility)
+  borderWidth?: number;
+  // Polygon-specific (future): points relative to (x, y)
+  points?: { x: number; y: number }[];
+  // Flowed content (populated by the text flow engine).
+  // Sections are MeasuredSection at runtime (DocumentSection plus measured lines).
+  flowedSections?: DocumentSection[];
+}
+
+export type PageItem = TextPageItem | ShapePageItem | ImagePageItem | TextFlowPageItem;
 
 export interface Spread {
   id: string;

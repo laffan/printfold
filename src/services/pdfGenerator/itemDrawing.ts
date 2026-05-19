@@ -4,12 +4,95 @@
 
 import { rgb, degrees } from 'pdf-lib';
 import type { PDFPage, PDFImage } from 'pdf-lib';
-import type { PageItem, TextPageItem, ShapePageItem, ImagePageItem, SpanningItem } from '../../types';
+import type { PageItem, TextPageItem, ShapePageItem, ImagePageItem, TextFlowPageItem, SpanningItem, FontOptions, LayoutOptions } from '../../types';
 import type { FontCache, ImageCacheType } from './types';
+import type { MeasuredSection } from '../textFlow/types';
 import { parseColor, getFillColorFromConfig } from './colors';
-import { getTextItemFont } from './fonts';
-import { sanitizeText } from './textUtils';
+import { getTextItemFont, getFontStyleForSection, getFont } from './fonts';
+import { sanitizeText, drawRichLine } from './textUtils';
 import { applyTextTransform } from '../textFlow';
+
+/**
+ * Draw the flowed content inside a text-flow page item.
+ * `itemPdfY` is the bottom of the item in PDF coordinates (y-up).
+ */
+export function drawTextFlowItem(
+  pdfPage: PDFPage,
+  item: TextFlowPageItem,
+  pageX: number,
+  itemPdfY: number,
+  fontOptions: FontOptions,
+  layoutOptions: LayoutOptions,
+  fontCache: FontCache
+): void {
+  const sections = (item.flowedSections as MeasuredSection[] | undefined) || [];
+  if (sections.length === 0) return;
+
+  const padding = item.padding ?? 0;
+  const contentX = pageX + item.x + padding;
+  const contentTopY = itemPdfY + item.height - padding; // PDF y of top of content area
+  const contentBottomY = itemPdfY + padding;
+  const contentWidth = Math.max(0, item.width - padding * 2);
+
+  let currentY = contentTopY;
+
+  for (const section of sections) {
+    const fontStyle = getFontStyleForSection(section.type, section.level, fontOptions);
+    const font = getFont(fontStyle, fontCache);
+    const lineHeight = layoutOptions.lineHeight * fontStyle.fontSize;
+
+    if (section.type === 'heading') {
+      switch (section.level) {
+        case 1: currentY -= layoutOptions.spacingAboveH1; break;
+        case 2: currentY -= layoutOptions.spacingAboveH2; break;
+        case 3: currentY -= layoutOptions.spacingAboveH3; break;
+      }
+    }
+
+    const lines = section.lines || [section.content];
+    const richLines = section.richLines;
+    const textAlign = fontStyle.textAlign || layoutOptions.textAlign || 'left';
+
+    if (richLines && richLines.length > 0) {
+      for (const richLine of richLines) {
+        if (currentY < contentBottomY) break;
+        drawRichLine(
+          pdfPage,
+          richLine,
+          contentX,
+          currentY - fontStyle.fontSize,
+          fontStyle,
+          fontOptions,
+          fontCache,
+          contentWidth,
+          textAlign
+        );
+        currentY -= lineHeight;
+      }
+    } else {
+      for (const line of lines) {
+        if (currentY < contentBottomY) break;
+        const sanitized = sanitizeText(line);
+        const textWidth = font.widthOfTextAtSize(sanitized, fontStyle.fontSize);
+        let lineX = contentX;
+        if (textAlign === 'center') {
+          lineX = contentX + (contentWidth - textWidth) / 2;
+        } else if (textAlign === 'right') {
+          lineX = contentX + contentWidth - textWidth;
+        }
+        pdfPage.drawText(sanitized, {
+          x: lineX,
+          y: currentY - fontStyle.fontSize,
+          size: fontStyle.fontSize,
+          font,
+          color: parseColor(fontStyle.color),
+        });
+        currentY -= lineHeight;
+      }
+    }
+    currentY -= layoutOptions.paragraphSpacing;
+  }
+}
 
 /**
  * Convert a SpanningItem to a PageItem for rendering
@@ -60,7 +143,9 @@ export function drawPageItemsClipped(
   itemOffsetX: number,
   clipWidth: number,
   fontCache: FontCache,
-  imageCache: ImageCacheType
+  imageCache: ImageCacheType,
+  fontOptions?: FontOptions,
+  layoutOptions?: LayoutOptions
 ): void {
   for (const item of items) {
     const adjustedX = item.x + itemOffsetX;
@@ -158,6 +243,10 @@ export function drawPageItemsClipped(
           height: item.height,
           opacity,
         });
+      }
+    } else if (item.type === 'textFlow') {
+      if (fontOptions && layoutOptions) {
+        drawTextFlowItem(pdfPage, item as TextFlowPageItem, pageX + itemOffsetX, itemPdfY, fontOptions, layoutOptions, fontCache);
       }
     }
   }

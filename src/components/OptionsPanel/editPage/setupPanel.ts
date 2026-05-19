@@ -43,6 +43,16 @@ export function setupEditPagePanel(updateEditSelectedSectionFn: () => void): voi
     addItemToCurrentPage('arrow');
   });
 
+  // Add Text Flow Square button
+  document.getElementById('btn-add-text-flow-square')?.addEventListener('click', () => {
+    addItemToCurrentPage('textFlowSquare');
+  });
+
+  // Add Text Flow Polygon button
+  document.getElementById('btn-add-text-flow-polygon')?.addEventListener('click', () => {
+    addItemToCurrentPage('textFlowPolygon');
+  });
+
   // Add Image button
   document.getElementById('btn-add-image')?.addEventListener('click', () => {
     // Create file input to select image

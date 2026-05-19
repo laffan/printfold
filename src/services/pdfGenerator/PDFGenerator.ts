@@ -314,7 +314,7 @@ export class PDFGenerator {
         );
 
         if (pageContent.items && pageContent.items.length > 0) {
-          drawPageItemsClipped(pdfPage, pageContent.items, x, y, width, height, 0, width, this.fontCache, this.imageCache);
+          drawPageItemsClipped(pdfPage, pageContent.items, x, y, width, height, 0, width, this.fontCache, this.imageCache, fontOptions, layoutOptions);
         }
         // Use reading-order position (pageContent.isRecto) not physical sheet position for crossing items
         this.drawCrossingItems(pdfPage, adjacentPage, x, y, width, height, pageContent.isRecto);
@@ -565,7 +565,7 @@ export class PDFGenerator {
       );
 
       if (hasItems) {
-        drawPageItemsClipped(pdfPage, pageContent.items!, x, y, width, height, 0, width, this.fontCache, this.imageCache);
+        drawPageItemsClipped(pdfPage, pageContent.items!, x, y, width, height, 0, width, this.fontCache, this.imageCache, fontOptions, layoutOptions);
       }
 
       // Draw crossing items from adjacent pages (within the clipping region)
