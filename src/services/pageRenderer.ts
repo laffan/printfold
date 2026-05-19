@@ -7,7 +7,7 @@ import Konva from 'konva';
 import { appState } from './state';
 import { calculateArrayPositions, getTotalArrayInstances } from '../components/SpreadEditor/items/arrayItems';
 import { applyTextTransform } from './textFlow';
-import type { PageContent, PageItem, TextPageItem, ShapePageItem, ImagePageItem, FillConfig, FontStyle, RichTextLine, TextSpan } from '../types';
+import type { PageContent, PageItem, TextPageItem, ShapePageItem, ImagePageItem, TextFlowPageItem, FillConfig, FontStyle, RichTextLine, TextSpan } from '../types';
 import type { MeasuredSection } from './textFlow/types';
 
 // Target DPI for print-quality rendering
@@ -584,6 +584,150 @@ function renderTextContent(
 }
 
 /**
+ * Render a text-flow page item into the supplied layer at scale, so the
+ * flowed content shows up in pre-rendered page images (and therefore in
+ * the exported PDF).
+ */
+function renderTextFlowItem(
+  layer: Konva.Layer,
+  item: TextFlowPageItem,
+  xOffset: number,
+  scale: number
+): void {
+  const project = appState.getProject();
+  const groupX = (xOffset + item.x) * scale;
+  const groupY = item.y * scale;
+  const scaledWidth = item.width * scale;
+  const scaledHeight = item.height * scale;
+
+  // Use a Konva.Group with a clipFunc so flowed text stays inside the shape.
+  // No outline or hit area is drawn — the editor's dashed border is purely a
+  // visual aid and should not appear in the exported page.
+  const isPolygon =
+    item.flowShape === 'polygon' &&
+    item.polygonPoints &&
+    item.polygonPoints.length >= 3;
+
+  const polygonAbsScaled = isPolygon
+    ? item.polygonPoints!.map(p => ({
+        x: p.x * scaledWidth,
+        y: p.y * scaledHeight,
+      }))
+    : null;
+
+  const group = new Konva.Group({
+    x: groupX,
+    y: groupY,
+    width: scaledWidth,
+    height: scaledHeight,
+    rotation: item.rotation || 0,
+    opacity: item.opacity ?? 1,
+    clipFunc: (ctx) => {
+      if (polygonAbsScaled) {
+        ctx.beginPath();
+        ctx.moveTo(polygonAbsScaled[0].x, polygonAbsScaled[0].y);
+        for (let i = 1; i < polygonAbsScaled.length; i++) {
+          ctx.lineTo(polygonAbsScaled[i].x, polygonAbsScaled[i].y);
+        }
+        ctx.closePath();
+      } else {
+        ctx.rect(0, 0, scaledWidth, scaledHeight);
+      }
+    },
+  });
+
+  if (isPolygon) {
+    renderTextFlowPolygonLines(group, item, scale);
+  } else {
+    renderTextFlowSquareSections(group, item, scale, project);
+  }
+
+  layer.add(group);
+}
+
+function renderTextFlowPolygonLines(
+  group: Konva.Group,
+  item: TextFlowPageItem,
+  scale: number
+): void {
+  const lines = item.flowedPolygonLines || [];
+  if (lines.length === 0) return;
+  const project = appState.getProject();
+
+  for (const line of lines) {
+    const fontStyle = getFontStyleForSection(line.sectionType, line.sectionLevel, project.fontOptions);
+    let combined = '';
+    if (fontStyle.fontStyle === 'italic') combined += 'italic ';
+    if (fontStyle.fontWeight === 'bold') combined += 'bold';
+    combined = combined.trim() || 'normal';
+
+    const textNode = new Konva.Text({
+      x: line.x * scale,
+      y: line.y * scale,
+      text: line.text,
+      fontSize: fontStyle.fontSize * scale,
+      fontFamily: fontStyle.fontFamily,
+      fontStyle: combined,
+      fill: fontStyle.color,
+    });
+    group.add(textNode);
+  }
+}
+
+function renderTextFlowSquareSections(
+  group: Konva.Group,
+  item: TextFlowPageItem,
+  scale: number,
+  project: ReturnType<typeof appState.getProject>
+): void {
+  const sections = (item.flowedSections as MeasuredSection[] | undefined) || [];
+  if (sections.length === 0) return;
+
+  const padding = (item.padding ?? 0) * scale;
+  const contentX = padding;
+  const contentWidth = Math.max(0, item.width * scale - padding * 2);
+  let currentY = padding;
+
+  for (const section of sections) {
+    const fontStyle = getFontStyleForSection(section.type, section.level, project.fontOptions);
+    const lineHeight = project.layoutOptions.lineHeight * fontStyle.fontSize * scale;
+    const fontSize = fontStyle.fontSize * scale;
+    const textAlign = fontStyle.textAlign || project.layoutOptions.textAlign;
+
+    if (section.type === 'heading') {
+      switch (section.level) {
+        case 1: currentY += project.layoutOptions.spacingAboveH1 * scale; break;
+        case 2: currentY += project.layoutOptions.spacingAboveH2 * scale; break;
+        case 3: currentY += project.layoutOptions.spacingAboveH3 * scale; break;
+      }
+    }
+
+    let combined = '';
+    if (fontStyle.fontStyle === 'italic') combined += 'italic ';
+    if (fontStyle.fontWeight === 'bold') combined += 'bold';
+    combined = combined.trim() || 'normal';
+
+    for (const line of section.lines) {
+      const textNode = new Konva.Text({
+        x: contentX,
+        y: currentY,
+        text: line,
+        width: contentWidth,
+        fontSize,
+        fontFamily: fontStyle.fontFamily,
+        fontStyle: combined,
+        fill: fontStyle.color,
+        align: textAlign as string,
+        wrap: 'none',
+      });
+      group.add(textNode);
+      currentY += lineHeight;
+    }
+    currentY += project.layoutOptions.paragraphSpacing * scale;
+  }
+}
+
+/**
  * Render a page's items to a high-resolution image
  * Returns a data URL of the rendered image
  *
@@ -662,6 +806,13 @@ export async function renderPageToImage(
     // Render page items (including array instances)
     if (page.items) {
       for (const item of page.items) {
+        // Text-flow items have multi-node content (one Konva.Text per flowed
+        // line) so they don't fit createRenderNode's single-node model.
+        if (item.type === 'textFlow') {
+          renderTextFlowItem(layer, item as TextFlowPageItem, 0, SCALE_FACTOR);
+          continue;
+        }
+
         const dimensions = item.arrayDimensions || [];
         const totalInstances = getTotalArrayInstances(dimensions);
 

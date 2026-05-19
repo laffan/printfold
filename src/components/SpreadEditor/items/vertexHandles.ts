@@ -15,6 +15,10 @@ const HANDLE_RADIUS = 5;
 const HANDLE_FILL = '#ffffff';
 const HANDLE_STROKE = '#3b82f6';
 const HANDLE_STROKE_WIDTH = 1.5;
+// Click within this many points of an edge inserts a new vertex there.
+const EDGE_CLICK_THRESHOLD = 8;
+// Polygon must keep at least this many vertices.
+const MIN_VERTEX_COUNT = 3;
 
 /**
  * Add a draggable handle for each polygon vertex to the supplied group.
@@ -32,6 +36,9 @@ export function addPolygonVertexHandles(
   const editor = appState.getEditor();
   const isSelected = editor.selectedItemIds.includes(item.id);
   if (!isSelected) return;
+
+  // Insert a new vertex when the user clicks near an edge.
+  setupEdgeInsertHandler(outline, item, pageNumber);
 
   for (let vertexIndex = 0; vertexIndex < item.polygonPoints.length; vertexIndex++) {
     const point = item.polygonPoints[vertexIndex];
@@ -58,19 +65,23 @@ export function addPolygonVertexHandles(
     });
 
     // Prevent the handle from being interpreted as a drag on the parent
-    // group (which would move the entire item).
+    // group (which would move the entire item). Alt/option + mousedown
+    // removes this vertex instead of starting a drag.
     handle.on('mousedown touchstart', (e) => {
       e.cancelBubble = true;
+      const isAlt = !!e.evt && 'altKey' in e.evt && (e.evt as MouseEvent).altKey;
+      if (!isAlt) return;
+      e.evt?.preventDefault();
+      if (item.polygonPoints!.length <= MIN_VERTEX_COUNT) return;
+      const newPoints = item.polygonPoints!.filter((_, idx) => idx !== vertexIndex);
+      appState.updateItemOnPage(pageNumber, item.id, { polygonPoints: newPoints });
+      appState.requestReflow();
     });
 
     handle.on('dragmove', () => {
-      // Clamp to the item's bounding box during drag for visual feedback.
-      const clampedX = Math.max(0, Math.min(item.width, handle.x()));
-      const clampedY = Math.max(0, Math.min(item.height, handle.y()));
-      handle.x(clampedX);
-      handle.y(clampedY);
-
       // Live-update the polygon outline so the user sees the new shape.
+      // No clamping: vertices may extend past the item's bounding box and
+      // the box auto-expands to fit on dragend.
       const points: number[] = [];
       const handles = group.find((n: Konva.Node) => n.getAttr('isVertexHandle') === true);
       const sorted = handles.slice().sort(
@@ -84,17 +95,140 @@ export function addPolygonVertexHandles(
     });
 
     handle.on('dragend', () => {
-      const newPoints = item.polygonPoints!.map((p, idx) => {
-        if (idx !== vertexIndex) return p;
-        return {
-          x: Math.max(0, Math.min(1, handle.x() / item.width)),
-          y: Math.max(0, Math.min(1, handle.y() / item.height)),
-        };
+      // Compute absolute item-local vertex positions with the dragged handle
+      // at its new spot, then reframe the polygon so the bounding box
+      // exactly contains every vertex.
+      const absPoints = item.polygonPoints!.map((p, idx) => {
+        if (idx === vertexIndex) return { x: handle.x(), y: handle.y() };
+        return { x: p.x * item.width, y: p.y * item.height };
       });
-      appState.updateItemOnPage(pageNumber, item.id, { polygonPoints: newPoints });
+      const updates = reframePolygon(item, absPoints);
+      appState.updateItemOnPage(pageNumber, item.id, updates);
       appState.requestReflow();
     });
 
     group.add(handle);
   }
+}
+
+/**
+ * Insert a new vertex when the user clicks near an edge of the polygon
+ * outline. Plain clicks on the interior fall through to the standard
+ * select-item behavior.
+ */
+function setupEdgeInsertHandler(
+  outline: Konva.Line,
+  item: TextFlowPageItem,
+  pageNumber: number
+): void {
+  outline.on('mousedown touchstart', (e) => {
+    if (!e.evt || ('altKey' in e.evt && (e.evt as MouseEvent).altKey)) return;
+    const stage = outline.getStage();
+    if (!stage) return;
+    const pointer = stage.getPointerPosition();
+    if (!pointer) return;
+    const local = outline.getAbsoluteTransform().copy().invert().point(pointer);
+
+    const absPoints = item.polygonPoints!.map(p => ({
+      x: p.x * item.width,
+      y: p.y * item.height,
+    }));
+    const nearest = findNearestEdge(absPoints, local.x, local.y);
+    if (!nearest || nearest.distance > EDGE_CLICK_THRESHOLD) return;
+
+    // Reject if the projection coincides with an existing vertex (avoid
+    // duplicate points that would zero out an edge).
+    const isAtExistingVertex = absPoints.some(p =>
+      Math.abs(p.x - nearest.projX) < 1 && Math.abs(p.y - nearest.projY) < 1
+    );
+    if (isAtExistingVertex) return;
+
+    const newPoint = {
+      x: nearest.projX / item.width,
+      y: nearest.projY / item.height,
+    };
+    const newPoints = [...item.polygonPoints!];
+    newPoints.splice(nearest.insertAt, 0, newPoint);
+    appState.updateItemOnPage(pageNumber, item.id, { polygonPoints: newPoints });
+    appState.requestReflow();
+    e.cancelBubble = true;
+    e.evt.preventDefault();
+  });
+}
+
+/**
+ * Find the polygon edge nearest to (x, y) along with the projection of
+ * (x, y) onto that edge segment. Used to position a newly inserted vertex.
+ */
+function findNearestEdge(
+  points: { x: number; y: number }[],
+  x: number,
+  y: number
+): { insertAt: number; distance: number; projX: number; projY: number } | null {
+  if (points.length < 2) return null;
+  let bestDistance = Infinity;
+  let bestInsertAt = -1;
+  let bestProjX = 0;
+  let bestProjY = 0;
+
+  for (let i = 0; i < points.length; i++) {
+    const p1 = points[i];
+    const p2 = points[(i + 1) % points.length];
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const lengthSq = dx * dx + dy * dy;
+    if (lengthSq === 0) continue;
+
+    let t = ((x - p1.x) * dx + (y - p1.y) * dy) / lengthSq;
+    t = Math.max(0, Math.min(1, t));
+    const projX = p1.x + t * dx;
+    const projY = p1.y + t * dy;
+    const distance = Math.hypot(x - projX, y - projY);
+
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestInsertAt = i + 1; // Insert between p_i and p_{i+1}
+      bestProjX = projX;
+      bestProjY = projY;
+    }
+  }
+
+  if (bestInsertAt === -1) return null;
+  return { insertAt: bestInsertAt, distance: bestDistance, projX: bestProjX, projY: bestProjY };
+}
+
+/**
+ * Given absolute (item-local) vertex positions for the polygon, compute a
+ * new bounding box that exactly contains them. Returns the item updates
+ * (x, y, width, height shifts plus re-normalized polygonPoints) needed to
+ * keep the polygon in the same place visually while making the bounds fit.
+ */
+function reframePolygon(
+  item: TextFlowPageItem,
+  absPoints: { x: number; y: number }[]
+): Partial<TextFlowPageItem> {
+  const xs = absPoints.map(p => p.x);
+  const ys = absPoints.map(p => p.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+
+  const newWidth = Math.max(1, maxX - minX);
+  const newHeight = Math.max(1, maxY - minY);
+  const newItemX = item.x + minX;
+  const newItemY = item.y + minY;
+
+  const polygonPoints = absPoints.map(p => ({
+    x: (p.x - minX) / newWidth,
+    y: (p.y - minY) / newHeight,
+  }));
+
+  return {
+    x: newItemX,
+    y: newItemY,
+    width: newWidth,
+    height: newHeight,
+    polygonPoints,
+  };
 }

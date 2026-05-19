@@ -162,7 +162,9 @@ export function createItemNode(
         }))
       : null;
 
-    const group = new Konva.Group({
+    // Outer group: positioning + drag. Not clipped, so the polygon outline
+    // and vertex handles can extend beyond the bounding box.
+    const outerGroup = new Konva.Group({
       x: xOffset + item.x,
       y: item.y,
       rotation: item.rotation || 0,
@@ -170,6 +172,15 @@ export function createItemNode(
       draggable: true,
       width: item.width,
       height: item.height,
+    });
+
+    // Inner group: clips the flowed text to the item's shape.
+    const contentGroup = new Konva.Group({
+      x: 0,
+      y: 0,
+      width: item.width,
+      height: item.height,
+      listening: false,
       clipFunc: (ctx) => {
         if (polygonAbs) {
           ctx.beginPath();
@@ -183,9 +194,11 @@ export function createItemNode(
         }
       },
     });
+    drawTextFlowItemContent(contentGroup, flowItem);
+    outerGroup.add(contentGroup);
 
-    // Hit-area shape: either the polygon or a square. Near-zero alpha fill so
-    // the whole interior catches pointer events while staying invisible.
+    // Hit-area shape sits on top so the user can click anywhere inside the
+    // boundary to select. Near-zero alpha fill catches pointer events.
     let polygonOutline: Konva.Line | null = null;
     if (polygonAbs) {
       polygonOutline = new Konva.Line({
@@ -197,7 +210,7 @@ export function createItemNode(
         fill: 'rgba(0,0,0,0.001)',
         listening: true,
       });
-      group.add(polygonOutline);
+      outerGroup.add(polygonOutline);
     } else {
       const bgRect = new Konva.Rect({
         x: 0,
@@ -210,20 +223,19 @@ export function createItemNode(
         fill: 'rgba(0,0,0,0.001)',
         listening: true,
       });
-      group.add(bgRect);
+      outerGroup.add(bgRect);
     }
 
-    drawTextFlowItemContent(group, flowItem);
-
     // Vertex-editing handles for polygons — appear only when the item is
-    // selected (the editor re-renders on selection change).
+    // selected (the editor re-renders on selection change). Added to the
+    // outer (unclipped) group so they can be dragged past the bounding box.
     if (polygonOutline && polygonAbs) {
-      addPolygonVertexHandles(group, polygonOutline, flowItem, pageNumber);
+      addPolygonVertexHandles(outerGroup, polygonOutline, flowItem, pageNumber);
     }
 
     // Konva.Group satisfies the structural methods used by the shared setup
     // path (x, y, on, setAttr, etc.); cast through unknown to appease TS.
-    node = group as unknown as Konva.Shape;
+    node = outerGroup as unknown as Konva.Shape;
   } else if (item.type === 'image') {
     const imageItem = item as ImagePageItem;
     const imageFile = appState.getProject().files.find(f => f.id === imageItem.imageFileId);
