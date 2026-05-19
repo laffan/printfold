@@ -53,8 +53,10 @@ export function addItemToCurrentPage(
       type: 'textFlow',
       flowShape: 'polygon',
       padding: 8,
-      borderColor: '#888888',
-      borderWidth: 1,
+      hasFill: false,
+      hasStroke: false,
+      strokeColor: '#000000',
+      strokeWidth: 1,
       polygonPoints: [
         { x: 0, y: 0 },
         { x: 1, y: 0 },

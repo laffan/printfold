@@ -264,6 +264,10 @@ export function updateEditSelectedSection(): void {
     hasStroke = textItem.hasStroke ?? false;
     strokeColor = textItem.strokeColor || '#000000';
     strokeWidth = textItem.strokeWidth || 1;
+  } else if (item.type === 'textFlow') {
+    hasStroke = item.hasStroke ?? false;
+    strokeColor = item.strokeColor || '#000000';
+    strokeWidth = item.strokeWidth ?? 1;
   }
 
   // Update unified stroke toggle
@@ -274,17 +278,31 @@ export function updateEditSelectedSection(): void {
   setInputValue('item-stroke', strokeColor);
   setInputValue('item-stroke-width', strokeWidth.toString());
 
-  // Update shadow toggle and properties
+  // Update shadow toggle and properties. Hidden entirely for text-flow
+  // items — shadow doesn't make sense on a region of flowed text.
   const hasShadow = item.hasShadow ?? false;
   const itemHasShadow = document.getElementById('item-has-shadow') as HTMLInputElement;
   const itemShadowSection = document.getElementById('item-shadow-section');
+  const shadowToggleRow = itemHasShadow?.closest('.form-group') as HTMLElement | null;
+  const isTextFlow = item.type === 'textFlow';
+  if (shadowToggleRow) shadowToggleRow.style.display = isTextFlow ? 'none' : '';
   if (itemHasShadow) itemHasShadow.checked = hasShadow;
-  if (itemShadowSection) itemShadowSection.style.display = hasShadow ? 'block' : 'none';
+  if (itemShadowSection) itemShadowSection.style.display = hasShadow && !isTextFlow ? 'block' : 'none';
   setInputValue('item-shadow-color', item.shadowColor || '#000000');
   setInputValue('item-shadow-blur', (item.shadowBlur ?? 5).toString());
   setInputValue('item-shadow-offset-x', (item.shadowOffsetX ?? 3).toString());
   setInputValue('item-shadow-offset-y', (item.shadowOffsetY ?? 3).toString());
   setInputValue('item-shadow-opacity', (item.shadowOpacity ?? 0.5).toString());
+
+  // Text-color picker for text-flow items: shown alongside the fill picker
+  // and applied to every flowed line.
+  const itemTextColorSection = document.getElementById('item-text-color-section');
+  if (itemTextColorSection) {
+    itemTextColorSection.style.display = isTextFlow ? 'block' : 'none';
+  }
+  if (isTextFlow) {
+    setInputValue('item-text-color', item.textColor || '#000000');
+  }
 
   // Update array toggle and properties (multi-dimensional)
   const dimensions = item.arrayDimensions || [];
@@ -305,7 +323,7 @@ export function updateEditSelectedSection(): void {
   updateArrayDimensionsList(item);
   setupAddDimensionButton();
 
-  // Update unified fill toggle and picker (works for both shapes and text)
+  // Update unified fill toggle and picker (works for shapes, text, text-flow)
   let hasFill = true;
   let currentFill: FillConfig;
   let defaultFillColor = '#cccccc';
@@ -321,6 +339,12 @@ export function updateEditSelectedSection(): void {
     hasFill = textItem.hasFill ?? true;
     defaultFillColor = textItem.color || '#000000';
     currentFill = textItem.fill || { type: 'color', color: defaultFillColor };
+  } else if (item.type === 'textFlow') {
+    // Text-flow fill = background of the region. Default off; a sensible
+    // initial color so toggling on produces a visible result.
+    hasFill = item.hasFill === true;
+    defaultFillColor = '#ffffff';
+    currentFill = item.fill || { type: 'color', color: defaultFillColor };
   } else {
     currentFill = { type: 'color', color: defaultFillColor };
   }
@@ -354,6 +378,8 @@ export function updateEditSelectedSection(): void {
             fill,
             color: fill.type === 'color' ? (fill.color || '#000000') : '#000000'
           });
+        } else if (currentItem.type === 'textFlow') {
+          appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { fill });
         }
       });
       setItemFillPicker(picker);

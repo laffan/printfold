@@ -628,6 +628,37 @@ function renderTextFlowItem(
     },
   });
 
+  // Fill and stroke (only when enabled by the user). Editor-only dashed
+  // border isn't rendered here.
+  const hasFill = item.hasFill === true;
+  const hasStroke = item.hasStroke === true;
+  const fillColor = hasFill
+    ? (item.fill?.type === 'color' ? (item.fill?.color || '#ffffff') : '#ffffff')
+    : undefined;
+  if (hasFill || hasStroke) {
+    if (polygonAbsScaled) {
+      const outline = new Konva.Line({
+        points: polygonAbsScaled.flatMap(p => [p.x, p.y]),
+        closed: true,
+        fill: fillColor,
+        stroke: hasStroke ? (item.strokeColor || '#000000') : undefined,
+        strokeWidth: hasStroke ? (item.strokeWidth ?? 1) * scale : 0,
+      });
+      group.add(outline);
+    } else {
+      const rect = new Konva.Rect({
+        x: 0,
+        y: 0,
+        width: scaledWidth,
+        height: scaledHeight,
+        fill: fillColor,
+        stroke: hasStroke ? (item.strokeColor || '#000000') : undefined,
+        strokeWidth: hasStroke ? (item.strokeWidth ?? 1) * scale : 0,
+      });
+      group.add(rect);
+    }
+  }
+
   if (isPolygon) {
     renderTextFlowPolygonLines(group, item, scale);
   } else {
@@ -660,7 +691,7 @@ function renderTextFlowPolygonLines(
       fontSize: fontStyle.fontSize * scale,
       fontFamily: fontStyle.fontFamily,
       fontStyle: combined,
-      fill: fontStyle.color,
+      fill: item.textColor || fontStyle.color,
     });
     group.add(textNode);
   }
@@ -708,7 +739,7 @@ function renderTextFlowSquareSections(
         fontSize,
         fontFamily: fontStyle.fontFamily,
         fontStyle: combined,
-        fill: fontStyle.color,
+        fill: item.textColor || fontStyle.color,
         align: textAlign as string,
         wrap: 'none',
       });

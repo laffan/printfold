@@ -190,8 +190,15 @@ export interface TextFlowPageItem extends PageItemBase {
   type: 'textFlow';
   flowShape: 'square' | 'polygon';
   padding?: number; // Inner padding in points (acts like mini-margins)
-  borderColor?: string; // Optional outline (mostly for editor visibility)
-  borderWidth?: number;
+  // Fill — background of the polygon interior (solid color for v1).
+  fill?: FillConfig;
+  hasFill?: boolean;
+  // Stroke — outline that follows the polygon path in editor and PDF.
+  hasStroke?: boolean;
+  strokeColor?: string;
+  strokeWidth?: number;
+  // Override color applied to all flowed text inside the region.
+  textColor?: string;
   // Normalized polygon vertices (each x,y in [0,1] relative to the item's
   // bounding box). Only used when flowShape === 'polygon'.
   polygonPoints?: { x: number; y: number }[];

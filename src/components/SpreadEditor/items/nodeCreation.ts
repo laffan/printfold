@@ -174,6 +174,46 @@ export function createItemNode(
       height: item.height,
     });
 
+    // Fill + hit-area shape added FIRST so the flowed text sits on top of
+    // any solid background. When stroke is enabled the outline gets the
+    // user's color/width; otherwise we render a dashed gray editor-aid
+    // that does NOT appear in the exported PDF.
+    const userHasFill = flowItem.hasFill === true;
+    const userHasStroke = flowItem.hasStroke === true;
+    const fillColor = userHasFill
+      ? (flowItem.fill?.type === 'color' ? (flowItem.fill?.color || '#ffffff') : '#ffffff')
+      : 'rgba(0,0,0,0.001)';
+    const strokeColor = userHasStroke ? (flowItem.strokeColor || '#000000') : '#888888';
+    const strokeWidth = userHasStroke ? (flowItem.strokeWidth ?? 1) : 1;
+    const strokeDash = userHasStroke ? undefined : [4, 4];
+
+    let polygonOutline: Konva.Line | null = null;
+    if (polygonAbs) {
+      polygonOutline = new Konva.Line({
+        points: polygonAbs.flatMap(p => [p.x, p.y]),
+        closed: true,
+        stroke: strokeColor,
+        strokeWidth,
+        dash: strokeDash,
+        fill: fillColor,
+        listening: true,
+      });
+      outerGroup.add(polygonOutline);
+    } else {
+      const bgRect = new Konva.Rect({
+        x: 0,
+        y: 0,
+        width: item.width,
+        height: item.height,
+        stroke: strokeColor,
+        strokeWidth,
+        dash: strokeDash,
+        fill: fillColor,
+        listening: true,
+      });
+      outerGroup.add(bgRect);
+    }
+
     // Inner group: clips the flowed text to the item's shape. Polygons
     // skip the clip — wrapping already respects the polygon's silhouette,
     // and descenders / ascenders should be free to extend past the edge.
@@ -189,35 +229,6 @@ export function createItemNode(
     });
     drawTextFlowItemContent(contentGroup, flowItem);
     outerGroup.add(contentGroup);
-
-    // Hit-area shape sits on top so the user can click anywhere inside the
-    // boundary to select. Near-zero alpha fill catches pointer events.
-    let polygonOutline: Konva.Line | null = null;
-    if (polygonAbs) {
-      polygonOutline = new Konva.Line({
-        points: polygonAbs.flatMap(p => [p.x, p.y]),
-        closed: true,
-        stroke: flowItem.borderColor ?? '#888888',
-        strokeWidth: flowItem.borderWidth ?? 1,
-        dash: [4, 4],
-        fill: 'rgba(0,0,0,0.001)',
-        listening: true,
-      });
-      outerGroup.add(polygonOutline);
-    } else {
-      const bgRect = new Konva.Rect({
-        x: 0,
-        y: 0,
-        width: item.width,
-        height: item.height,
-        stroke: flowItem.borderColor ?? '#888888',
-        strokeWidth: flowItem.borderWidth ?? 1,
-        dash: [4, 4],
-        fill: 'rgba(0,0,0,0.001)',
-        listening: true,
-      });
-      outerGroup.add(bgRect);
-    }
 
     // Vertex-editing handles for polygons — appear only when the item is
     // selected (the editor re-renders on selection change). Added to the

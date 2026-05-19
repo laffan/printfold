@@ -43,7 +43,8 @@ export function drawTextFlowItem(
 
   for (const section of sections) {
     const fontStyle = getFontStyleForSection(section.type, section.level, fontOptions);
-    const font = getFont(fontStyle, fontCache);
+    const renderStyle = item.textColor ? { ...fontStyle, color: item.textColor } : fontStyle;
+    const font = getFont(renderStyle, fontCache);
     const lineHeight = layoutOptions.lineHeight * fontStyle.fontSize;
 
     if (section.type === 'heading') {
@@ -66,7 +67,7 @@ export function drawTextFlowItem(
           richLine,
           contentX,
           currentY - fontStyle.fontSize,
-          fontStyle,
+          renderStyle,
           fontOptions,
           fontCache,
           contentWidth,
@@ -90,7 +91,7 @@ export function drawTextFlowItem(
           y: currentY - fontStyle.fontSize,
           size: fontStyle.fontSize,
           font,
-          color: parseColor(fontStyle.color),
+          color: parseColor(renderStyle.color),
         });
         currentY -= lineHeight;
       }
@@ -152,6 +153,7 @@ function drawPolygonFlowItem(
 
   for (const line of lines) {
     const fontStyle = getFontStyleForSection(line.sectionType, line.sectionLevel, fontOptions);
+    const color = item.textColor || fontStyle.color;
     const font = getFont(fontStyle, fontCache);
     // PDF y is bottom-up. itemPdfY is item bottom; item.height - line.y is
     // distance from item bottom up to the top of the line; subtract fontSize
@@ -162,7 +164,7 @@ function drawPolygonFlowItem(
       y: baselineY,
       size: fontStyle.fontSize,
       font,
-      color: parseColor(fontStyle.color),
+      color: parseColor(color),
     });
   }
 }

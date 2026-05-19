@@ -73,11 +73,15 @@ export function drawTextFlowItemContent(
       }
     }
 
+    // If the item overrides the text color, clone the section's font style
+    // with the override so rich-text spans use it too.
+    const renderStyle = item.textColor ? { ...fontStyle, color: item.textColor } : fontStyle;
+
     const richLines = section.richLines;
     if (richLines && richLines.length > 0) {
       for (const richLine of richLines) {
         if (cursorY > contentY + contentHeight) break;
-        drawRichLine(group, richLine, contentX, cursorY, fontStyle, contentWidth, lineHeight, textAlign);
+        drawRichLine(group, richLine, contentX, cursorY, renderStyle, contentWidth, lineHeight, textAlign);
         cursorY += lineHeight;
       }
     } else {
@@ -97,7 +101,7 @@ export function drawTextFlowItemContent(
           fontSize: fontStyle.fontSize,
           fontFamily: fontStyle.fontFamily,
           fontStyle: combinedFontStyle,
-          fill: fontStyle.color,
+          fill: renderStyle.color,
           width: contentWidth,
           wrap: 'none',
           align: textAlign as string,
@@ -145,7 +149,7 @@ function drawPolygonFlowLines(group: Konva.Group, item: TextFlowPageItem): void 
       fontSize: fontStyle.fontSize,
       fontFamily: fontStyle.fontFamily,
       fontStyle: combined,
-      fill: fontStyle.color,
+      fill: item.textColor || fontStyle.color,
       listening: false,
     });
     group.add(text);
