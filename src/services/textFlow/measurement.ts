@@ -310,91 +310,115 @@ export function wrapRichText(
     // Skip empty paragraphs
     if (!paragraph.trim()) continue;
 
-    // Parse markdown to spans
-    const spans = parseInlineMarkdown(paragraph.replace(/\n/g, ' '));
-    if (spans.length === 0) continue;
+    // Single newlines within a paragraph are treated as hard line breaks
+    // (so poetry and other line-sensitive content renders correctly).
+    // Each hard-line is parsed and wrapped independently.
+    const hardLines = paragraph.split('\n');
 
-    // Convert spans to words
-    const words = spansToWords(spans);
-    if (words.length === 0) {
-      // Empty paragraph, add empty line
-      allLines.push({ spans: [{ text: '' }] });
-      continue;
-    }
-
-    // Wrap words into lines
-    const lines: RichTextLine[] = [];
-    let currentLineSpans: TextSpan[] = [];
-    let currentLineWidth = 0;
-
-    for (let i = 0; i < words.length; i++) {
-      const word = words[i];
-      const wordStyle = getSpanFontStyle(baseStyle, word.span, fontOptions);
-      const wordWidth = measureTextWidth(ctx, word.text, wordStyle);
-      const spaceWidth = word.trailingSpace ? measureTextWidth(ctx, ' ', wordStyle) : 0;
-
-      // Calculate width with space if not first word on line
-      const addedWidth = currentLineSpans.length > 0
-        ? measureTextWidth(ctx, ' ', wordStyle) + wordWidth
-        : wordWidth;
-
-      if (currentLineWidth + addedWidth <= safeMaxWidth) {
-        // Word fits on current line
-        if (currentLineSpans.length > 0) {
-          // Add space before word (as part of previous span or new span)
-          const lastSpan = currentLineSpans[currentLineSpans.length - 1];
-          if (spansHaveSameStyle(lastSpan, word.span)) {
-            // Same style, append to last span
-            lastSpan.text += ' ' + word.text;
-          } else {
-            // Different style, add space to last span and new span for word
-            lastSpan.text += ' ';
-            currentLineSpans.push({ ...word.span });
-          }
-        } else {
-          // First word on line
-          currentLineSpans.push({ ...word.span });
-        }
-        currentLineWidth += addedWidth;
-      } else {
-        // Word doesn't fit - start new line
-        if (currentLineSpans.length > 0) {
-          lines.push({ spans: mergeAdjacentSpans(currentLineSpans) });
-        }
-
-        // Check if single word is too long
-        if (wordWidth > safeMaxWidth) {
-          // Break the word character by character
-          const brokenLines = breakLongWord(ctx, word, safeMaxWidth, baseStyle, fontOptions);
-          for (let j = 0; j < brokenLines.length - 1; j++) {
-            lines.push(brokenLines[j]);
-          }
-          // Last part becomes current line
-          if (brokenLines.length > 0) {
-            const lastLine = brokenLines[brokenLines.length - 1];
-            currentLineSpans = [...lastLine.spans];
-            currentLineWidth = measureRichLineWidth(ctx, lastLine, baseStyle, fontOptions);
-          } else {
-            currentLineSpans = [];
-            currentLineWidth = 0;
-          }
-        } else {
-          // Word fits on new line
-          currentLineSpans = [{ ...word.span }];
-          currentLineWidth = wordWidth;
-        }
+    for (const hardLine of hardLines) {
+      const trimmed = hardLine.trim();
+      if (!trimmed) {
+        allLines.push({ spans: [{ text: '' }] });
+        continue;
       }
-    }
 
-    // Add final line
-    if (currentLineSpans.length > 0) {
-      lines.push({ spans: mergeAdjacentSpans(currentLineSpans) });
-    }
+      const spans = parseInlineMarkdown(trimmed);
+      if (spans.length === 0) {
+        allLines.push({ spans: [{ text: '' }] });
+        continue;
+      }
 
-    allLines.push(...lines);
+      const wrapped = wrapSpansToLines(ctx, spans, safeMaxWidth, baseStyle, fontOptions);
+      allLines.push(...wrapped);
+    }
   }
 
   return allLines;
+}
+
+/**
+ * Wrap a sequence of styled spans into width-constrained rich text lines.
+ */
+function wrapSpansToLines(
+  ctx: CanvasRenderingContext2D,
+  spans: TextSpan[],
+  safeMaxWidth: number,
+  baseStyle: FontStyle,
+  fontOptions: FontOptions
+): RichTextLine[] {
+  const words = spansToWords(spans);
+  if (words.length === 0) {
+    return [{ spans: [{ text: '' }] }];
+  }
+
+  const lines: RichTextLine[] = [];
+  let currentLineSpans: TextSpan[] = [];
+  let currentLineWidth = 0;
+
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    const wordStyle = getSpanFontStyle(baseStyle, word.span, fontOptions);
+    const wordWidth = measureTextWidth(ctx, word.text, wordStyle);
+
+    // Calculate width with space if not first word on line
+    const addedWidth = currentLineSpans.length > 0
+      ? measureTextWidth(ctx, ' ', wordStyle) + wordWidth
+      : wordWidth;
+
+    if (currentLineWidth + addedWidth <= safeMaxWidth) {
+      // Word fits on current line
+      if (currentLineSpans.length > 0) {
+        // Add space before word (as part of previous span or new span)
+        const lastSpan = currentLineSpans[currentLineSpans.length - 1];
+        if (spansHaveSameStyle(lastSpan, word.span)) {
+          // Same style, append to last span
+          lastSpan.text += ' ' + word.text;
+        } else {
+          // Different style, add space to last span and new span for word
+          lastSpan.text += ' ';
+          currentLineSpans.push({ ...word.span });
+        }
+      } else {
+        // First word on line
+        currentLineSpans.push({ ...word.span });
+      }
+      currentLineWidth += addedWidth;
+    } else {
+      // Word doesn't fit - start new line
+      if (currentLineSpans.length > 0) {
+        lines.push({ spans: mergeAdjacentSpans(currentLineSpans) });
+      }
+
+      // Check if single word is too long
+      if (wordWidth > safeMaxWidth) {
+        // Break the word character by character
+        const brokenLines = breakLongWord(ctx, word, safeMaxWidth, baseStyle, fontOptions);
+        for (let j = 0; j < brokenLines.length - 1; j++) {
+          lines.push(brokenLines[j]);
+        }
+        // Last part becomes current line
+        if (brokenLines.length > 0) {
+          const lastLine = brokenLines[brokenLines.length - 1];
+          currentLineSpans = [...lastLine.spans];
+          currentLineWidth = measureRichLineWidth(ctx, lastLine, baseStyle, fontOptions);
+        } else {
+          currentLineSpans = [];
+          currentLineWidth = 0;
+        }
+      } else {
+        // Word fits on new line
+        currentLineSpans = [{ ...word.span }];
+        currentLineWidth = wordWidth;
+      }
+    }
+  }
+
+  // Add final line
+  if (currentLineSpans.length > 0) {
+    lines.push({ spans: mergeAdjacentSpans(currentLineSpans) });
+  }
+
+  return lines;
 }
 
 /**
