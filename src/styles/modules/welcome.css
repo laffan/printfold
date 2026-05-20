@@ -19,23 +19,10 @@
 .welcome-card {
   width: 100%;
   max-width: 560px;
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  overflow: hidden;
 }
 
 .welcome-hero {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 24px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.welcome-hero .logo {
-  font-size: 32px;
+  padding: 24px 0;
 }
 
 .welcome-hero h1 {
@@ -53,8 +40,7 @@
 .welcome-actions {
   display: flex;
   gap: 8px;
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--color-border);
+  padding: 16px 0;
 }
 
 .welcome-actions .btn {
@@ -64,7 +50,7 @@
 }
 
 .welcome-recents {
-  padding: 16px 24px 24px;
+  padding: 16px 0 24px;
 }
 
 .welcome-recents h3 {
@@ -90,10 +76,9 @@
   grid-template-rows: auto auto;
   gap: 0 8px;
   width: 100%;
-  padding: 10px 12px;
-  background: var(--color-bg-tertiary);
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  padding: 8px 0;
+  background: transparent;
+  border: none;
   text-align: left;
   cursor: pointer;
   color: var(--color-text);
@@ -101,8 +86,7 @@
 }
 
 .recent-row:hover {
-  background: var(--color-bg-hover);
-  border-color: var(--color-border-light);
+  color: var(--color-primary);
 }
 
 .recent-name {
@@ -141,7 +125,6 @@
 }
 
 .recent-remove:hover {
-  background: var(--color-bg);
   color: var(--color-text);
 }
 
