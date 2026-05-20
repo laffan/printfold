@@ -11,7 +11,7 @@ export class FileList {
   private container!: HTMLElement;
   private selectedFileId: string | null = null;
   private onFileSelect: ((file: ProjectFile | null) => void) | null = null;
-  private activeTab: 'text' | 'images' = 'text';
+  private activeTab: 'text' | 'images' | 'fonts' = 'text';
   private draggedFileId: string | null = null;
 
   mount(): void {
@@ -71,7 +71,7 @@ export class FileList {
   private async openFileDialog(): Promise<void> {
     const files = await env.openFiles({
       filters: [
-        { name: 'Supported Files', extensions: ['md', 'png', 'jpg', 'jpeg', 'webp', 'zip'] },
+        { name: 'Supported Files', extensions: ['md', 'png', 'jpg', 'jpeg', 'webp', 'zip', 'ttf', 'otf', 'woff'] },
       ],
       multiple: true,
     });
@@ -83,7 +83,7 @@ export class FileList {
 
   private async processDroppedFiles(droppedFiles: globalThis.FileList): Promise<ProjectFile[]> {
     const files: ProjectFile[] = [];
-    const allowedExtensions = ['md', 'png', 'jpg', 'jpeg', 'webp', 'zip'];
+    const allowedExtensions = ['md', 'png', 'jpg', 'jpeg', 'webp', 'zip', 'ttf', 'otf', 'woff'];
 
     for (const file of Array.from(droppedFiles) as File[]) {
       const ext = file.name.split('.').pop()?.toLowerCase() || '';
@@ -142,6 +142,10 @@ export class FileList {
         return 'image';
       case 'zip':
         return 'archive';
+      case 'ttf':
+      case 'otf':
+      case 'woff':
+        return 'font';
       default:
         return 'unknown';
     }
@@ -181,21 +185,30 @@ export class FileList {
       this.render();
     });
 
+    const fontsTab = document.createElement('button');
+    fontsTab.className = 'file-tab' + (this.activeTab === 'fonts' ? ' active' : '');
+    const fontCount = files.filter(f => f.type === 'font').length;
+    fontsTab.textContent = `Fonts (${fontCount})`;
+    fontsTab.addEventListener('click', () => {
+      this.activeTab = 'fonts';
+      this.render();
+    });
+
     tabsContainer.appendChild(textTab);
     tabsContainer.appendChild(imagesTab);
+    tabsContainer.appendChild(fontsTab);
     this.container.appendChild(tabsContainer);
 
     // File list container
     const fileListContainer = document.createElement('div');
     fileListContainer.className = 'file-items-container';
+    if (this.activeTab === 'fonts') fileListContainer.classList.add('file-items-fonts');
 
     // Filter files based on active tab
     const filteredFiles = files.filter(file => {
-      if (this.activeTab === 'text') {
-        return file.type === 'markdown';
-      } else {
-        return file.type === 'image';
-      }
+      if (this.activeTab === 'text') return file.type === 'markdown';
+      if (this.activeTab === 'images') return file.type === 'image';
+      return file.type === 'font';
     });
 
     // Add file items
@@ -208,9 +221,10 @@ export class FileList {
     if (filteredFiles.length === 0) {
       const emptyState = document.createElement('div');
       emptyState.className = 'file-list-empty';
-      emptyState.textContent = this.activeTab === 'text'
-        ? 'No text files. Drop .md files here.'
-        : 'No images. Drop image files here.';
+      emptyState.textContent =
+        this.activeTab === 'text'  ? 'No text files. Drop .md files here.' :
+        this.activeTab === 'images' ? 'No images. Drop image files here.' :
+                                      'No custom fonts. Drop .ttf, .otf, or .woff files here.';
       fileListContainer.appendChild(emptyState);
     }
 
@@ -228,6 +242,7 @@ export class FileList {
 
     const isTextFile = file.type === 'markdown';
     const isImageFile = file.type === 'image';
+    const isFontFile = file.type === 'font';
 
     // Add drag handle for text files
     const dragHandle = isTextFile ? '<span class="drag-handle" title="Drag to reorder">⋮⋮</span>' : '';
@@ -240,6 +255,18 @@ export class FileList {
           <img src="data:image/png;base64,${file.content}" alt="${file.name}" draggable="false">
         </div>
         <span class="file-name" title="${file.name}">${file.name}</span>
+        <div class="file-actions">
+          <button class="btn btn-icon btn-remove" title="Remove file">×</button>
+        </div>
+      `;
+    } else if (isFontFile) {
+      // Font file: render the family name in its own typeface as a live preview.
+      item.classList.add('file-item-text', 'file-item-font');
+      const family = file.name.replace(/\.[^.]+$/, '');
+      const icon = this.getFileIcon(file.type);
+      item.innerHTML = `
+        <span class="file-icon">${icon}</span>
+        <span class="file-name file-font-preview" title="${file.name}" style="font-family: '${family.replace(/'/g, "\\'")}', sans-serif;">${family}</span>
         <div class="file-actions">
           <button class="btn btn-icon btn-remove" title="Remove file">×</button>
         </div>
@@ -365,6 +392,8 @@ export class FileList {
         return '🖼️';
       case 'archive':
         return '📦';
+      case 'font':
+        return 'Aa';
       default:
         return '📎';
     }

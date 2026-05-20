@@ -7,6 +7,7 @@ import { appState } from '../services/state';
 import { env } from '../services/environment';
 import { textFlowEngine, clearMeasurementCache } from '../services/textFlow';
 import { googleFonts } from '../services/googleFonts';
+import { fontService } from '../services/fontService';
 import { FileList } from './FileList';
 import { FilePreview } from './FilePreview';
 import { SpreadEditor } from './SpreadEditor';
@@ -386,9 +387,29 @@ export class App {
       this.performReflow();
     });
 
-    // Update document info when project changes
+    // Keep the font service's custom-font registry in sync with project
+    // files. Whenever the file list changes, register any new font files
+    // and unregister fonts whose files have been removed.
+    const registeredFontFiles = new Map<string, string>(); // fileId -> family
     appState.onProjectChange((project) => {
       this.updateDocumentInfo(project);
+
+      const currentFontFiles = project.files.filter((f) => f.type === 'font');
+      const seenIds = new Set<string>();
+      for (const file of currentFontFiles) {
+        seenIds.add(file.id);
+        if (!registeredFontFiles.has(file.id)) {
+          const family = fontService.registerCustomFont(file.name, file.content);
+          registeredFontFiles.set(file.id, family);
+        }
+      }
+      // Drop any fonts whose files were removed.
+      for (const [fileId, family] of Array.from(registeredFontFiles.entries())) {
+        if (!seenIds.has(fileId)) {
+          fontService.unregisterCustomFont(family);
+          registeredFontFiles.delete(fileId);
+        }
+      }
     });
 
     // Reflow when fonts finish loading (measurements may change)

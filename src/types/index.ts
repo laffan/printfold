@@ -83,7 +83,7 @@ export function createDefaultFill(type: FillType): FillConfig {
 export interface ProjectFile {
   id: string;
   name: string;
-  type: 'markdown' | 'image' | 'archive' | 'unknown';
+  type: 'markdown' | 'image' | 'archive' | 'font' | 'unknown';
   content: string;
   isBase64: boolean;
   lastModified: number;

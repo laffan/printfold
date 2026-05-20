@@ -67,6 +67,7 @@ export class ZipHandler {
   private static readonly TEXT_FOLDER = 'text';
   private static readonly IMAGES_FOLDER = 'images';
   private static readonly STATIC_FOLDER = 'static';
+  private static readonly FONTS_FOLDER = 'fonts';
 
   // Store pending static page data to apply after reflow
   private pendingStaticPages: Map<number, StaticPageData> = new Map();
@@ -82,6 +83,7 @@ export class ZipHandler {
     const textFolder = zip.folder(ZipHandler.TEXT_FOLDER)!;
     const imagesFolder = zip.folder(ZipHandler.IMAGES_FOLDER)!;
     const staticFolder = zip.folder(ZipHandler.STATIC_FOLDER)!;
+    const fontsFolder = zip.folder(ZipHandler.FONTS_FOLDER)!;
 
     // Build file manifest and add files to appropriate folders
     const manifestFiles: ManifestFile[] = [];
@@ -105,6 +107,17 @@ export class ZipHandler {
         const path = `${ZipHandler.IMAGES_FOLDER}/${baseName}`;
         const binaryData = this.base64ToArrayBuffer(file.content);
         imagesFolder.file(baseName, binaryData);
+        manifestFiles.push({
+          id: file.id,
+          name: file.name,
+          type: file.type,
+          path,
+          lastModified: file.lastModified,
+        });
+      } else if (file.type === 'font') {
+        const path = `${ZipHandler.FONTS_FOLDER}/${baseName}`;
+        const binaryData = this.base64ToArrayBuffer(file.content);
+        fontsFolder.file(baseName, binaryData);
         manifestFiles.push({
           id: file.id,
           name: file.name,
@@ -210,11 +223,12 @@ export class ZipHandler {
         return;
       }
 
-      // Handle text and image files
+      // Handle text, image, and font files
       const isTextFile = ext === 'md';
       const isImageFile = ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext);
+      const isFontFile = ['ttf', 'otf', 'woff'].includes(ext);
 
-      if (!isTextFile && !isImageFile) return;
+      if (!isTextFile && !isImageFile && !isFontFile) return;
 
       const promise = (async () => {
         // Find file info in manifest
@@ -404,6 +418,10 @@ export class ZipHandler {
         return 'image';
       case 'zip':
         return 'archive';
+      case 'ttf':
+      case 'otf':
+      case 'woff':
+        return 'font';
       default:
         return 'unknown';
     }

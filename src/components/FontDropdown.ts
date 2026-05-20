@@ -40,6 +40,7 @@ export class FontDropdown {
   private mode: FontDropdownMode;
   private unsubscribeFontLoad: (() => void) | null = null;
   private unsubscribeSystemFonts: (() => void) | null = null;
+  private unsubscribeCustomFonts: (() => void) | null = null;
   private fontPreviewQueue: Map<string, HTMLElement> = new Map();
   private previewCheckInProgress = false;
   private variantCheckQueue: Map<string, HTMLElement> = new Map();
@@ -154,6 +155,12 @@ export class FontDropdown {
       // Trigger system font loading
       fontService.loadSystemFonts();
     }
+
+    // Rebuild whenever the user's custom fonts list changes.
+    this.unsubscribeCustomFonts = fontService.onCustomFontsChanged(() => {
+      this.buildDropdownContent();
+      this.updateButtonDisplay();
+    });
   }
 
   private shouldShowSearch(): boolean {
@@ -173,6 +180,24 @@ export class FontDropdown {
     this.fontPreviewQueue.clear();
 
     const fonts = this.getFonts();
+
+    // Always render user-uploaded fonts first, in their own section, in
+    // both styles and items modes.
+    const customFonts = fontService.getCustomFonts();
+    if (customFonts.length > 0) {
+      const customHeader = document.createElement('div');
+      customHeader.className = 'font-dropdown-header';
+      customHeader.textContent = 'Custom Fonts';
+      this.optionsContainer.appendChild(customHeader);
+
+      for (const font of customFonts) {
+        const option = this.createFontOption(font, false);
+        // The @font-face is already injected by FontService; render the name
+        // in its own typeface immediately.
+        option.style.fontFamily = `"${font.family}", ${font.category}`;
+        this.optionsContainer.appendChild(option);
+      }
+    }
 
     if (this.mode === 'items') {
       // For items, show Google Fonts first, then web-safe fonts
@@ -471,6 +496,12 @@ export class FontDropdown {
   }
 
   private updateButtonDisplay(): void {
+    if (fontService.isCustomFont(this.selectedFont)) {
+      this.button.textContent = this.selectedFont;
+      this.button.style.fontFamily = fontService.getFontFamily(this.selectedFont);
+      return;
+    }
+
     const allFonts = [...GOOGLE_FONTS, ...WEB_SAFE_FONTS];
     const font = allFonts.find(f => f.family === this.selectedFont || f.name === this.selectedFont);
 
@@ -548,6 +579,9 @@ export class FontDropdown {
     }
     if (this.unsubscribeSystemFonts) {
       this.unsubscribeSystemFonts();
+    }
+    if (this.unsubscribeCustomFonts) {
+      this.unsubscribeCustomFonts();
     }
   }
 }

@@ -159,6 +159,26 @@
   align-content: flex-start;
 }
 
+/* Fonts tab uses a vertical list, not a wrapping grid. */
+.file-items-container.file-items-fonts {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 0;
+}
+
+.file-item-font .file-icon {
+  font-family: 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  width: 18px;
+  text-align: center;
+}
+
+.file-item-font .file-font-preview {
+  font-size: 14px;
+}
+
 .file-item-image {
   flex-direction: column;
   align-items: stretch;
@@ -256,6 +276,32 @@
   height: 100%;
   color: var(--color-text-muted);
   font-style: italic;
+}
+
+.font-preview {
+  height: 100%;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  color: var(--color-text);
+  overflow: auto;
+}
+
+.font-preview-large {
+  font-size: 56px;
+  line-height: 1;
+}
+
+.font-preview-pangram {
+  font-size: 18px;
+}
+
+.font-preview-numbers {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  letter-spacing: 2px;
 }
 
 .filename {

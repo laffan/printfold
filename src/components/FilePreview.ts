@@ -51,9 +51,25 @@ export class FilePreview {
       case 'image':
         this.showImage(file);
         break;
+      case 'font':
+        this.showFontPreview(file);
+        break;
       default:
         this.showPlaceholder();
     }
+  }
+
+  private showFontPreview(file: ProjectFile): void {
+    this.destroyEditor();
+    const family = file.name.replace(/\.[^.]+$/, '');
+    const safeFamily = family.replace(/'/g, "\\'");
+    this.container.innerHTML = `
+      <div class="font-preview" style="font-family: '${safeFamily}', sans-serif;">
+        <div class="font-preview-large">Aa</div>
+        <div class="font-preview-pangram">The quick brown fox jumps over the lazy dog.</div>
+        <div class="font-preview-numbers">0 1 2 3 4 5 6 7 8 9</div>
+      </div>
+    `;
   }
 
   private showPlaceholder(): void {
@@ -272,10 +288,16 @@ export class FilePreview {
       a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
-    } else if (this.currentFile.type === 'image' && this.currentFile.isBase64) {
-      // For images, decode base64
-      const ext = filename.split('.').pop()?.toLowerCase() || 'png';
-      mimeType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+    } else if (this.currentFile.isBase64) {
+      // Images and fonts are stored as base64.
+      const ext = filename.split('.').pop()?.toLowerCase() || 'bin';
+      if (this.currentFile.type === 'image') {
+        mimeType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+      } else if (this.currentFile.type === 'font') {
+        mimeType = ext === 'otf' ? 'font/otf' : ext === 'woff' ? 'font/woff' : 'font/ttf';
+      } else {
+        mimeType = 'application/octet-stream';
+      }
 
       const binary = atob(this.currentFile.content);
       const bytes = new Uint8Array(binary.length);

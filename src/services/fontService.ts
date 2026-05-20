@@ -107,6 +107,19 @@ export interface FontFileData {
   boldItalic?: Uint8Array;
 }
 
+function base64ToUint8Array(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
 class FontService {
   private loadedGoogleFonts = new Set<string>();
   private loadingGoogleFonts = new Map<string, Promise<void>>();
@@ -124,6 +137,16 @@ class FontService {
   // Cache for font file data (for PDF embedding in Electron)
   private fontFileCache = new Map<string, FontFileData>();
   private fontFileLoadingPromises = new Map<string, Promise<FontFileData | null>>();
+
+  // User-uploaded custom fonts. Keyed by font family name (the filename
+  // without extension). The bytes are kept so we can embed the font in
+  // exported PDFs even outside Electron — pdf-lib + fontkit can consume
+  // raw TTF/OTF/WOFF/WOFF2 buffers.
+  private customFonts = new Map<string, FontDefinition>();
+  private customFontBytes = new Map<string, Uint8Array>();
+  private customFontExt = new Map<string, 'ttf' | 'otf' | 'woff'>();
+  private customFontStyleEl: HTMLStyleElement | null = null;
+  private customFontsChangedCallbacks = new Set<() => void>();
 
   /**
    * Get fonts for markdown styles (body, headings, etc.)
@@ -144,6 +167,123 @@ class FontService {
    */
   getItemFonts(): FontDefinition[] {
     return [...GOOGLE_FONTS, ...WEB_SAFE_FONTS];
+  }
+
+  /**
+   * User-uploaded custom fonts (sorted alphabetically by display name).
+   */
+  getCustomFonts(): FontDefinition[] {
+    return Array.from(this.customFonts.values()).sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
+  }
+
+  /**
+   * Check whether a font name belongs to a user-uploaded custom font.
+   */
+  isCustomFont(fontName: string): boolean {
+    return this.customFonts.has(fontName);
+  }
+
+  /**
+   * Register a custom font from base64-encoded file content (TTF/OTF/WOFF).
+   * The font is installed via @font-face for immediate use in the editor
+   * and canvas, and kept as raw bytes so it can be embedded into exported
+   * PDFs by the pdf-lib + fontkit pipeline.
+   *
+   * Returns the family name actually used (filename without extension).
+   */
+  registerCustomFont(fileName: string, base64Content: string): string {
+    const family = this.familyNameFromFileName(fileName);
+    const ext = this.fontExtension(fileName);
+
+    const bytes = base64ToUint8Array(base64Content);
+    this.customFontBytes.set(family, bytes);
+    this.customFontExt.set(family, ext);
+    this.customFonts.set(family, {
+      name: family,
+      family,
+      category: this.guessFontCategory(family),
+      loaded: true,
+    });
+
+    this.injectCustomFontFace(family, ext, base64Content);
+    this.notifyCustomFontsChanged();
+    this.notifyFontLoaded();
+    return family;
+  }
+
+  /**
+   * Remove a previously registered custom font.
+   */
+  unregisterCustomFont(family: string): void {
+    if (!this.customFonts.has(family)) return;
+    this.customFonts.delete(family);
+    this.customFontBytes.delete(family);
+    this.customFontExt.delete(family);
+    this.fontFileCache.delete(family);
+    this.rebuildCustomFontFaces();
+    this.notifyCustomFontsChanged();
+    this.notifyFontLoaded();
+  }
+
+  /**
+   * Subscribe to changes to the custom-fonts list (additions/removals).
+   */
+  onCustomFontsChanged(callback: () => void): () => void {
+    this.customFontsChangedCallbacks.add(callback);
+    return () => this.customFontsChangedCallbacks.delete(callback);
+  }
+
+  private notifyCustomFontsChanged(): void {
+    for (const callback of this.customFontsChangedCallbacks) callback();
+  }
+
+  private familyNameFromFileName(fileName: string): string {
+    const dot = fileName.lastIndexOf('.');
+    return (dot > 0 ? fileName.slice(0, dot) : fileName).trim();
+  }
+
+  private fontExtension(fileName: string): 'ttf' | 'otf' | 'woff' {
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    return ext === 'otf' ? 'otf' : ext === 'woff' ? 'woff' : 'ttf';
+  }
+
+  private fontFormatFor(ext: 'ttf' | 'otf' | 'woff'): string {
+    return ext === 'otf' ? 'opentype' : ext === 'woff' ? 'woff' : 'truetype';
+  }
+
+  private injectCustomFontFace(family: string, ext: 'ttf' | 'otf' | 'woff', base64Content: string): void {
+    if (!this.customFontStyleEl) {
+      this.customFontStyleEl = document.createElement('style');
+      this.customFontStyleEl.dataset.printfoldCustomFonts = 'true';
+      document.head.appendChild(this.customFontStyleEl);
+    }
+    const mime = ext === 'otf' ? 'font/otf' : ext === 'woff' ? 'font/woff' : 'font/ttf';
+    const format = this.fontFormatFor(ext);
+    const rule = `
+@font-face {
+  font-family: "${family}";
+  src: url(data:${mime};base64,${base64Content}) format("${format}");
+  font-display: swap;
+}
+`;
+    this.customFontStyleEl.appendChild(document.createTextNode(rule));
+  }
+
+  /**
+   * Rebuild the entire custom-font stylesheet from current state. Used after
+   * a removal to drop the @font-face rule cleanly.
+   */
+  private rebuildCustomFontFaces(): void {
+    if (!this.customFontStyleEl) return;
+    this.customFontStyleEl.textContent = '';
+    for (const family of this.customFonts.keys()) {
+      const bytes = this.customFontBytes.get(family);
+      const ext = this.customFontExt.get(family) ?? 'ttf';
+      if (!bytes) continue;
+      this.injectCustomFontFace(family, ext, uint8ArrayToBase64(bytes));
+    }
   }
 
   /**
@@ -320,6 +460,12 @@ class FontService {
    * Get CSS font-family value with fallbacks
    */
   getFontFamily(fontName: string): string {
+    const custom = this.customFonts.get(fontName);
+    if (custom) {
+      const fallback = custom.category === 'serif' ? 'serif' :
+                       custom.category === 'monospace' ? 'monospace' : 'sans-serif';
+      return `"${custom.family}", ${fallback}`;
+    }
     const allFonts = [...GOOGLE_FONTS, ...WEB_SAFE_FONTS, ...this.systemFonts];
     const font = allFonts.find(f => f.name === fontName || f.family === fontName);
     if (!font) return fontName;
@@ -357,10 +503,12 @@ class FontService {
   // ============================================
 
   /**
-   * Check if font file embedding is available (Electron only)
+   * Check if font file embedding is available. True when Electron exposes
+   * system-font extraction OR when the user has registered any custom
+   * fonts (whose raw bytes we can embed directly via pdf-lib + fontkit).
    */
   canEmbedFonts(): boolean {
-    return env.isElectron && !!window.electronAPI?.getFontFile;
+    return (env.isElectron && !!window.electronAPI?.getFontFile) || this.customFonts.size > 0;
   }
 
   /**
@@ -368,7 +516,15 @@ class FontService {
    * Returns cached data if available, otherwise loads from system
    */
   async loadFontFileData(fontFamily: string): Promise<FontFileData | null> {
-    if (!this.canEmbedFonts()) {
+    // Custom user-uploaded fonts take precedence and are available in
+    // every environment (we keep their bytes in memory).
+    const primary = this.extractPrimaryFontName(fontFamily);
+    const customBytes = this.customFontBytes.get(primary);
+    if (customBytes) {
+      return { regular: customBytes };
+    }
+
+    if (!(env.isElectron && !!window.electronAPI?.getFontFile)) {
       return null;
     }
 
