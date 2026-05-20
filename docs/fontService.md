@@ -8,6 +8,7 @@ The `FontService` class provides centralized font management that adapts to the 
 
 - **Web**: Uses web-safe fonts for styles, Google Fonts for static page items
 - **Electron**: Uses system fonts for styles, Google Fonts + web-safe fonts for items, and can embed actual font files into PDFs
+- **Custom fonts** (any environment): User-uploaded `.ttf` / `.otf` / `.woff` files in the project's Files area are registered as additional families that show up first in every font dropdown and are embedded directly into exported PDFs via their stored bytes
 
 ## Font Categories
 
@@ -35,6 +36,27 @@ Used for text items placed on static pages. These are rendered as images via Kon
 - 40+ Google Fonts (DM Sans, Inter, Playfair Display, etc.)
 - All web-safe fonts
 
+### Custom Fonts (User-Uploaded)
+
+When the user drags a `.ttf`, `.otf`, or `.woff` file into the Files
+area, `fontService.registerCustomFont(fileName, base64)`:
+
+1. Decodes the base64 and stores the raw bytes (used later by pdf-lib
+   + fontkit when embedding the family into an exported PDF — works in
+   web *and* Electron, since the data is already in memory).
+2. Injects an `@font-face` rule via a managed `<style>` element so the
+   family becomes usable in the editor, in the Konva canvas, and in
+   font previews.
+3. Defers the `notifyFontLoaded()` broadcast until `document.fonts
+   .load()` resolves, so the post-load reflow re-measures and re-paints
+   with the actual typeface rather than the fallback.
+
+Custom families are returned by `getCustomFonts()` and surfaced at the
+top of every font dropdown (both `styles` and `items` modes) by
+`FontDropdown`, ahead of the built-in groups. `loadFontFileData()`
+checks the custom-font cache first, so the PDF pipeline transparently
+picks up uploaded fonts the same way it picks up system fonts.
+
 ## Key Methods
 
 ### Font Lists
@@ -43,8 +65,18 @@ Used for text items placed on static pages. These are rendered as images via Kon
 |--------|-------------|
 | `getStyleFonts()` | Returns fonts for markdown styles (web-safe or system fonts) |
 | `getItemFonts()` | Returns fonts for static page items (Google + web-safe) |
+| `getCustomFonts()` | Returns user-uploaded fonts, alphabetically by display name |
+| `isCustomFont(name)` | True if `name` matches a registered custom-font family |
 | `isElectron()` | Checks if running in Electron environment |
 | `hasSystemFonts()` | Returns true if system fonts are loaded (Electron only) |
+
+### Custom Font Registry
+
+| Method | Description |
+|--------|-------------|
+| `registerCustomFont(fileName, base64)` | Decode bytes, inject `@font-face`, return the family name (file name without extension) |
+| `unregisterCustomFont(family)` | Drop the family and rebuild the `@font-face` stylesheet |
+| `onCustomFontsChanged(cb)` | Subscribe to additions/removals (used by `FontDropdown` to rebuild) |
 
 ### Font Loading
 
@@ -66,11 +98,16 @@ For PDF generation in Electron, actual system fonts can be embedded to ensure ex
 
 #### `canEmbedFonts(): boolean`
 
-Returns `true` if font file embedding is available (Electron with IPC support).
+Returns `true` when font file embedding is available — either Electron
+exposes the system-font IPC channel, or at least one custom font has
+been registered (its bytes live in memory and can be embedded in any
+environment).
 
 #### `loadFontFileData(fontFamily: string): Promise<FontFileData | null>`
 
-Loads font file data for all variants of a font family.
+Loads font file data for all variants of a font family. Custom
+user-uploaded fonts are returned from the in-memory cache first;
+otherwise falls through to the Electron IPC path.
 
 **Returns:**
 ```typescript

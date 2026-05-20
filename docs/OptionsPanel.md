@@ -58,8 +58,16 @@ Dynamically generated based on markdown content:
 **Detected styles:**
 - Body text (if any text content exists)
 - Headings H1-H6 (only levels actually used)
+- Blockquote / Highlight / Strikethrough (if used in markdown)
 - Header text (if header enabled)
 - Footer text (if footer enabled)
+
+Each detected section renders as a **collapsible accordion**. Body Text
+is expanded by default; the open/closed state of every section is kept
+across re-renders so a project-state update never collapses something
+the user has open. Every color field inside each section is a
+color-only variant of the `FillPicker` (the same swatch + popover used
+for Page Fill), so all color editing has identical UX across the app.
 
 ### Document Tab
 
@@ -415,15 +423,21 @@ Toggle-based effects available for all items:
 
 #### Stroke Effect
 - Enable/disable toggle
-- Stroke color
+- Stroke color (standardized `ColorPicker` swatch + popover)
 - Stroke width
 
 #### Shadow Effect
 - Enable/disable toggle
-- Shadow color
+- Shadow color (standardized `ColorPicker` swatch + popover)
 - Blur amount
 - X/Y offset
 - Opacity
+
+> Every color-only field across the app (stroke, shadow, crop-mark
+> color, and the colors inside the Styles tab) uses the same
+> `ColorPicker` wrapper around `FillPicker` so the chrome matches
+> Page Fill. Fields that also support gradients/patterns (item fill,
+> page background) keep the full multi-tab picker.
 
 #### Array Effect
 Creates multiple copies of an item with multi-dimensional offset support:
@@ -513,19 +527,34 @@ Button shown at bottom of Selected tab for static pages. Removes all content fro
 
 The styles tab is dynamically generated based on the markdown content.
 
-### `updateStylesTab(): void`
+### `updateStylesTab(force = false): void`
 
-Called on mount and whenever project changes. The function:
+Called on mount, on every project change, and when the user activates
+the Styles tab. The function:
 
-1. Clears existing dynamic content
-2. Scans markdown files to detect which elements are used
-3. Creates style sections only for detected elements
-4. Adds header/footer sections if they're enabled
-5. Sets up input handlers and font dropdowns
+1. Computes a *render signature* — a short string capturing which
+   detected styles and header/footer states the current project has.
+2. If the signature matches the last rebuild and `force` is not
+   passed, returns immediately. This skips the rebuild on routine
+   project updates so any open color picker, font dropdown, or input
+   isn't destroyed mid-interaction.
+3. Otherwise: destroys the existing dropdowns and color pickers,
+   clears the container, then rebuilds the sections — each wrapped in
+   an `.accordion-section` whose open/closed state is taken from a
+   module-level `accordionState` map (Body Text defaults to expanded).
+4. Mounts a `ColorPicker` (a `FillPicker` restricted to its color tab)
+   into every `.color-picker-mount` so all color fields share the
+   Page Fill chrome.
+5. Wires up draggable caps for unit-tagged numeric inputs.
+
+`updateStylesTab(true)` is used by tab activation (in `App.ts`) so the
+controls always refresh their values when the user clicks back into
+the tab — even if the structural signature didn't change.
 
 ### Detection Logic
 
 The `detectUsedStyles()` function scans:
 - Markdown file content for headings (`# `, `## `, etc.)
 - Parsed sections from signatures
-- Raw markdown for lists, code blocks, blockquotes
+- Raw markdown for lists, code blocks, blockquotes, highlight
+  (`==text==`), and strikethrough (`~~text~~`)

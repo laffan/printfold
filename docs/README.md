@@ -144,9 +144,10 @@ Manages fonts for both web and Electron environments with separate font lists fo
 **Key Responsibilities:**
 - **Style fonts** (body, headings): Web-safe fonts (web) or system fonts (Electron)
 - **Item fonts** (text objects on static pages): Google Fonts + web-safe fonts
+- **Custom fonts** (user-uploaded `.ttf` / `.otf` / `.woff` files in the Fonts tab): registered via `@font-face` and shown at the top of every font dropdown
 - System font discovery (Electron via IPC with fallback to web-safe fonts)
 - Google Font loading with caching
-- **Font file embedding** for PDFs (Electron only, using paths from system database)
+- **Font file embedding** for PDFs — Electron uses paths from the system database; custom fonts embed straight from their in-memory bytes (works on web too)
 - Font availability checking
 
 **Packaged App Notes:**
@@ -178,9 +179,12 @@ Handles project import/export as ZIP archives.
 
 **Key Responsibilities:**
 - Project serialization
-- File organization (text/, images/, static/)
-- Manifest generation
+- File organization (`text/`, `images/`, `fonts/`, `static/`)
+- Manifest generation (per-page state + items + fills + custom backgrounds)
 - Legacy format support
+- Two-phase import: wait for the first reflow to publish signatures,
+  layer the saved per-page metadata, and re-flow text around any pages
+  that transitioned to a non-text state
 
 **Quick Reference:**
 ```typescript
@@ -348,6 +352,20 @@ Component Action
 
 ## Feature Guide
 
+### Files Area
+
+The left-hand Files panel is split into three tabs:
+
+| Tab | Accepted files | Behavior |
+|-----|----------------|----------|
+| **Text** | `.md` | Concatenated in tab order for the markdown flow; drag rows to reorder |
+| **Images** | `.png`, `.jpg`, `.jpeg`, `.webp` | Drag thumbnails onto static pages to place; also usable as page backgrounds and pattern fills |
+| **Fonts** | `.ttf`, `.otf`, `.woff` | Each file is registered via `@font-face` and appears at the top of every font dropdown under a "Custom Fonts" heading; usable in body/headings/headers/footers and on static-page text items |
+
+Files in every tab can be dragged into the panel or added via the
+"+ Files" button. Selecting a font shows a sample preview (Aa, pangram,
+digits) in the preview pane below the list.
+
 ### Static Spreads
 
 Static spreads exist independently of Markdown content:
@@ -467,12 +485,17 @@ src/
 │   ├── FontDropdown.ts
 │   ├── PDFPreview.ts
 │   ├── FillPicker/
-│   │   ├── index.ts          # Re-exports
-│   │   ├── FillPicker.ts     # Main component class
-│   │   ├── colorUtils.ts     # Color conversion utilities
-│   │   ├── colorTab.ts       # Solid color picker tab
-│   │   ├── gradientTab.ts    # Gradient editor tab
-│   │   └── patternTab.ts     # Pattern fill tab
+│   │   ├── index.ts                  # Re-exports: FillPicker, createFillPicker,
+│   │   │                              # ColorPicker, createColorPicker
+│   │   └── fillpicker/
+│   │       ├── index.ts              # Module barrel + ColorPicker wrapper
+│   │       │                          # (color-only FillPicker used app-wide for
+│   │       │                          # plain hex color fields)
+│   │       ├── FillPicker.ts         # Main component class
+│   │       ├── colorUtils.ts         # Color conversion utilities
+│   │       ├── colorTab.ts           # Solid color picker tab
+│   │       ├── gradientTab.ts        # Gradient editor tab
+│   │       └── patternTab.ts         # Pattern fill tab
 │   ├── OptionsPanel/
 │   │   ├── component.ts      # Main panel class
 │   │   ├── helpers.ts        # Input binding utilities
@@ -602,9 +625,10 @@ appState.requestReflow();
 ### Testing
 
 ```bash
-npm run typecheck   # TypeScript checking
-npm run dev         # Development server
-npm run build       # Production build
+npm run typecheck       # TypeScript checking
+npm run dev             # Development server (webpack-dev-server on :3000)
+npm run build:web       # Production web build
+npm run build:electron  # Production electron build
 ```
 
 ---
@@ -623,10 +647,13 @@ npm run build       # Production build
 | State Management | `state/` (AppStateCore + method extensions) |
 | Page Items | `SpreadEditor/items/`, `OptionsPanel/editPage/` |
 | Fills/Gradients | `FillPicker/` (colorTab, gradientTab, patternTab) |
+| Color Picker (color-only) | `FillPicker/fillpicker/index.ts` (`ColorPicker` wrapper used everywhere a plain hex color is needed) |
 | Cross-page Items | `pageRenderer.ts`, `pdfGenerator/images.ts`, `pdfGenerator/itemDrawing.ts` |
-| Fonts | `fontService.ts`, `OptionsPanel/fontOptions.ts`, `pdfGenerator/fonts.ts` |
+| Fonts | `fontService.ts`, `OptionsPanel/fontOptions.ts`, `pdfGenerator/fonts.ts`, `FontDropdown.ts` |
+| Custom Fonts (uploads) | `services/fontService.ts` (registry + `@font-face`), `components/FileList.ts` (Fonts tab), `services/zipHandler.ts` (`fonts/` folder) |
 | Project I/O | `zipHandler.ts` |
 | Settings UI | `OptionsPanel/` |
+| Styles Tab Accordion | `OptionsPanel/stylesTab.ts` (signature-gated rebuild, per-section `accordion-section`) |
 | Styles | `styles/modules/` (12 modular CSS files) |
 
 ### Important Constants

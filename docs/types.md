@@ -90,12 +90,17 @@ Helper function to create default fill configurations.
 interface ProjectFile {
   id: string;
   name: string;
-  type: 'markdown' | 'image' | 'archive' | 'unknown';
-  content: string;       // Text content or base64
+  type: 'markdown' | 'image' | 'archive' | 'font' | 'unknown';
+  content: string;       // Text content or base64 (binary types)
   isBase64: boolean;
   lastModified: number;
 }
 ```
+
+The `font` type holds user-uploaded `.ttf`, `.otf`, or `.woff` files
+that have been dragged into the Files area. They're surfaced through
+the Fonts tab and registered with `fontService` so the family can be
+selected from any font dropdown and embedded into exported PDFs.
 
 ---
 
