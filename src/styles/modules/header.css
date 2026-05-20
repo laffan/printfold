@@ -34,7 +34,33 @@
 
 .header-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
   -webkit-app-region: no-drag;
+}
+
+.project-name-display {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text);
+  max-width: 240px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.save-status {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  min-width: 64px;
+  text-align: right;
+}
+
+.save-status.saving {
+  color: var(--color-text-secondary);
+}
+
+.save-status.error {
+  color: var(--color-error);
 }
 

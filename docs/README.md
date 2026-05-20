@@ -175,7 +175,9 @@ if (fontService.canEmbedFonts()) {
 
 ### [ZIP Handler (`zipHandler.ts`)](./zipHandler.md)
 
-Handles project import/export as ZIP archives.
+Handles project import/export. The on-disk format is a ZIP archive
+with a `.printfold` extension (so the OS can register a file
+association). Internally the format is unchanged.
 
 **Key Responsibilities:**
 - Project serialization
@@ -226,10 +228,34 @@ Main application orchestrator.
 
 **Key Responsibilities:**
 - Component initialization and mounting
-- Header button handlers (New, Open, Save, Export)
+- Welcome-screen-driven project lifecycle (New / Open / Recent)
+- Auto-save loop (debounced writes to the bound `.printfold` file)
+- Header button handlers (Projects, Save fallback, Export)
 - Tab and panel management
 - State listener setup
 - Reflow triggering
+
+### Welcome Screen (`WelcomeScreen.ts`)
+
+The first thing the user sees on launch. Enforces the file-first flow:
+the editor stays hidden until the user creates or opens a project, so
+every change always has a backing `.printfold` file on disk.
+
+- `New Project` → prompts for a save location, creates the empty file
+  immediately, opens the editor.
+- `Open Project` → prompts for a `.printfold` file to load.
+- `Recent Projects` → list backed by `recentProjects.ts`; clicking a
+  row reopens the project directly.
+
+### Project File / Recents Services
+
+- [`projectFile.ts`](./projectFile.md): tracks the active destination
+  (Electron path or `FileSystemFileHandle`) and performs writes for the
+  auto-save loop.
+- [`recentProjects.ts`](./recentProjects.md): per-environment recents
+  persistence. Electron stores paths in `userData/recents.json`; Web
+  stores `FileSystemFileHandle`s in IndexedDB with display metadata in
+  `localStorage`.
 
 ---
 

@@ -1,0 +1,178 @@
+/* Welcome / Startup Screen */
+
+.welcome-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg);
+  overflow: auto;
+  padding: 32px;
+}
+
+.welcome-screen.hidden {
+  display: none;
+}
+
+.welcome-card {
+  width: 100%;
+  max-width: 560px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.welcome-hero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 24px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.welcome-hero .logo {
+  font-size: 32px;
+}
+
+.welcome-hero h1 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.welcome-hero p {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin: 2px 0 0;
+}
+
+.welcome-actions {
+  display: flex;
+  gap: 8px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.welcome-actions .btn {
+  flex: 1;
+  padding: 12px 16px;
+  font-size: 13px;
+}
+
+.welcome-recents {
+  padding: 16px 24px 24px;
+}
+
+.welcome-recents h3 {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  margin: 0 0 8px;
+}
+
+#welcome-recents-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.recent-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 0 8px;
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--color-bg-tertiary);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  text-align: left;
+  cursor: pointer;
+  color: var(--color-text);
+  font: inherit;
+}
+
+.recent-row:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-light);
+}
+
+.recent-name {
+  grid-column: 1;
+  grid-row: 1;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-sub {
+  grid-column: 1;
+  grid-row: 2;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-remove {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  align-self: center;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.recent-remove:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+#welcome-recents-empty {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  padding: 12px 0;
+}
+
+/* When welcome is active, hide the main app shell so it can't be
+   interacted with through the overlay. */
+body.welcome-active .app-header,
+body.welcome-active .app-main {
+  visibility: hidden;
+}
+
+/* Banner shown when running on a browser without File System Access API.
+   Auto-save can't write back to disk silently, so we warn the user. */
+.no-fsa-banner {
+  position: fixed;
+  top: var(--header-height);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  padding: 6px 16px;
+  background: var(--color-warning);
+  color: #1a1a1a;
+  font-size: 12px;
+  text-align: center;
+}
+
+.no-fsa-banner.hidden {
+  display: none;
+}

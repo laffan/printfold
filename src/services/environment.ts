@@ -20,6 +20,22 @@ export interface OpenFilesOptions {
   multiple?: boolean;
 }
 
+/**
+ * Result returned when picking a .printfold file destination. Includes
+ * a writable destination handle (web) or absolute path (Electron) so
+ * the caller can continue writing to it after the dialog closes.
+ */
+export interface ProjectFileDestination {
+  name: string;
+  path?: string;                  // Electron
+  handle?: FileSystemFileHandle;  // Web (Chromium)
+}
+
+export interface ProjectFileSource extends ProjectFileDestination {
+  /** Initial file contents read from disk. */
+  content: Uint8Array;
+}
+
 export interface EnvironmentAPI {
   isElectron: boolean;
 
@@ -27,6 +43,12 @@ export interface EnvironmentAPI {
   openFiles(options?: OpenFilesOptions): Promise<ProjectFile[] | null>;
   saveFile(options: SaveFileOptions): Promise<boolean>;
   downloadFile(filename: string, content: Uint8Array | Blob): void | Promise<void>;
+
+  // Project file lifecycle
+  pickProjectDestination(defaultName: string): Promise<ProjectFileDestination | null>;
+  openProjectFile(): Promise<ProjectFileSource | null>;
+  /** True when silent writes to the bound destination are possible. */
+  supportsSilentWrites: boolean;
 
   // Printing
   print(content?: Uint8Array): Promise<void>;
@@ -39,6 +61,73 @@ export interface EnvironmentAPI {
 class WebEnvironment implements EnvironmentAPI {
   isElectron = false;
 
+  get supportsSilentWrites(): boolean {
+    return 'showSaveFilePicker' in window;
+  }
+
+  async pickProjectDestination(defaultName: string): Promise<ProjectFileDestination | null> {
+    if (!('showSaveFilePicker' in window)) {
+      // No File System Access API — fall through to download-on-save path.
+      return null;
+    }
+    try {
+      const handle = await (window as unknown as {
+        showSaveFilePicker: (opts: unknown) => Promise<FileSystemFileHandle>
+      }).showSaveFilePicker({
+        suggestedName: defaultName,
+        types: [{
+          description: 'PrintFold Project',
+          accept: { 'application/octet-stream': ['.printfold'] },
+        }],
+      });
+      // Touch the file so it exists on disk immediately.
+      const writable = await handle.createWritable();
+      await writable.close();
+      return { name: handle.name, handle };
+    } catch (e) {
+      if ((e as Error).name === 'AbortError') return null;
+      throw e;
+    }
+  }
+
+  async openProjectFile(): Promise<ProjectFileSource | null> {
+    if ('showOpenFilePicker' in window) {
+      try {
+        const [handle] = await (window as unknown as {
+          showOpenFilePicker: (opts: unknown) => Promise<FileSystemFileHandle[]>
+        }).showOpenFilePicker({
+          types: [{
+            description: 'PrintFold Project',
+            accept: { 'application/octet-stream': ['.printfold'] },
+          }],
+          multiple: false,
+        });
+        const file = await handle.getFile();
+        const buffer = await file.arrayBuffer();
+        return { name: handle.name, handle, content: new Uint8Array(buffer) };
+      } catch (e) {
+        if ((e as Error).name === 'AbortError') return null;
+        throw e;
+      }
+    }
+
+    // Fallback: <input type=file> — no handle, so subsequent saves will
+    // prompt for a download.
+    return new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.printfold';
+      input.onchange = async () => {
+        const file = input.files?.[0];
+        if (!file) { resolve(null); return; }
+        const buffer = await file.arrayBuffer();
+        resolve({ name: file.name, content: new Uint8Array(buffer) });
+      };
+      input.oncancel = () => resolve(null);
+      input.click();
+    });
+  }
+
   async openFiles(options?: OpenFilesOptions): Promise<ProjectFile[] | null> {
     return new Promise((resolve) => {
       const input = document.createElement('input');
@@ -46,7 +135,7 @@ class WebEnvironment implements EnvironmentAPI {
       input.multiple = options?.multiple ?? true;
 
       // Build accept string from filters
-      const extensions = options?.filters?.flatMap(f => f.extensions) ?? ['md', 'png', 'jpg', 'jpeg', 'webp', 'zip'];
+      const extensions = options?.filters?.flatMap(f => f.extensions) ?? ['md', 'png', 'jpg', 'jpeg', 'webp'];
       input.accept = extensions.map(ext => `.${ext}`).join(',');
 
       input.onchange = async () => {
@@ -113,8 +202,6 @@ class WebEnvironment implements EnvironmentAPI {
       case 'jpeg':
       case 'webp':
         return 'image';
-      case 'zip':
-        return 'archive';
       default:
         return 'unknown';
     }
@@ -208,8 +295,28 @@ class WebEnvironment implements EnvironmentAPI {
 class ElectronEnvironment implements EnvironmentAPI {
   isElectron = true;
 
+  get supportsSilentWrites(): boolean {
+    return true;
+  }
+
   private get api() {
     return window.electronAPI!;
+  }
+
+  async pickProjectDestination(defaultName: string): Promise<ProjectFileDestination | null> {
+    const result = await this.api.pickProjectDestination?.(defaultName);
+    if (!result) return null;
+    return { name: result.name, path: result.path };
+  }
+
+  async openProjectFile(): Promise<ProjectFileSource | null> {
+    const result = await this.api.openProjectFile?.();
+    if (!result) return null;
+    // result.content is base64 from main process
+    const binary = atob(result.content);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return { name: result.name, path: result.path, content: bytes };
   }
 
   async openFiles(options?: OpenFilesOptions): Promise<ProjectFile[] | null> {
@@ -317,6 +424,12 @@ export const env = {
   saveFile: (options: SaveFileOptions) => getEnvironment().saveFile(options),
   downloadFile: (filename: string, content: Uint8Array | Blob) =>
     getEnvironment().downloadFile(filename, content),
+  pickProjectDestination: (defaultName: string) =>
+    getEnvironment().pickProjectDestination(defaultName),
+  openProjectFile: () => getEnvironment().openProjectFile(),
+  get supportsSilentWrites(): boolean {
+    return getEnvironment().supportsSilentWrites;
+  },
   print: (content?: Uint8Array) => getEnvironment().print(content),
   loadTemplate: (templateId: string) => getEnvironment().loadTemplate(templateId),
   listTemplates: () => getEnvironment().listTemplates(),

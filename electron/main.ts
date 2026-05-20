@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as crypto from 'crypto';
 import { exec } from 'child_process';
 import * as os from 'os';
 
@@ -66,7 +67,7 @@ ipcMain.handle('dialog:openFiles', async (_event, options: {
   const result = await dialog.showOpenDialog(mainWindow!, {
     properties: options.multiple ? ['openFile', 'multiSelections'] : ['openFile'],
     filters: options.filters || [
-      { name: 'Supported Files', extensions: ['md', 'png', 'jpg', 'jpeg', 'webp', 'zip'] },
+      { name: 'Supported Files', extensions: ['md', 'png', 'jpg', 'jpeg', 'webp'] },
     ],
   });
 
@@ -147,12 +148,132 @@ function getFileType(ext: string): string {
     case '.jpeg':
     case '.webp':
       return 'image';
-    case '.zip':
-      return 'archive';
     default:
       return 'unknown';
   }
 }
+
+// -------------------------------------------------------------------------
+// PrintFold project file lifecycle (.printfold)
+// -------------------------------------------------------------------------
+
+const PROJECT_EXT = 'printfold';
+const PROJECT_FILTER = { name: 'PrintFold Project', extensions: [PROJECT_EXT] };
+
+ipcMain.handle('printfold:pickDestination', async (_event, defaultName: string) => {
+  const result = await dialog.showSaveDialog(mainWindow!, {
+    defaultPath: defaultName,
+    filters: [PROJECT_FILTER],
+  });
+  if (result.canceled || !result.filePath) return null;
+
+  let filePath = result.filePath;
+  if (!filePath.toLowerCase().endsWith(`.${PROJECT_EXT}`)) {
+    filePath = `${filePath}.${PROJECT_EXT}`;
+  }
+
+  // Touch the file so it exists on disk before the user makes any edits.
+  await fs.promises.writeFile(filePath, Buffer.alloc(0));
+
+  return { name: path.basename(filePath), path: filePath };
+});
+
+ipcMain.handle('printfold:openFile', async () => {
+  const result = await dialog.showOpenDialog(mainWindow!, {
+    properties: ['openFile'],
+    filters: [PROJECT_FILTER],
+  });
+  if (result.canceled || result.filePaths.length === 0) return null;
+
+  const filePath = result.filePaths[0];
+  const content = await fs.promises.readFile(filePath);
+  return {
+    name: path.basename(filePath),
+    path: filePath,
+    content: content.toString('base64'),
+  };
+});
+
+ipcMain.handle('printfold:writeFile', async (_event, filePath: string, content: Uint8Array | Buffer) => {
+  try {
+    const buffer = Buffer.isBuffer(content) ? content : Buffer.from(content);
+    // Atomic write: write to .tmp then rename, so a crash mid-save can't
+    // corrupt the project file.
+    const tmpPath = `${filePath}.tmp`;
+    await fs.promises.writeFile(tmpPath, buffer);
+    await fs.promises.rename(tmpPath, filePath);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+// -------------------------------------------------------------------------
+// Recent projects (Electron)
+// -------------------------------------------------------------------------
+
+interface RecentRecord {
+  id: string;
+  name: string;
+  path: string;
+  lastOpened: number;
+}
+
+function recentsFilePath(): string {
+  return path.join(app.getPath('userData'), 'recents.json');
+}
+
+async function readRecents(): Promise<RecentRecord[]> {
+  try {
+    const raw = await fs.promises.readFile(recentsFilePath(), 'utf-8');
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function writeRecents(entries: RecentRecord[]): Promise<void> {
+  await fs.promises.writeFile(recentsFilePath(), JSON.stringify(entries, null, 2), 'utf-8');
+}
+
+ipcMain.handle('printfold:getRecents', async () => {
+  const entries = await readRecents();
+  // Filter out entries whose file no longer exists on disk.
+  const alive: RecentRecord[] = [];
+  for (const entry of entries) {
+    try {
+      await fs.promises.access(entry.path, fs.constants.R_OK);
+      alive.push(entry);
+    } catch {
+      // Skip missing files but don't rewrite — let removeRecent handle cleanup.
+    }
+  }
+  return alive;
+});
+
+ipcMain.handle('printfold:addRecent', async (_event, entry: { path: string; name: string; lastOpened: number }) => {
+  const entries = await readRecents();
+  const existing = entries.find(e => e.path === entry.path);
+  if (existing) {
+    existing.name = entry.name;
+    existing.lastOpened = entry.lastOpened;
+  } else {
+    entries.push({
+      id: crypto.randomUUID(),
+      name: entry.name,
+      path: entry.path,
+      lastOpened: entry.lastOpened,
+    });
+  }
+  entries.sort((a, b) => b.lastOpened - a.lastOpened);
+  await writeRecents(entries.slice(0, 10));
+});
+
+ipcMain.handle('printfold:removeRecent', async (_event, filePath: string) => {
+  const entries = await readRecents();
+  await writeRecents(entries.filter(e => e.path !== filePath));
+});
 
 // Get system fonts based on platform
 async function getSystemFonts(): Promise<string[]> {

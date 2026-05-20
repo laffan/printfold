@@ -26,6 +26,7 @@
 @import './modules/editor.css';
 @import './modules/options-panel.css';
 @import './modules/modal.css';
+@import './modules/welcome.css';
 @import './modules/font-dropdown.css';
 @import './modules/fill-picker.css';
 @import './modules/utilities.css';

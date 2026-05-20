@@ -446,8 +446,6 @@ export class ZipHandler {
       case 'webp':
       case 'gif':
         return 'image';
-      case 'zip':
-        return 'archive';
       case 'ttf':
       case 'otf':
       case 'woff':

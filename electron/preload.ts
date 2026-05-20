@@ -34,6 +34,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('fonts:getFontFile', fontFamily, weight || 'normal', style || 'normal'),
   getFontVariants: (fontFamily: string) =>
     ipcRenderer.invoke('fonts:getFontVariants', fontFamily),
+
+  // Project file lifecycle (file-first flow)
+  pickProjectDestination: (defaultName: string) =>
+    ipcRenderer.invoke('printfold:pickDestination', defaultName),
+  openProjectFile: () =>
+    ipcRenderer.invoke('printfold:openFile'),
+  writeProjectFile: (path: string, content: Uint8Array) =>
+    ipcRenderer.invoke('printfold:writeFile', path, content),
+
+  // Recent projects
+  getRecents: () => ipcRenderer.invoke('printfold:getRecents'),
+  addRecent: (entry: { path: string; name: string; lastOpened: number }) =>
+    ipcRenderer.invoke('printfold:addRecent', entry),
+  removeRecent: (path: string) =>
+    ipcRenderer.invoke('printfold:removeRecent', path),
 });
 
 // Type declarations for the exposed API
@@ -76,6 +91,33 @@ declare global {
         italic: boolean;
         boldItalic: boolean;
       }>;
+
+      pickProjectDestination: (defaultName: string) => Promise<{
+        name: string;
+        path: string;
+      } | null>;
+      openProjectFile: () => Promise<{
+        name: string;
+        path: string;
+        content: string; // base64
+      } | null>;
+      writeProjectFile: (path: string, content: Uint8Array) => Promise<{
+        success: boolean;
+        error?: string;
+      }>;
+
+      getRecents: () => Promise<Array<{
+        id: string;
+        name: string;
+        path: string;
+        lastOpened: number;
+      }>>;
+      addRecent: (entry: {
+        path: string;
+        name: string;
+        lastOpened: number;
+      }) => Promise<void>;
+      removeRecent: (path: string) => Promise<void>;
     };
   }
 }

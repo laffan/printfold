@@ -16,7 +16,12 @@ import { OptionsPanel } from './OptionsPanel';
 import { updateStylesTab } from './OptionsPanel/stylesTab';
 import { ZipHandler } from '../services/zipHandler';
 import { PDFGenerator } from '../services/pdfGenerator';
+import { projectFile } from '../services/projectFile';
+import { recentProjects, type RecentEntry } from '../services/recentProjects';
+import { WelcomeScreen, type WelcomeAction } from './WelcomeScreen';
 import type { BookletProject } from '../types';
+
+const AUTOSAVE_DEBOUNCE_MS = 600;
 
 export class App {
   private fileList!: FileList;
@@ -26,6 +31,13 @@ export class App {
   private optionsPanel!: OptionsPanel;
   private zipHandler!: ZipHandler;
   private pdfGenerator!: PDFGenerator;
+  private welcomeScreen!: WelcomeScreen;
+
+  /** Debounced auto-save handle. */
+  private autoSaveTimer: number | null = null;
+  /** Suppress auto-save while loading an existing project (avoids
+   *  re-writing the file we just read). */
+  private suppressAutoSave = false;
 
   init(): void {
     // Initialize components
@@ -36,6 +48,7 @@ export class App {
     this.optionsPanel = new OptionsPanel();
     this.zipHandler = new ZipHandler();
     this.pdfGenerator = new PDFGenerator();
+    this.welcomeScreen = new WelcomeScreen();
 
     // Mount components
     this.fileList.mount();
@@ -43,6 +56,8 @@ export class App {
     this.spreadEditor.mount();
     this.pdfPreview.mount();
     this.optionsPanel.mount();
+    this.welcomeScreen.mount();
+    this.welcomeScreen.setOnAction((action) => this.handleWelcomeAction(action));
 
     // Connect file list to preview
     this.fileList.setOnFileSelect((file) => {
@@ -56,50 +71,214 @@ export class App {
     this.setupCollapsiblePanels();
     this.setupStateListeners();
     this.setupResizers();
+    this.setupAutoSave();
 
-    // Initial reflow if there's content
-    this.performReflow();
+    // Show the welcome screen — the user must create or open a project
+    // before the editor becomes interactive.
+    void this.welcomeScreen.show();
+
+    // Warn the user up-front on browsers without the File System Access
+    // API: auto-save can't write to disk, so the manual Save button
+    // (re-download flow) is shown instead.
+    if (!env.isElectron && !env.supportsSilentWrites) {
+      document.getElementById('no-fsa-banner')?.classList.remove('hidden');
+      const saveBtn = document.getElementById('btn-save');
+      if (saveBtn) saveBtn.style.display = '';
+    }
 
     console.log('PrintFold initialized', env.isElectron ? '(Electron)' : '(Web)');
   }
 
-  private setupHeaderButtons(): void {
-    // New button
-    document.getElementById('btn-new')?.addEventListener('click', () => {
-      if (confirm('Create a new booklet? Unsaved changes will be lost.')) {
+  // -------------------------------------------------------------------
+  // Welcome screen / project file lifecycle
+  // -------------------------------------------------------------------
+
+  private async handleWelcomeAction(action: WelcomeAction): Promise<void> {
+    try {
+      if (action.kind === 'new') {
+        await this.createNewProject();
+      } else if (action.kind === 'open') {
+        await this.openExistingProject();
+      } else if (action.kind === 'openRecent') {
+        await this.openRecentProject(action.entry);
+      }
+    } catch (e) {
+      console.error('Welcome action failed:', e);
+      alert(`Could not open project: ${(e as Error).message}`);
+    }
+  }
+
+  private async createNewProject(): Promise<void> {
+    const dest = await env.pickProjectDestination('Untitled.printfold');
+    if (!dest) return;
+
+    // Reset to a fresh project, then bind the file destination and
+    // perform the initial write so the .printfold file on disk reflects
+    // the empty starting state.
+    this.suppressAutoSave = true;
+    appState.reset();
+    const displayName = stripExtension(dest.name);
+    appState.updateProject({ name: displayName });
+
+    if (dest.path) {
+      projectFile.setElectronPath(dest.path, dest.name);
+      await recentProjects.addElectronPath(dest.path, dest.name);
+    } else if (dest.handle) {
+      projectFile.setWebHandle(dest.handle, dest.name);
+      await recentProjects.addWebHandle(dest.handle, dest.name);
+    }
+    this.suppressAutoSave = false;
+
+    this.welcomeScreen.hide();
+    this.updateHeaderForProject();
+    this.performReflow();
+    await this.saveNow();
+  }
+
+  private async openExistingProject(): Promise<void> {
+    const source = await env.openProjectFile();
+    if (!source) return;
+    await this.loadProjectFromSource(source.content, source.name, {
+      path: source.path,
+      handle: source.handle,
+    });
+  }
+
+  private async openRecentProject(entry: RecentEntry): Promise<void> {
+    if (env.isElectron && entry.path) {
+      const api = window.electronAPI;
+      if (!api) throw new Error('Electron bridge unavailable');
+      const direct = await api.readFile(entry.path);
+      if (!direct.success || !direct.content) {
+        throw new Error(`Could not read ${entry.path}`);
+      }
+      const binary = atob(direct.content);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      await this.loadProjectFromSource(bytes, entry.name, { path: entry.path });
+      await recentProjects.addElectronPath(entry.path, entry.name);
+      return;
+    }
+
+    // Web: try to re-use the persisted FileSystemFileHandle.
+    const handle = await recentProjects.getWebHandle(entry.id);
+    if (!handle) {
+      await recentProjects.remove(entry);
+      throw new Error('This recent project is no longer available. Try Open Project instead.');
+    }
+    // Re-validate permissions — browsers drop them after a session.
+    const permState = await (handle as unknown as {
+      queryPermission: (opts: { mode: string }) => Promise<PermissionState>
+    }).queryPermission({ mode: 'readwrite' });
+    if (permState !== 'granted') {
+      const requested = await (handle as unknown as {
+        requestPermission: (opts: { mode: string }) => Promise<PermissionState>
+      }).requestPermission({ mode: 'readwrite' });
+      if (requested !== 'granted') {
+        throw new Error('Permission to access this file was denied.');
+      }
+    }
+    const file = await handle.getFile();
+    const buffer = await file.arrayBuffer();
+    await this.loadProjectFromSource(new Uint8Array(buffer), entry.name, { handle });
+    await recentProjects.touchWeb(entry.id);
+  }
+
+  private async loadProjectFromSource(
+    bytes: Uint8Array,
+    name: string,
+    binding: { path?: string; handle?: FileSystemFileHandle },
+  ): Promise<void> {
+    this.suppressAutoSave = true;
+    try {
+      // Empty file (e.g. a fresh .printfold from a brand-new project on
+      // another machine, or a file the OS created but never populated).
+      // Treat as a blank project rather than a load error.
+      if (bytes.length === 0) {
         appState.reset();
-        this.performReflow();
+        appState.updateProject({ name: stripExtension(name) });
+      } else {
+        const base64 = uint8ArrayToBase64(bytes);
+        await this.zipHandler.import(base64);
+        appState.updateProject({ name: stripExtension(name) });
       }
+
+      if (binding.path) {
+        projectFile.setElectronPath(binding.path, name);
+      } else if (binding.handle) {
+        projectFile.setWebHandle(binding.handle, name);
+      }
+    } finally {
+      this.suppressAutoSave = false;
+    }
+
+    this.welcomeScreen.hide();
+    this.updateHeaderForProject();
+    this.performReflow();
+  }
+
+  private updateHeaderForProject(): void {
+    const display = document.getElementById('project-name-display');
+    if (display) display.textContent = projectFile.getName();
+  }
+
+  // -------------------------------------------------------------------
+  // Auto-save
+  // -------------------------------------------------------------------
+
+  private setupAutoSave(): void {
+    appState.onProjectChange(() => {
+      if (this.suppressAutoSave) return;
+      if (!projectFile.hasFile()) return;
+      this.scheduleAutoSave();
+    });
+  }
+
+  private scheduleAutoSave(): void {
+    if (this.autoSaveTimer !== null) {
+      clearTimeout(this.autoSaveTimer);
+    }
+    this.setSaveStatus('Saving…', 'saving');
+    this.autoSaveTimer = window.setTimeout(() => {
+      this.autoSaveTimer = null;
+      void this.saveNow();
+    }, AUTOSAVE_DEBOUNCE_MS);
+  }
+
+  private async saveNow(): Promise<void> {
+    if (!projectFile.hasFile()) return;
+    try {
+      const bytes = await this.zipHandler.export();
+      await projectFile.write(bytes);
+      this.setSaveStatus('Saved', '');
+    } catch (e) {
+      console.error('Auto-save failed:', e);
+      this.setSaveStatus('Save failed', 'error');
+    }
+  }
+
+  private setSaveStatus(text: string, cls: 'saving' | 'error' | ''): void {
+    const el = document.getElementById('save-status');
+    if (!el) return;
+    el.textContent = text;
+    el.classList.remove('saving', 'error');
+    if (cls) el.classList.add(cls);
+  }
+
+  private setupHeaderButtons(): void {
+    // Re-open the welcome screen (for switching projects)
+    document.getElementById('btn-welcome')?.addEventListener('click', () => {
+      void this.welcomeScreen.show();
     });
 
-    // Open button
-    document.getElementById('btn-open')?.addEventListener('click', async () => {
-      const files = await env.openFiles({
-        filters: [
-          { name: 'PrintFold Project', extensions: ['zip', 'json'] },
-          { name: 'Markdown', extensions: ['md'] },
-          { name: 'All Supported', extensions: ['zip', 'json', 'md', 'png', 'jpg', 'jpeg', 'webp'] },
-        ],
-        multiple: true,
-      });
-
-      if (files) {
-        for (const file of files) {
-          if (file.type === 'archive') {
-            await this.zipHandler.import(file.content);
-          } else {
-            appState.addFiles([file]);
-          }
-        }
-      }
-    });
-
-    // Save button
+    // Manual save button — shown only when auto-save isn't available
+    // (browsers without the File System Access API). Performs a fresh
+    // download of the .printfold file.
     document.getElementById('btn-save')?.addEventListener('click', async () => {
       const zipContent = await this.zipHandler.export();
       await env.saveFile({
-        defaultName: `${appState.getProject().name}.zip`,
-        filters: [{ name: 'PrintFold Project', extensions: ['zip'] }],
+        defaultName: `${appState.getProject().name}.printfold`,
+        filters: [{ name: 'PrintFold Project', extensions: ['printfold'] }],
         content: zipContent,
       });
     });
@@ -475,4 +654,16 @@ export class App {
     document.getElementById('info-signatures')!.textContent = signatureCount.toString();
     document.getElementById('info-sheets')!.textContent = sheetCount.toString();
   }
+}
+
+function stripExtension(name: string): string {
+  return name.replace(/\.printfold$/i, '');
+}
+
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
 }

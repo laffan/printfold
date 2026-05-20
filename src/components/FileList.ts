@@ -71,7 +71,7 @@ export class FileList {
   private async openFileDialog(): Promise<void> {
     const files = await env.openFiles({
       filters: [
-        { name: 'Supported Files', extensions: ['md', 'png', 'jpg', 'jpeg', 'webp', 'zip', 'ttf', 'otf', 'woff'] },
+        { name: 'Supported Files', extensions: ['md', 'png', 'jpg', 'jpeg', 'webp', 'ttf', 'otf', 'woff'] },
       ],
       multiple: true,
     });
@@ -83,7 +83,7 @@ export class FileList {
 
   private async processDroppedFiles(droppedFiles: globalThis.FileList): Promise<ProjectFile[]> {
     const files: ProjectFile[] = [];
-    const allowedExtensions = ['md', 'png', 'jpg', 'jpeg', 'webp', 'zip', 'ttf', 'otf', 'woff'];
+    const allowedExtensions = ['md', 'png', 'jpg', 'jpeg', 'webp', 'ttf', 'otf', 'woff'];
 
     for (const file of Array.from(droppedFiles) as File[]) {
       const ext = file.name.split('.').pop()?.toLowerCase() || '';
@@ -140,8 +140,6 @@ export class FileList {
       case 'jpeg':
       case 'webp':
         return 'image';
-      case 'zip':
-        return 'archive';
       case 'ttf':
       case 'otf':
       case 'woff':

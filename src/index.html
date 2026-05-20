@@ -9,6 +9,33 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono&display=swap" rel="stylesheet">
 </head>
 <body>
+  <!-- Welcome / Startup screen (file-first flow) -->
+  <div id="welcome-screen" class="welcome-screen hidden">
+    <div class="welcome-card">
+      <div class="welcome-hero">
+        <span class="logo">📖</span>
+        <div>
+          <h1>PrintFold</h1>
+          <p>Create printable, signature-based booklets from markdown</p>
+        </div>
+      </div>
+      <div class="welcome-actions">
+        <button id="welcome-new" class="btn btn-primary">New Project</button>
+        <button id="welcome-open" class="btn btn-secondary">Open Project</button>
+      </div>
+      <div class="welcome-recents">
+        <h3>Recent Projects</h3>
+        <div id="welcome-recents-list"></div>
+        <p id="welcome-recents-empty">No recent projects yet. Create a new project to get started.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Browser auto-save warning (web only, when File System Access API is missing) -->
+  <div id="no-fsa-banner" class="no-fsa-banner hidden">
+    This browser can't auto-save to disk. Use Save to download a fresh copy of your project.
+  </div>
+
   <div id="app">
     <!-- Header -->
     <header class="app-header">
@@ -17,9 +44,10 @@
         <h1>PrintFold</h1>
       </div>
       <div class="header-actions">
-        <button id="btn-new" class="btn btn-secondary">New</button>
-        <button id="btn-open" class="btn btn-secondary">Open</button>
-        <button id="btn-save" class="btn btn-secondary">Save</button>
+        <span id="project-name-display" class="project-name-display"></span>
+        <span id="save-status" class="save-status" aria-live="polite"></span>
+        <button id="btn-welcome" class="btn btn-secondary" title="Open the welcome screen">Projects…</button>
+        <button id="btn-save" class="btn btn-secondary" style="display: none;">Save</button>
         <button id="btn-export" class="btn btn-primary">Export PDF</button>
       </div>
     </header>
