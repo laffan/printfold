@@ -17,10 +17,10 @@ AppState.prototype.makePageStatic = function(pageNumber: number): void {
     spreads: sig.spreads.map(spread => ({
       ...spread,
       verso: spread.verso?.pageNumber === pageNumber
-        ? { ...spread.verso, pageState: 'static' as const, isStatic: true }
+        ? { ...spread.verso, pageState: 'static' as const, isStatic: true, sections: [] }
         : spread.verso,
       recto: spread.recto?.pageNumber === pageNumber
-        ? { ...spread.recto, pageState: 'static' as const, isStatic: true }
+        ? { ...spread.recto, pageState: 'static' as const, isStatic: true, sections: [] }
         : spread.recto,
     })),
   }));
@@ -393,16 +393,23 @@ AppState.prototype.deleteStaticPage = function(pageNumber: number): void {
 AppState.prototype.setPageState = function(pageNumber: number, state: PageState): void {
   const prevState = this.getProject();
 
+  // A page in 'text' state holds flowed markdown sections; static and
+  // available pages are owned by the user (items / background only) and
+  // must not retain leftover flowed content from a previous text flow.
+  const applyPageState = (page: PageContent) => ({
+    ...page,
+    pageState: state,
+    sections: state === 'text' ? page.sections : [],
+    isBlank: state === 'available',
+    isStatic: state === 'static',
+  });
+
   const signatures = prevState.signatures.map(sig => ({
     ...sig,
     spreads: sig.spreads.map(spread => ({
       ...spread,
-      verso: spread.verso?.pageNumber === pageNumber
-        ? { ...spread.verso, pageState: state, isBlank: state === 'available', isStatic: state === 'static' }
-        : spread.verso,
-      recto: spread.recto?.pageNumber === pageNumber
-        ? { ...spread.recto, pageState: state, isBlank: state === 'available', isStatic: state === 'static' }
-        : spread.recto,
+      verso: spread.verso?.pageNumber === pageNumber ? applyPageState(spread.verso) : spread.verso,
+      recto: spread.recto?.pageNumber === pageNumber ? applyPageState(spread.recto) : spread.recto,
     })),
   }));
 

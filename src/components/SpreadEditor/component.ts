@@ -1427,8 +1427,11 @@ export class SpreadEditor {
       this.layer.add(pageNum);
     }
 
-    // Skip content rendering for blank pages (items are rendered separately)
-    if (pageContent.isBlank) {
+    // Only text pages render flowed markdown content. Static and available
+    // pages are owned by the user (items / background only); rendering
+    // their `sections` would draw stale text left over from when the page
+    // was previously a text page.
+    if (pageContent.pageState !== 'text') {
       return;
     }
 

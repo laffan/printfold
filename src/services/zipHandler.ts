@@ -288,7 +288,8 @@ export class ZipHandler {
       });
     }
 
-    // Add files (this triggers reflow)
+    // Add files (this triggers an initial reflow that lays out the
+    // markdown across plain text pages).
     appState.addFiles(files);
 
     // Set main document if specified in manifest
@@ -299,12 +300,33 @@ export class ZipHandler {
       }
     }
 
-    // Apply static page data after a short delay to allow reflow to complete
+    // Layer the saved static-page metadata onto the freshly-flowed
+    // signatures, then trigger a second reflow so the surrounding
+    // markdown flows around the now-marked static pages instead of
+    // sitting on top of them.
     if (this.pendingStaticPages.size > 0) {
-      setTimeout(() => {
-        this.applyStaticPageData();
-      }, 100);
+      await this.waitForSignatures();
+      this.applyStaticPageData();
+      appState.requestReflow();
     }
+  }
+
+  /**
+   * Resolve once the project has at least one signature. Used after
+   * `addFiles` to wait for the initial reflow to publish its result
+   * (signatures are produced by the text-flow engine and pushed back
+   * through `updateProject`).
+   */
+  private waitForSignatures(): Promise<void> {
+    if (appState.getProject().signatures.length > 0) return Promise.resolve();
+    return new Promise<void>(resolve => {
+      const unsubscribe = appState.onProjectChange((project) => {
+        if (project.signatures.length > 0) {
+          unsubscribe();
+          resolve();
+        }
+      });
+    });
   }
 
   /**

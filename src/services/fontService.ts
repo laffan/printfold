@@ -209,7 +209,16 @@ class FontService {
 
     this.injectCustomFontFace(family, ext, base64Content);
     this.notifyCustomFontsChanged();
-    this.notifyFontLoaded();
+
+    // Defer the font-loaded notification until the browser has actually
+    // parsed the @font-face descriptor. Without this, downstream listeners
+    // (App.ts reflows, dropdown previews) can re-measure/re-render before
+    // the font becomes available and end up using the fallback typeface.
+    if ('fonts' in document) {
+      document.fonts.load(`16px "${family}"`).then(() => this.notifyFontLoaded());
+    } else {
+      this.notifyFontLoaded();
+    }
     return family;
   }
 
