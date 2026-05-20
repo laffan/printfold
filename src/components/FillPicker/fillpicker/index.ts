@@ -23,3 +23,47 @@ export function createFillPicker(
 ): FillPicker {
   return new FillPicker(container, initialFill, onChange, options);
 }
+
+/**
+ * Thin wrapper around FillPicker that exposes a plain hex-color API.
+ * Used for fields that only support solid colors (text/background/stroke/
+ * shadow/crop-mark, etc.) so they get the same swatch + popover UX as
+ * the Page Fill picker.
+ */
+export class ColorPicker {
+  private picker: FillPicker;
+
+  constructor(
+    container: HTMLElement,
+    initialColor: string,
+    onChange: (color: string) => void
+  ) {
+    this.picker = new FillPicker(
+      container,
+      { type: 'color', color: initialColor || '#000000' },
+      (fill) => {
+        if (fill.type === 'color' && fill.color) onChange(fill.color);
+      },
+      { allowedTabs: ['color'] }
+    );
+  }
+
+  setColor(color: string): void {
+    this.picker.setFill({ type: 'color', color: color || '#000000' });
+  }
+
+  destroy(): void {
+    this.picker.destroy();
+  }
+}
+
+/**
+ * Factory for the color-only wrapper.
+ */
+export function createColorPicker(
+  container: HTMLElement,
+  initialColor: string,
+  onChange: (color: string) => void
+): ColorPicker {
+  return new ColorPicker(container, initialColor, onChange);
+}

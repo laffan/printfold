@@ -5,9 +5,71 @@
 
 import { appState } from '../../services/state';
 import { createStylesFontDropdown, FontDropdown } from '../FontDropdown';
+import { createColorPicker, ColorPicker } from '../FillPicker';
 
-// Track dynamically created font dropdowns
+// Track dynamically created font dropdowns and color pickers
 const dynamicFontDropdowns: Map<string, FontDropdown> = new Map();
+const dynamicColorPickers: Map<string, ColorPicker> = new Map();
+
+// Track accordion open state across re-renders so updates don't collapse
+// sections the user has expanded.
+const accordionState: Map<string, boolean> = new Map([['body', true]]);
+
+/**
+ * Wrap an options-section element in accordion behavior. The first existing
+ * `.section-header` becomes the clickable accordion header; everything else
+ * inside the section moves into the collapsible content container.
+ */
+function makeAccordion(section: HTMLElement, key: string, label: string): void {
+  section.classList.add('accordion-section');
+  if (accordionState.get(key)) section.classList.add('expanded');
+
+  // Pull out everything currently inside the section; we'll re-add the header
+  // and wrap the rest in an .accordion-content div.
+  const children = Array.from(section.children);
+  section.innerHTML = '';
+
+  const header = document.createElement('h4');
+  header.className = 'section-header accordion-header';
+  header.innerHTML = `<span class="accordion-toggle">▶</span><span>${label}</span>`;
+  header.addEventListener('click', () => {
+    const expanded = section.classList.toggle('expanded');
+    accordionState.set(key, expanded);
+  });
+  section.appendChild(header);
+
+  const content = document.createElement('div');
+  content.className = 'accordion-content';
+  // Skip any pre-existing section-header from the template; we replaced it.
+  for (const child of children) {
+    if (child.classList.contains('section-header')) continue;
+    content.appendChild(child);
+  }
+  section.appendChild(content);
+}
+
+/**
+ * Helper to render a labeled color-picker mount inside a controls row.
+ */
+function colorPickerField(label: string, mountId: string): string {
+  return `
+    <label>
+      <span>${label}</span>
+      <div class="color-picker-mount" id="${mountId}"></div>
+    </label>
+  `;
+}
+
+/**
+ * Mount a ColorPicker (color-only FillPicker) into a `.color-picker-mount`
+ * container by id and track it for cleanup on re-render.
+ */
+function mountColorPicker(mountId: string, initialColor: string, onChange: (color: string) => void): void {
+  const container = document.getElementById(mountId);
+  if (!container) return;
+  const picker = createColorPicker(container, initialColor, onChange);
+  dynamicColorPickers.set(mountId, picker);
+}
 
 interface DetectedStyles {
   hasBody: boolean;
@@ -157,16 +219,8 @@ function generateTextFormatControls(prefix: string, options: {
       </div>
     </div>
     <div class="form-group style-controls-row">
-      <label>
-        <span>Color</span>
-        <input type="color" id="${prefix}-color">
-      </label>
-      ${showBackground ? `
-      <label>
-        <span>Bg</span>
-        <input type="color" id="${prefix}-background">
-      </label>
-      ` : ''}
+      ${colorPickerField('Color', `${prefix}-color`)}
+      ${showBackground ? colorPickerField('Bg', `${prefix}-background`) : ''}
       ${showAlignment ? `
       <div class="control-group">
         <span>Align</span>
@@ -254,14 +308,8 @@ function createHeadingsSection(styles: DetectedStyles): HTMLElement {
       </div>
     </div>
     <div class="form-group style-controls-row">
-      <label>
-        <span>Color</span>
-        <input type="color" id="dyn-heading-color">
-      </label>
-      <label>
-        <span>Bg</span>
-        <input type="color" id="dyn-heading-background">
-      </label>
+      ${colorPickerField('Color', 'dyn-heading-color')}
+      ${colorPickerField('Bg', 'dyn-heading-background')}
       <div class="control-group">
         <span>Align</span>
         <div class="btn-group">
@@ -296,15 +344,9 @@ function createHighlightSection(): HTMLElement {
   section.className = 'options-section';
   section.innerHTML = `
     <h4 class="section-header">Highlight</h4>
-    <div class="form-group inline-sizes" style="grid-template-columns: 1fr 1fr;">
-      <label>
-        <span>Text Color</span>
-        <input type="color" id="dyn-highlight-text-color">
-      </label>
-      <label>
-        <span>Background</span>
-        <input type="color" id="dyn-highlight-bg-color">
-      </label>
+    <div class="form-group style-controls-row">
+      ${colorPickerField('Text Color', 'dyn-highlight-text-color')}
+      ${colorPickerField('Background', 'dyn-highlight-bg-color')}
     </div>
   `;
   return section;
@@ -318,15 +360,9 @@ function createStrikethroughSection(): HTMLElement {
   section.className = 'options-section';
   section.innerHTML = `
     <h4 class="section-header">Strikethrough</h4>
-    <div class="form-group inline-sizes" style="grid-template-columns: 1fr 1fr;">
-      <label>
-        <span>Text Color</span>
-        <input type="color" id="dyn-strikethrough-text-color">
-      </label>
-      <label>
-        <span>Line Color</span>
-        <input type="color" id="dyn-strikethrough-line-color">
-      </label>
+    <div class="form-group style-controls-row">
+      ${colorPickerField('Text Color', 'dyn-strikethrough-text-color')}
+      ${colorPickerField('Line Color', 'dyn-strikethrough-line-color')}
     </div>
   `;
   return section;
@@ -450,18 +486,14 @@ function setupTextFormatHandlers(
   }
 
   // Color
-  const colorInput = document.getElementById(`${prefix}-color`) as HTMLInputElement;
-  if (colorInput) {
-    colorInput.value = getStyle().color || '#000000';
-    colorInput.addEventListener('input', () => updateStyle({ color: colorInput.value }));
-  }
+  mountColorPicker(`${prefix}-color`, getStyle().color || '#000000', (color) => {
+    updateStyle({ color });
+  });
 
-  // Background - use 'change' event to avoid premature picker closing
-  const bgInput = document.getElementById(`${prefix}-background`) as HTMLInputElement;
-  if (bgInput) {
-    bgInput.value = getStyle().backgroundColor || '#ffffff';
-    bgInput.addEventListener('change', () => updateStyle({ backgroundColor: bgInput.value }));
-  }
+  // Background
+  mountColorPicker(`${prefix}-background`, getStyle().backgroundColor || '#ffffff', (color) => {
+    updateStyle({ backgroundColor: color });
+  });
 
   // Alignment buttons
   const alignments = ['left', 'center', 'right'] as const;
@@ -670,11 +702,9 @@ function setupHeadingHandlers(): void {
   }
 
   // Color
-  const colorInput = document.getElementById('dyn-heading-color') as HTMLInputElement;
-  if (colorInput) {
-    colorInput.value = fontOptions.h1.color || '#000000';
-    colorInput.addEventListener('input', () => updateAllHeadings({ color: colorInput.value }));
-  }
+  mountColorPicker('dyn-heading-color', fontOptions.h1.color || '#000000', (color) => {
+    updateAllHeadings({ color });
+  });
 
   // Alignment
   const alignments = ['left', 'center', 'right'] as const;
@@ -739,11 +769,9 @@ function setupHeadingHandlers(): void {
   }
 
   // Background color
-  const bgInput = document.getElementById('dyn-heading-background') as HTMLInputElement;
-  if (bgInput) {
-    bgInput.value = fontOptions.h1.backgroundColor || '#ffffff';
-    bgInput.addEventListener('change', () => updateAllHeadings({ backgroundColor: bgInput.value }));
-  }
+  mountColorPicker('dyn-heading-background', fontOptions.h1.backgroundColor || '#ffffff', (color) => {
+    updateAllHeadings({ backgroundColor: color });
+  });
 
   // Case toggles
   setupCaseToggles(
@@ -772,24 +800,15 @@ function setupHighlightHandlers(): void {
   const fontOptions = appState.getProject().fontOptions;
   const highlight = fontOptions.highlight || { textColor: '#000000', backgroundColor: '#ffff00' };
 
-  const textColorInput = document.getElementById('dyn-highlight-text-color') as HTMLInputElement;
-  const bgColorInput = document.getElementById('dyn-highlight-bg-color') as HTMLInputElement;
+  mountColorPicker('dyn-highlight-text-color', highlight.textColor, (color) => {
+    const fonts = appState.getProject().fontOptions;
+    appState.updateFontOptions({ highlight: { ...fonts.highlight!, textColor: color } });
+  });
 
-  if (textColorInput) {
-    textColorInput.value = highlight.textColor;
-    textColorInput.addEventListener('input', () => {
-      const fonts = appState.getProject().fontOptions;
-      appState.updateFontOptions({ highlight: { ...fonts.highlight!, textColor: textColorInput.value } });
-    });
-  }
-
-  if (bgColorInput) {
-    bgColorInput.value = highlight.backgroundColor;
-    bgColorInput.addEventListener('input', () => {
-      const fonts = appState.getProject().fontOptions;
-      appState.updateFontOptions({ highlight: { ...fonts.highlight!, backgroundColor: bgColorInput.value } });
-    });
-  }
+  mountColorPicker('dyn-highlight-bg-color', highlight.backgroundColor, (color) => {
+    const fonts = appState.getProject().fontOptions;
+    appState.updateFontOptions({ highlight: { ...fonts.highlight!, backgroundColor: color } });
+  });
 }
 
 /**
@@ -799,24 +818,15 @@ function setupStrikethroughHandlers(): void {
   const fontOptions = appState.getProject().fontOptions;
   const strikethrough = fontOptions.strikethrough || { textColor: '#888888', lineColor: '#888888' };
 
-  const textColorInput = document.getElementById('dyn-strikethrough-text-color') as HTMLInputElement;
-  const lineColorInput = document.getElementById('dyn-strikethrough-line-color') as HTMLInputElement;
+  mountColorPicker('dyn-strikethrough-text-color', strikethrough.textColor, (color) => {
+    const fonts = appState.getProject().fontOptions;
+    appState.updateFontOptions({ strikethrough: { ...fonts.strikethrough!, textColor: color } });
+  });
 
-  if (textColorInput) {
-    textColorInput.value = strikethrough.textColor;
-    textColorInput.addEventListener('input', () => {
-      const fonts = appState.getProject().fontOptions;
-      appState.updateFontOptions({ strikethrough: { ...fonts.strikethrough!, textColor: textColorInput.value } });
-    });
-  }
-
-  if (lineColorInput) {
-    lineColorInput.value = strikethrough.lineColor;
-    lineColorInput.addEventListener('input', () => {
-      const fonts = appState.getProject().fontOptions;
-      appState.updateFontOptions({ strikethrough: { ...fonts.strikethrough!, lineColor: lineColorInput.value } });
-    });
-  }
+  mountColorPicker('dyn-strikethrough-line-color', strikethrough.lineColor, (color) => {
+    const fonts = appState.getProject().fontOptions;
+    appState.updateFontOptions({ strikethrough: { ...fonts.strikethrough!, lineColor: color } });
+  });
 }
 
 /**
@@ -913,16 +923,23 @@ export function updateStylesTab(): void {
 
   dynamicFontDropdowns.forEach(dropdown => dropdown.destroy?.());
   dynamicFontDropdowns.clear();
+  dynamicColorPickers.forEach(picker => picker.destroy());
+  dynamicColorPickers.clear();
   container.innerHTML = '';
 
   const styles = detectUsedStyles();
   const headerFooter = appState.getProject().headerFooter;
   const hasMarkdown = appState.getProject().files.some(f => f.type === 'markdown');
 
+  const appendAccordion = (section: HTMLElement, key: string, label: string) => {
+    makeAccordion(section, key, label);
+    container.appendChild(section);
+  };
+
   if (!hasMarkdown) {
     if (noMarkdownMsg) noMarkdownMsg.style.display = 'block';
-    if (headerFooter.header.enabled) container.appendChild(createHeaderFooterSection('header'));
-    if (headerFooter.footer.enabled) container.appendChild(createHeaderFooterSection('footer'));
+    if (headerFooter.header.enabled) appendAccordion(createHeaderFooterSection('header'), 'header', 'Header Text');
+    if (headerFooter.footer.enabled) appendAccordion(createHeaderFooterSection('footer'), 'footer', 'Footer Text');
     if (headerFooter.header.enabled || headerFooter.footer.enabled) {
       setupInputHandlers();
       setupFontDropdowns();
@@ -933,17 +950,17 @@ export function updateStylesTab(): void {
 
   if (noMarkdownMsg) noMarkdownMsg.style.display = 'none';
 
-  if (styles.hasBody) container.appendChild(createBodySection());
+  if (styles.hasBody) appendAccordion(createBodySection(), 'body', 'Body Text');
 
   const hasAnyHeading = styles.hasH1 || styles.hasH2 || styles.hasH3 || styles.hasH4 || styles.hasH5 || styles.hasH6;
-  if (hasAnyHeading) container.appendChild(createHeadingsSection(styles));
+  if (hasAnyHeading) appendAccordion(createHeadingsSection(styles), 'headings', 'Headings');
 
-  if (styles.hasBlockquote) container.appendChild(createBlockquoteSection());
-  if (styles.hasHighlight) container.appendChild(createHighlightSection());
-  if (styles.hasStrikethrough) container.appendChild(createStrikethroughSection());
+  if (styles.hasBlockquote) appendAccordion(createBlockquoteSection(), 'blockquote', 'Blockquote');
+  if (styles.hasHighlight) appendAccordion(createHighlightSection(), 'highlight', 'Highlight');
+  if (styles.hasStrikethrough) appendAccordion(createStrikethroughSection(), 'strikethrough', 'Strikethrough');
 
-  if (headerFooter.header.enabled) container.appendChild(createHeaderFooterSection('header'));
-  if (headerFooter.footer.enabled) container.appendChild(createHeaderFooterSection('footer'));
+  if (headerFooter.header.enabled) appendAccordion(createHeaderFooterSection('header'), 'header', 'Header Text');
+  if (headerFooter.footer.enabled) appendAccordion(createHeaderFooterSection('footer'), 'footer', 'Footer Text');
 
   setupInputHandlers();
   setupFontDropdowns();

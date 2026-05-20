@@ -4,7 +4,14 @@
 
 import { appState } from '../../../services/state';
 import { createItemsFontDropdown } from '../../FontDropdown';
-import { setItemFontDropdown } from './shared';
+import { createColorPicker } from '../../FillPicker';
+import {
+  setItemFontDropdown,
+  itemStrokeColorPicker,
+  setItemStrokeColorPicker,
+  itemShadowColorPicker,
+  setItemShadowColorPicker,
+} from './shared';
 import { addArrayDimension } from './arrayInstances';
 import type { TextPageItem, ArrayDimension } from '../../../types';
 
@@ -33,19 +40,26 @@ export function setupEditPropertyInputs(updateEditSelectedSectionFn: () => void)
   setupPropInput('item-rotation', 'rotation');
   setupPropInput('item-opacity', 'opacity');
 
-  // Shape properties
-  const setupColorInput = (id: string, prop: string) => {
-    const input = document.getElementById(id) as HTMLInputElement;
-    if (!input) return;
-    input.addEventListener('input', () => {
+  // Picker-backed color property for items (stroke / shadow). Mounts a
+  // ColorPicker (color-only FillPicker) into the picker mount-div with the
+  // given id and writes the chosen color back to the selected item.
+  const setupItemColorPicker = (
+    mountId: string,
+    prop: 'strokeColor' | 'shadowColor',
+    setPicker: (p: ReturnType<typeof createColorPicker> | null) => void
+  ) => {
+    const mount = document.getElementById(mountId);
+    if (!mount) return;
+    const picker = createColorPicker(mount, '#000000', (color) => {
       const editorState = appState.getEditor();
       if (!editorState.selectedPageNumber || !editorState.selectedItemId) return;
-      appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { [prop]: input.value });
+      appState.updateItemOnPage(editorState.selectedPageNumber, editorState.selectedItemId, { [prop]: color });
     });
+    setPicker(picker);
   };
 
   // Shape stroke properties
-  setupColorInput('item-stroke', 'strokeColor');
+  if (!itemStrokeColorPicker) setupItemColorPicker('item-stroke', 'strokeColor', setItemStrokeColorPicker);
   setupPropInput('item-stroke-width', 'strokeWidth');
   setupPropInput('item-stroke-offset', 'strokeOffset');
   setupPropInput('item-fill-offset', 'fillOffset');
@@ -160,7 +174,7 @@ export function setupEditPropertyInputs(updateEditSelectedSectionFn: () => void)
   });
 
   // Shadow properties
-  setupColorInput('item-shadow-color', 'shadowColor');
+  if (!itemShadowColorPicker) setupItemColorPicker('item-shadow-color', 'shadowColor', setItemShadowColorPicker);
   setupPropInput('item-shadow-blur', 'shadowBlur');
   setupPropInput('item-shadow-offset-x', 'shadowOffsetX');
   setupPropInput('item-shadow-offset-y', 'shadowOffsetY');

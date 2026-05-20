@@ -10,7 +10,9 @@ import {
   itemFillPicker,
   setItemFillPicker,
   textFillPicker,
-  setTextFillPicker
+  setTextFillPicker,
+  itemStrokeColorPicker,
+  itemShadowColorPicker,
 } from './shared';
 import { updateMultiSelectControls } from './multiSelect';
 import { updateArrayDimensionsList, setupAddDimensionButton } from './arrayInstances';
@@ -277,7 +279,7 @@ export function updateEditSelectedSection(): void {
   const itemStrokeSection = document.getElementById('item-stroke-section');
   if (itemHasStroke) itemHasStroke.checked = hasStroke;
   if (itemStrokeSection) itemStrokeSection.style.display = hasStroke ? 'block' : 'none';
-  setInputValue('item-stroke', strokeColor);
+  itemStrokeColorPicker?.setColor(strokeColor);
   setInputValue('item-stroke-width', strokeWidth.toString());
   setInputValue('item-stroke-offset', (item.strokeOffset ?? 0).toString());
   setInputValue('item-fill-offset', (item.fillOffset ?? 0).toString());
@@ -292,7 +294,7 @@ export function updateEditSelectedSection(): void {
   if (shadowToggleRow) shadowToggleRow.style.display = isTextFlow ? 'none' : '';
   if (itemHasShadow) itemHasShadow.checked = hasShadow;
   if (itemShadowSection) itemShadowSection.style.display = hasShadow && !isTextFlow ? 'block' : 'none';
-  setInputValue('item-shadow-color', item.shadowColor || '#000000');
+  itemShadowColorPicker?.setColor(item.shadowColor || '#000000');
   setInputValue('item-shadow-blur', (item.shadowBlur ?? 5).toString());
   setInputValue('item-shadow-offset-x', (item.shadowOffsetX ?? 3).toString());
   setInputValue('item-shadow-offset-y', (item.shadowOffsetY ?? 3).toString());
@@ -416,7 +418,7 @@ export function updateEditSelectedSection(): void {
     shapeProps!.style.display = 'block';
     textProps!.style.display = 'none';
 
-    setInputValue('item-stroke', shapeItem.strokeColor || '#000000');
+    itemStrokeColorPicker?.setColor(shapeItem.strokeColor || '#000000');
     setInputValue('item-stroke-width', (shapeItem.strokeWidth || 1).toString());
   } else if (item.type === 'text') {
     const textItem = item as TextPageItem;

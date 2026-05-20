@@ -17,7 +17,7 @@ import {
   updateInputCapLabels,
 } from './helpers';
 import { convertFromPoints, UNIT_CONVERSIONS, type MarginUnit } from '../../types';
-import { setupOutputOptions, updateFillSpaceVisibility } from './outputOptions';
+import { setupOutputOptions, updateFillSpaceVisibility, syncCropMarkColorPicker } from './outputOptions';
 import { setupLayoutOptions } from './layoutOptions';
 import { setupHeaderFooterOptions } from './headerFooterOptions';
 import { initFontDropdowns, setupFontOptions, preloadFonts } from './fontOptions';
@@ -154,7 +154,7 @@ export class OptionsPanel {
     if (cropMarksSettings) {
       cropMarksSettings.style.display = (project.outputOptions.showCropMarks ?? true) ? 'block' : 'none';
     }
-    setColorValue('opt-crop-mark-color', project.outputOptions.cropMarkColor ?? '#000000');
+    syncCropMarkColorPicker(project.outputOptions.cropMarkColor ?? '#000000');
     setInputValue('opt-crop-mark-thickness', (project.outputOptions.cropMarkThickness ?? 0.5).toString());
 
     // Layout options - margins are converted to display unit

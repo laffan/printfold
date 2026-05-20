@@ -9,6 +9,16 @@ import { getOrientedSheetSize, UNIT_CONVERSIONS } from '../../types';
 import { bindSelect, bindCheckbox, type DebounceCallback } from './helpers';
 import { PDFGenerator } from '../../services/pdfGenerator';
 import { env } from '../../services/environment';
+import { createColorPicker, ColorPicker } from '../FillPicker';
+
+let cropMarkColorPicker: ColorPicker | null = null;
+
+/**
+ * Update the crop-mark color swatch to match current project state.
+ */
+export function syncCropMarkColorPicker(color: string): void {
+  cropMarkColorPicker?.setColor(color || '#000000');
+}
 
 /**
  * Set up output options event handlers
@@ -179,12 +189,14 @@ export function setupOutputOptions(debounce: (fn: DebounceCallback) => void): vo
     });
   }
 
-  // Crop mark color
-  const cropMarkColorInput = document.getElementById('opt-crop-mark-color') as HTMLInputElement;
-  if (cropMarkColorInput) {
-    cropMarkColorInput.addEventListener('input', () => {
+  // Crop mark color — uses the standardized color picker (color-only variant
+  // of the page-fill picker).
+  const cropMarkColorMount = document.getElementById('opt-crop-mark-color');
+  if (cropMarkColorMount && !cropMarkColorPicker) {
+    const initial = appState.getProject().outputOptions.cropMarkColor ?? '#000000';
+    cropMarkColorPicker = createColorPicker(cropMarkColorMount, initial, (color) => {
       debounce(() => {
-        appState.updateOutputOptions({ cropMarkColor: cropMarkColorInput.value });
+        appState.updateOutputOptions({ cropMarkColor: color });
       });
     });
   }
