@@ -299,8 +299,16 @@ export class FillPicker {
   private updateColorFromHsv(): void {
     const color = hsvToHex(this.hue, this.saturation, this.value);
     this.fill = { type: 'color', color };
-    this.render();
+    // Update only the preview swatch — calling this.render() would
+    // destroy the open panel DOM (and any in-progress drag on the hue
+    // slider or sat/val area) every time the color changes.
+    this.updatePreviewSwatch();
     this.onChange(this.fill);
+  }
+
+  private updatePreviewSwatch(): void {
+    const preview = this.container.querySelector('.fill-preview') as HTMLElement | null;
+    if (preview) preview.style.background = this.getFillPreviewStyle();
   }
 
   private updateGradient(): void {

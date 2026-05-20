@@ -123,6 +123,7 @@ export function renderColorTab(
     if (/^#[0-9A-Fa-f]{6}$/.test(hex)) {
       const hsv = hexToHsv(hex);
       drawSatValCanvas(satValCanvas, hsv.h, hsv.s, hsv.v);
+      hueThumb.style.left = `${(hsv.h / 360) * 100}%`;
       callbacks.onColorChange(hsv.h, hsv.s, hsv.v);
     }
   });
@@ -147,8 +148,10 @@ export function renderColorTab(
     swatch.style.background = color;
     swatch.addEventListener('click', () => {
       const hsv = hexToHsv(color);
-      callbacks.render();
+      // Update the picker's internal HSV state first so the subsequent
+      // re-render reads the new hue/saturation/value.
       callbacks.onColorChange(hsv.h, hsv.s, hsv.v);
+      callbacks.render();
     });
     presets.appendChild(swatch);
   });

@@ -912,14 +912,57 @@ function setupFontDropdowns(): void {
   }
 }
 
+// Signature of the last rebuild — used to avoid destroying and rebuilding
+// the whole tab (which would kill any open color picker mid-interaction)
+// when only values change. Style edits typically don't add/remove sections,
+// so most project updates can be a no-op here.
+let lastRenderSignature: string | null = null;
+
+function computeRenderSignature(): string {
+  const project = appState.getProject();
+  const hasMarkdown = project.files.some(f => f.type === 'markdown');
+  if (!hasMarkdown) {
+    return [
+      'no-md',
+      project.headerFooter.header.enabled ? 'h' : '-',
+      project.headerFooter.footer.enabled ? 'f' : '-',
+    ].join('|');
+  }
+  const styles = detectUsedStyles();
+  return [
+    'md',
+    styles.hasBody ? 'b' : '-',
+    styles.hasH1 ? '1' : '-',
+    styles.hasH2 ? '2' : '-',
+    styles.hasH3 ? '3' : '-',
+    styles.hasH4 ? '4' : '-',
+    styles.hasH5 ? '5' : '-',
+    styles.hasH6 ? '6' : '-',
+    styles.hasBlockquote ? 'q' : '-',
+    styles.hasHighlight ? 'h' : '-',
+    styles.hasStrikethrough ? 's' : '-',
+    project.headerFooter.header.enabled ? 'H' : '-',
+    project.headerFooter.footer.enabled ? 'F' : '-',
+  ].join('|');
+}
+
 /**
- * Update the Styles tab content
+ * Update the Styles tab content. Pass `force` to rebuild even when nothing
+ * structural has changed (used on tab activation so values refresh after
+ * external state mutations like project open).
  */
-export function updateStylesTab(): void {
+export function updateStylesTab(force = false): void {
   const noMarkdownMsg = document.getElementById('styles-no-markdown');
   const container = document.getElementById('styles-content');
 
   if (!container) return;
+
+  // Skip the full rebuild when nothing about the tab's structure has
+  // changed. The inputs we leave in place keep their existing handlers
+  // and — crucially — any open color picker keeps its DOM intact.
+  const signature = computeRenderSignature();
+  if (!force && signature === lastRenderSignature) return;
+  lastRenderSignature = signature;
 
   dynamicFontDropdowns.forEach(dropdown => dropdown.destroy?.());
   dynamicFontDropdowns.clear();

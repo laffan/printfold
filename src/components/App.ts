@@ -190,7 +190,7 @@ export class App {
 
       // Refresh styles tab if it's active to ensure proper initialization
       if (stylesTabBtn?.classList.contains('active')) {
-        updateStylesTab();
+        updateStylesTab(true);
       }
     }
   }
@@ -219,7 +219,7 @@ export class App {
 
         // Refresh styles tab when it becomes active to ensure proper initialization
         if (tabName === 'styles') {
-          updateStylesTab();
+          updateStylesTab(true);
         }
       });
     });
