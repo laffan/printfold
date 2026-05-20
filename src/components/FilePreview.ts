@@ -6,6 +6,8 @@
 import { EditorView, basicSetup } from 'codemirror';
 import { markdown } from '@codemirror/lang-markdown';
 import { EditorState } from '@codemirror/state';
+import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { tags } from '@lezer/highlight';
 import { appState } from '../services/state';
 import type { ProjectFile } from '../types';
 
@@ -74,6 +76,9 @@ export class FilePreview {
       extensions: [
         basicSetup,
         markdown(),
+        syntaxHighlighting(HighlightStyle.define([
+          { tag: tags.contentSeparator, color: '#4a9eff' },
+        ])),
         EditorView.lineWrapping,
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
