@@ -18,6 +18,12 @@ PrintFold is an Electron/Web application for creating printable booklets from Ma
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
+│                     WelcomeScreen                            │
+│        (file-first gate: New / Open / Recents)               │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
 │                        App.ts                                │
 │                   (Main Orchestrator)                        │
 └─────────────────────────────────────────────────────────────┘
@@ -40,7 +46,32 @@ PrintFold is an Electron/Web application for creating printable booklets from Ma
 │  TextFlowEngine │ │  PDFGenerator   │ │    ZipHandler       │
 │ (Layout Engine) │ │  (PDF Export)   │ │  (Project I/O)      │
 └─────────────────┘ └─────────────────┘ └─────────────────────┘
+                                                  │
+                                                  ▼
+                                  ┌─────────────────────────────┐
+                                  │  projectFile  recentProjects │
+                                  │   (auto-save + recents)     │
+                                  └─────────────────────────────┘
 ```
+
+### Project Lifecycle (file-first)
+
+PrintFold enforces that every project has a backing `.printfold` file
+on disk before the editor opens. On launch, the WelcomeScreen is the
+only UI: the user must pick **New Project**, **Open Project**, or a
+**Recent Project** entry. After that selection:
+
+1. `projectFile` records the destination (Electron path or web
+   `FileSystemFileHandle`).
+2. The editor mounts and listens for state changes.
+3. Every change schedules a debounced write (600ms) back to that file
+   via `ZipHandler.export()` → `projectFile.write()`.
+4. `recentProjects` records the entry so it appears the next time the
+   welcome screen is shown.
+
+The header `Projects…` button reopens the WelcomeScreen at any time to
+switch projects. Browsers without the File System Access API fall back
+to a manual Save button that re-downloads the project.
 
 ### Key Technologies
 
@@ -378,6 +409,37 @@ Component Action
 
 ## Feature Guide
 
+### Project Files (`.printfold`)
+
+Projects are stored as `.printfold` files — a ZIP archive with a custom
+extension so the OS can register a file association. The on-disk
+layout is unchanged from the previous `.zip` format: `project.json`
+manifest at the root, plus `text/`, `images/`, `fonts/`, and `static/`
+subfolders.
+
+**Lifecycle:**
+
+1. The WelcomeScreen gates entry to the editor. Users pick **New
+   Project**, **Open Project**, or a **Recent Project** entry.
+2. *New Project*: the user picks a save location; an empty
+   `.printfold` file is created on disk immediately.
+3. *Open Project* / *Recent*: the file's bytes are loaded through
+   `ZipHandler.import()`.
+4. Once the editor mounts, every state change schedules a debounced
+   write (600ms) to the bound destination.
+5. The header shows a `Saving…` / `Saved` indicator. Atomic writes
+   (Electron writes to `.tmp` then renames) prevent corruption.
+
+**Recents storage:**
+
+- *Electron*: `userData/recents.json` (file paths).
+- *Web (Chromium)*: `FileSystemFileHandle`s in IndexedDB + display
+  metadata (name, lastOpened) in `localStorage`. Permissions are
+  re-requested when a stale handle is reused.
+- *Web (Safari/Firefox)*: no silent writes are possible. The welcome
+  screen still works, but a banner appears and the manual **Save**
+  button (re-download flow) is shown in the header.
+
 ### Files Area
 
 The left-hand Files panel is split into three tabs:
@@ -506,6 +568,7 @@ PDF export handles booklet imposition automatically:
 src/
 ├── components/
 │   ├── App.ts
+│   ├── WelcomeScreen.ts      # File-first launch screen (New/Open/Recents)
 │   ├── FileList.ts
 │   ├── FilePreview.ts
 │   ├── FontDropdown.ts
@@ -596,7 +659,9 @@ src/
 │   │   ├── printMarks.ts
 │   │   └── itemDrawing.ts
 │   ├── fontService.ts        # Font management (system, web-safe, Google Fonts)
-│   ├── zipHandler.ts
+│   ├── zipHandler.ts         # .printfold (ZIP) read/write
+│   ├── projectFile.ts        # Active project file binding (path/handle) + writes
+│   ├── recentProjects.ts     # Per-environment recents storage
 │   └── environment.ts
 ├── styles/
 │   ├── main.css              # Imports all modules
@@ -610,6 +675,7 @@ src/
 │       ├── editor.css        # Spread editor, thumbnails
 │       ├── options-panel.css # Options tabs, forms
 │       ├── modal.css         # Modal dialogs
+│       ├── welcome.css       # Welcome / startup screen
 │       ├── font-dropdown.css # Font picker
 │       ├── fill-picker.css   # Fill picker tabs
 │       └── utilities.css     # Responsive, context menu
@@ -678,6 +744,7 @@ npm run build:electron  # Production electron build
 | Fonts | `fontService.ts`, `OptionsPanel/fontOptions.ts`, `pdfGenerator/fonts.ts`, `FontDropdown.ts` |
 | Custom Fonts (uploads) | `services/fontService.ts` (registry + `@font-face`), `components/FileList.ts` (Fonts tab), `services/zipHandler.ts` (`fonts/` folder) |
 | Project I/O | `zipHandler.ts` |
+| Project Lifecycle | `WelcomeScreen.ts`, `App.ts` (auto-save loop), `projectFile.ts`, `recentProjects.ts` |
 | Settings UI | `OptionsPanel/` |
 | Styles Tab Accordion | `OptionsPanel/stylesTab.ts` (signature-gated rebuild, per-section `accordion-section`) |
 | Styles | `styles/modules/` (12 modular CSS files) |
