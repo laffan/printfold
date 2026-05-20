@@ -315,6 +315,19 @@ export function createItemNode(
     const imageItem = item as ImagePageItem;
     const imageFile = appState.getProject().files.find(f => f.id === imageItem.imageFileId);
 
+    if (!imageFile) {
+      const all = appState.getProject().files;
+      // eslint-disable-next-line no-console
+      console.warn(
+        '[PrintFold] image item references unknown file id',
+        imageItem.imageFileId,
+        '— project has',
+        all.length,
+        'files:',
+        all.map(f => `${f.id} (${f.type}, ${f.name})`)
+      );
+    }
+
     if (imageFile) {
       // Load image first, then create Konva.Image
       const img = new window.Image();

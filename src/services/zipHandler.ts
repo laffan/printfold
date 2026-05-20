@@ -301,13 +301,18 @@ export class ZipHandler {
     }
 
     // Layer the saved static-page metadata onto the freshly-flowed
-    // signatures, then trigger a second reflow so the surrounding
-    // markdown flows around the now-marked static pages instead of
-    // sitting on top of them.
+    // signatures. If any page transitioned out of 'text' state, trigger
+    // a second reflow so the surrounding markdown re-flows around the
+    // newly-marked static pages. When only items/backgrounds were added
+    // to pages whose state didn't change, the second reflow is skipped:
+    // captureStaticPages wouldn't preserve 'text'-state pages, so a
+    // re-run would silently drop the items we just restored.
     if (this.pendingStaticPages.size > 0) {
       await this.waitForSignatures();
-      this.applyStaticPageData();
-      appState.requestReflow();
+      const stateChanged = this.applyStaticPageData();
+      if (stateChanged) {
+        appState.requestReflow();
+      }
     }
   }
 
@@ -340,11 +345,13 @@ export class ZipHandler {
   /**
    * Apply pending static page data after reflow
    */
-  private applyStaticPageData(): void {
+  private applyStaticPageData(): boolean {
+    let stateChanged = false;
     for (const [pageNumber, pageData] of this.pendingStaticPages) {
       // Apply page state if not 'text' (static or available)
       if (pageData.pageState !== 'text') {
         appState.setPageState(pageNumber, pageData.pageState);
+        stateChanged = true;
       }
 
       // Apply background fill if present
@@ -363,6 +370,7 @@ export class ZipHandler {
       }
     }
     this.pendingStaticPages.clear();
+    return stateChanged;
   }
 
   /**
