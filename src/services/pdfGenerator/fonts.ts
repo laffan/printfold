@@ -80,6 +80,10 @@ export function getFontStyleForSection(
       return fontOptions.code;
     case 'blockquote':
       return fontOptions.blockquote;
+    case 'endnoteHeader':
+      return fontOptions[`h${level || 2}` as keyof typeof fontOptions] as FontStyle;
+    case 'endnote':
+      return fontOptions.footnote;
     default:
       return fontOptions.body;
   }
@@ -208,6 +212,9 @@ export function getFontForSpan(
  * Get font size for a span, applying code span size reduction
  */
 export function getFontSizeForSpan(span: TextSpan, baseFontSize: number): number {
+  if (span.footnoteNumber !== undefined) {
+    return baseFontSize * 0.65;
+  }
   if (span.code) {
     return baseFontSize * 0.9; // Slightly smaller for inline code
   }

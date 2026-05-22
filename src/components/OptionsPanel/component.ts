@@ -167,6 +167,17 @@ export class OptionsPanel {
     setInputValue('opt-line-height', project.layoutOptions.lineHeight.toString());
     setInputValue('opt-paragraph-spacing', project.layoutOptions.paragraphSpacing.toString());
 
+    // Footnote options
+    const showEndnotes = project.layoutOptions.showFootnotesAsEndnotes === true;
+    setCheckboxValue('opt-show-endnotes', showEndnotes);
+    const endnoteSub = document.getElementById('endnote-placement-options');
+    if (endnoteSub) endnoteSub.style.display = showEndnotes ? 'block' : 'none';
+    const placement = project.layoutOptions.endnotePlacement ?? 'document';
+    const placementRadio = document.querySelector<HTMLInputElement>(
+      `input[name="opt-endnote-placement"][value="${placement}"]`
+    );
+    if (placementRadio) placementRadio.checked = true;
+
     // Header/footer options
     setCheckboxValue('opt-header-enabled', project.headerFooter.header.enabled);
     document.getElementById('header-options')!.style.display =

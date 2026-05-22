@@ -5,8 +5,13 @@
 
 import Konva from 'konva';
 import { appState } from '../../services/state';
-import type { PageContent, FontStyle, TextSpan, RichTextLine, FontOptions } from '../../types';
+import type { PageContent, FontStyle, TextSpan, RichTextLine, FontOptions, FootnoteDefinition } from '../../types';
 import type { MeasuredSection } from '../../services/textFlow/types';
+import {
+  FOOTNOTE_RULE_GAP,
+  FOOTNOTE_RULE_THICKNESS,
+  FOOTNOTE_RULE_WIDTH_RATIO,
+} from '../../services/textFlow/footnotes';
 
 /**
  * Draw page content (text sections, images, headings)
@@ -210,6 +215,121 @@ export function drawPageContent(
     // Add paragraph spacing
     currentY += project.layoutOptions.paragraphSpacing;
   }
+
+  // Draw footnote block at the bottom of the content area (above the
+  // bottom margin). Pagination already shrank the effective content area
+  // to leave room for it.
+  if (page.footnotes && page.footnotes.length > 0) {
+    drawFootnoteBlock(page.footnotes, x, y, width, height, layer);
+  }
+}
+
+/**
+ * Draw the footnote block at the bottom of a page: a short separator rule
+ * followed by each footnote rendered with the `footnote` FontStyle.
+ */
+function drawFootnoteBlock(
+  footnotes: FootnoteDefinition[],
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  layer: Konva.Layer,
+): void {
+  const project = appState.getProject();
+  const style = project.fontOptions.footnote;
+  const lineHeight = (style.lineHeight ?? project.layoutOptions.lineHeight) * style.fontSize;
+
+  // Estimate total block height the same way the pagination reservation
+  // did, then anchor the block flush against the bottom of the content area.
+  let totalLines = 0;
+  for (const f of footnotes) {
+    const lines = estimateLineCount(`${f.number}. ${f.content}`, width, style);
+    totalLines += lines;
+  }
+  const ruleSpace = FOOTNOTE_RULE_GAP + FOOTNOTE_RULE_THICKNESS + FOOTNOTE_RULE_GAP;
+  const blockHeight = ruleSpace + totalLines * lineHeight;
+
+  let currentY = y + height - blockHeight;
+
+  // Separator rule (~30% of content width).
+  const rule = new Konva.Line({
+    points: [x, currentY + FOOTNOTE_RULE_GAP, x + width * FOOTNOTE_RULE_WIDTH_RATIO, currentY + FOOTNOTE_RULE_GAP],
+    stroke: style.color || '#000000',
+    strokeWidth: FOOTNOTE_RULE_THICKNESS,
+    listening: false,
+  });
+  layer.add(rule);
+  currentY += ruleSpace;
+
+  // One footnote per loop; each may wrap across multiple lines.
+  for (const f of footnotes) {
+    const text = `${f.number}. ${f.content}`;
+    const wrapped = wrapPlainToWidth(text, width, style);
+    for (const line of wrapped) {
+      drawSimpleSpan(layer, { text: line }, x, currentY, style);
+      currentY += lineHeight;
+    }
+  }
+}
+
+function drawSimpleSpan(
+  layer: Konva.Layer,
+  span: TextSpan,
+  x: number,
+  y: number,
+  style: FontStyle,
+): void {
+  let combined = '';
+  if (style.fontWeight === 'bold') combined += 'bold';
+  if (style.fontStyle === 'italic') combined += (combined ? ' ' : '') + 'italic';
+  if (!combined) combined = 'normal';
+  const text = new Konva.Text({
+    x,
+    y,
+    text: span.text,
+    fontSize: style.fontSize,
+    fontFamily: style.fontFamily,
+    fontStyle: combined,
+    fill: style.color,
+    listening: false,
+  });
+  layer.add(text);
+}
+
+function estimateLineCount(text: string, contentWidth: number, style: FontStyle): number {
+  return wrapPlainToWidth(text, contentWidth, style).length;
+}
+
+function wrapPlainToWidth(text: string, contentWidth: number, style: FontStyle): string[] {
+  // Light wrapping helper used only for footnote bodies — uses an offscreen
+  // canvas so the result matches the rest of the layout engine.
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return [text];
+  const safe = contentWidth * 0.98;
+  const quoted = style.fontFamily.includes(' ') ? `"${style.fontFamily}"` : style.fontFamily;
+  ctx.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize}px ${quoted}`;
+  const out: string[] = [];
+  for (const hard of text.split('\n')) {
+    const words = hard.split(/\s+/).filter(Boolean);
+    if (words.length === 0) {
+      out.push('');
+      continue;
+    }
+    let line = '';
+    for (const w of words) {
+      const cand = line ? `${line} ${w}` : w;
+      if (ctx.measureText(cand).width <= safe) {
+        line = cand;
+      } else {
+        if (line) out.push(line);
+        line = w;
+      }
+    }
+    if (line) out.push(line);
+  }
+  return out.length ? out : [''];
 }
 
 /**
@@ -226,6 +346,10 @@ export function getFontStyleForSection(type: string, level?: number): FontStyle 
       return fonts.code;
     case 'blockquote':
       return fonts.blockquote;
+    case 'endnoteHeader':
+      return fonts[`h${level || 2}` as keyof typeof fonts] as FontStyle;
+    case 'endnote':
+      return fonts.footnote;
     default:
       return fonts.body;
   }
@@ -261,6 +385,9 @@ function getSpanFontFamily(baseStyle: FontStyle, span: TextSpan, fontOptions: Fo
  * Get font size for a span
  */
 function getSpanFontSize(baseFontSize: number, span: TextSpan): number {
+  if (span.footnoteNumber !== undefined) {
+    return baseFontSize * 0.65;
+  }
   if (span.code) {
     return baseFontSize * 0.9;
   }
@@ -338,10 +465,16 @@ function drawRichLineKonva(
       textDecoration = 'line-through';
     }
 
+    // Footnote-reference markers render raised so they read as
+    // superscript. Other spans stay on the baseline.
+    const yOffset = span.footnoteNumber !== undefined
+      ? -baseStyle.fontSize * 0.35
+      : 0;
+
     // Create text node for this span
     const textNode = new Konva.Text({
       x: currentX,
-      y: y,
+      y: y + yOffset,
       text: span.text,
       fontSize,
       fontFamily,

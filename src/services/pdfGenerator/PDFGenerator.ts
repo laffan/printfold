@@ -480,6 +480,12 @@ export class PDFGenerator {
       currentY -= layoutOptions.paragraphSpacing;
     }
 
+    // Draw footnote block at the bottom of the content area (above the
+    // bottom margin) — pagination already reserved space for it.
+    if (pageContent.footnotes && pageContent.footnotes.length > 0) {
+      this.drawFootnotes(pdfPage, pageContent, contentX, contentY, contentWidth, fontOptions, layoutOptions);
+    }
+
     // Draw footer
     // The footer is positioned inside the bottom margin area, offset from the margin boundary by footerHeight
     // In the editor: marginBoundaryY = y + height - margins.bottom, footerLineY = marginBoundaryY + footerHeight
@@ -578,6 +584,64 @@ export class PDFGenerator {
 
     // Draw spanning items
     this.drawSpanningItems(pdfPage, spreadSpanningItems, x, y, width, height, isRecto);
+  }
+
+  /**
+   * Draw the footnote block (separator rule + per-footnote text) anchored
+   * to the bottom of the content area.
+   */
+  private drawFootnotes(
+    pdfPage: PDFPage,
+    pageContent: PageContent,
+    contentX: number,
+    contentY: number,
+    contentWidth: number,
+    fontOptions: ReturnType<typeof appState.getProject>['fontOptions'],
+    layoutOptions: ReturnType<typeof appState.getProject>['layoutOptions'],
+  ): void {
+    if (!this.fontCache || !pageContent.footnotes || pageContent.footnotes.length === 0) return;
+    const style = fontOptions.footnote;
+    const font = getFont(style, this.fontCache);
+    const lineHeight = (style.lineHeight ?? layoutOptions.lineHeight) * style.fontSize;
+
+    // Measure each footnote (line count) to compute total block height.
+    const wrappedPerFootnote: string[][] = pageContent.footnotes.map(f => {
+      return wrapPlainText(`${f.number}. ${f.content}`, contentWidth, font, style.fontSize);
+    });
+    const totalLines = wrappedPerFootnote.reduce((a, b) => a + b.length, 0);
+
+    const ruleGap = 4;
+    const ruleThickness = 0.5;
+    const ruleSpace = ruleGap + ruleThickness + ruleGap;
+    const blockHeight = ruleSpace + totalLines * lineHeight;
+
+    // PDF coords: y=0 at bottom. The block sits with its top at
+    // (contentY + blockHeight) above contentY.
+    const topY = contentY + blockHeight;
+    const ruleY = topY - ruleGap;
+
+    pdfPage.drawLine({
+      start: { x: contentX, y: ruleY },
+      end: { x: contentX + contentWidth * 0.3, y: ruleY },
+      thickness: ruleThickness,
+      color: parseColor(style.color),
+    });
+
+    // Walk top to bottom; each line lives at (y - fontSize) baseline in
+    // pdf-lib's coordinate system. textY is the top-of-line cursor.
+    let textY = ruleY - ruleGap;
+    for (const lines of wrappedPerFootnote) {
+      for (const line of lines) {
+        pdfPage.drawText(sanitizeText(line), {
+          x: contentX,
+          y: textY - style.fontSize,
+          size: style.fontSize,
+          font,
+          color: parseColor(style.color),
+        });
+        textY -= lineHeight;
+      }
+    }
   }
 
   /**
@@ -1072,4 +1136,33 @@ export class PDFGenerator {
       color: darkColor,
     });
   }
+}
+
+/**
+ * Wrap plain text to a max width using pdf-lib's font width measurement.
+ * Used for footnote bodies, where line layout is straightforward — no
+ * inline styling, no per-span widths.
+ */
+function wrapPlainText(text: string, maxWidth: number, font: PDFFont, fontSize: number): string[] {
+  const safe = maxWidth * 0.98;
+  const out: string[] = [];
+  for (const hardLine of text.split('\n')) {
+    const words = hardLine.split(/\s+/).filter(Boolean);
+    if (words.length === 0) {
+      out.push('');
+      continue;
+    }
+    let line = '';
+    for (const word of words) {
+      const candidate = line ? `${line} ${word}` : word;
+      if (font.widthOfTextAtSize(sanitizeText(candidate), fontSize) <= safe) {
+        line = candidate;
+      } else {
+        if (line) out.push(line);
+        line = word;
+      }
+    }
+    if (line) out.push(line);
+  }
+  return out.length ? out : [''];
 }

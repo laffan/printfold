@@ -116,9 +116,27 @@ export function flowSectionsIntoSlots(
   fullPageDim: PageDimensions,
   staticPagesByNumber: Map<number, PageContent>,
   fontOptions: FontOptions,
-  layoutOptions: LayoutOptions
+  layoutOptions: LayoutOptions,
+  getReservedHeight?: (pageIndex: number) => number,
 ): FlowSlot[] {
   const slots: FlowSlot[] = initialSlots.map(s => ({ ...s, sections: [] }));
+
+  // Count of page-kind slots from index 0 up to (and including) the slot
+  // at `idx` — used to map back to the output text-page index for the
+  // reservation callback.
+  const pageSlotIndexAt = (idx: number): number => {
+    let count = -1;
+    for (let k = 0; k <= idx && k < slots.length; k++) {
+      if (slots[k].kind === 'page') count++;
+    }
+    return count;
+  };
+  const effectiveHeight = (slot: FlowSlot, idx: number): number => {
+    if (!getReservedHeight || slot.kind !== 'page') return slot.contentHeight;
+    const pi = pageSlotIndexAt(idx);
+    if (pi < 0) return slot.contentHeight;
+    return slot.contentHeight - (getReservedHeight(pi) || 0);
+  };
 
   // Next available page number for auto-extended text slots — must skip
   // pages already occupied by static pages.
@@ -210,8 +228,9 @@ export function flowSectionsIntoSlots(
     }
 
     const measured = measureSection(ctx, section, slot.contentWidth, fontOptions, layoutOptions);
+    const slotMaxHeight = effectiveHeight(slot, slotIndex);
 
-    if (currentHeight + measured.measuredHeight <= slot.contentHeight) {
+    if (currentHeight + measured.measuredHeight <= slotMaxHeight) {
       slot.sections.push(measured);
       currentHeight += measured.measuredHeight;
       continue;
@@ -233,7 +252,7 @@ export function flowSectionsIntoSlots(
       let lineCursor = 0;
 
       // Fit what we can into the current slot if at least two lines fit.
-      const remainingHeight = slot.contentHeight - currentHeight;
+      const remainingHeight = effectiveHeight(slot, slotIndex) - currentHeight;
       const linesForCurrent = Math.floor(remainingHeight / lineHeight);
 
       if (linesForCurrent >= 2 && lineCursor < totalLineCount) {
@@ -253,7 +272,7 @@ export function flowSectionsIntoSlots(
         // For now we keep the same measured.lines (computed at the original
         // contentWidth). Lines were already wrapped to the slot they started
         // in, so we'd ideally re-wrap. v1: tolerate slight overflow.
-        const maxLinesPerSlot = Math.floor(slot.contentHeight / lineHeight);
+        const maxLinesPerSlot = Math.floor(effectiveHeight(slot, slotIndex) / lineHeight);
         if (maxLinesPerSlot < 1) {
           // Slot too small; skip to next slot.
           advanceSlot();
@@ -279,7 +298,7 @@ export function flowSectionsIntoSlots(
     if (slot.sections.length > 0) advanceSlot();
     slot = ensureSlot();
 
-    if (measured.measuredHeight <= slot.contentHeight) {
+    if (measured.measuredHeight <= effectiveHeight(slot, slotIndex)) {
       slot.sections.push(measured);
       currentHeight = measured.measuredHeight;
       continue;
@@ -296,7 +315,7 @@ export function flowSectionsIntoSlots(
     let lineCursor = 0;
     while (lineCursor < totalLineCount) {
       slot = ensureSlot();
-      const maxLinesPerSlot = Math.floor(slot.contentHeight / lineHeight);
+      const maxLinesPerSlot = Math.floor(effectiveHeight(slot, slotIndex) / lineHeight);
       if (maxLinesPerSlot < 1) {
         advanceSlot();
         continue;

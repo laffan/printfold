@@ -3,7 +3,8 @@
  */
 
 import { marked } from 'marked';
-import type { DocumentSection, TextSpan, RichTextLine } from '../../types';
+import type { DocumentSection, FootnoteDefinition, TextSpan, RichTextLine } from '../../types';
+import { extractFootnotes, spansFromSentinelText, expandFootnoteRefs } from './footnotes';
 
 /**
  * Apply textTransform to a string. Mirrors CSS text-transform values used
@@ -168,20 +169,89 @@ export function tokenToSection(token: any): DocumentSection | null {
 }
 
 /**
- * Parse markdown into structured sections
+ * Active footnote definitions used by the inline parser. Set just before
+ * tokenization by `parseMarkdownWithFootnotes` so that any `[^id]` left in
+ * `rawMarkdown` (paragraphs and blockquotes round-trip through marked)
+ * gets resolved to a numbered superscript marker. Cleared after the parse
+ * so unrelated calls to `parseInlineMarkdown` (e.g. headers/footers) aren't
+ * affected.
+ */
+let activeFootnoteDefs: Map<string, FootnoteDefinition> | null = null;
+
+export function getActiveFootnoteDefs(): Map<string, FootnoteDefinition> | null {
+  return activeFootnoteDefs;
+}
+
+/**
+ * Parse markdown into structured sections (no footnote handling — kept for
+ * callers that don't care).
  */
 export function parseMarkdown(markdown: string): DocumentSection[] {
-  const sections: DocumentSection[] = [];
-  const tokens = marked.lexer(markdown);
+  return parseMarkdownWithFootnotes(markdown).sections;
+}
 
-  for (const token of tokens) {
-    const section = tokenToSection(token);
-    if (section) {
+export interface ParsedMarkdown {
+  sections: DocumentSection[];
+  footnotes: FootnoteDefinition[];
+  footnotesById: Map<string, FootnoteDefinition>;
+}
+
+/**
+ * Parse markdown into sections AND extract footnote definitions. Inline
+ * `[^id]` references are rewritten to a sentinel-wrapped sequential number
+ * inside each section's `rawMarkdown`/`content` so the rich-text wrapper
+ * can emit superscript marker spans at the right positions.
+ */
+export function parseMarkdownWithFootnotes(markdown: string): ParsedMarkdown {
+  const { strippedMarkdown, ordered, definitions } = extractFootnotes(markdown);
+
+  // Rewrite `[^id]` references to sentinel form BEFORE marked sees them so
+  // marked never tries to interpret them as link syntax. The sentinel
+  // (\x01FN<n>\x01) passes through as ordinary text.
+  const expanded = expandFootnoteRefs(strippedMarkdown, definitions);
+
+  activeFootnoteDefs = definitions;
+  try {
+    const sections: DocumentSection[] = [];
+    const tokens = marked.lexer(expanded.text);
+
+    for (const token of tokens) {
+      const section = tokenToSection(token);
+      if (!section) continue;
+
+      // Annotate sections with the footnote numbers their inline content
+      // references — pagination uses this to track which footnotes land on
+      // which page.
+      const refsInSection = collectFootnoteNumbersInText(section.content)
+        .concat(collectFootnoteNumbersInText(section.rawMarkdown));
+      if (refsInSection.length > 0) {
+        const unique = Array.from(new Set(refsInSection));
+        section.footnoteRefs = unique;
+      }
       sections.push(section);
     }
-  }
 
-  return sections;
+    return {
+      sections,
+      footnotes: ordered,
+      footnotesById: definitions,
+    };
+  } finally {
+    activeFootnoteDefs = null;
+  }
+}
+
+/**
+ * Scan a text run for embedded footnote-sentinel numbers.
+ */
+function collectFootnoteNumbersInText(text: string): number[] {
+  const out: number[] = [];
+  const re = /\x01FN(\d+)\x01/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    out.push(parseInt(m[1], 10));
+  }
+  return out;
 }
 
 /**
@@ -194,12 +264,15 @@ export function tokensToSpans(tokens: any[], inheritedStyle: Partial<TextSpan> =
 
   for (const token of tokens) {
     switch (token.type) {
-      case 'text':
-        spans.push({
-          text: decodeHtmlEntities(token.text || token.raw || ''),
-          ...inheritedStyle,
-        });
+      case 'text': {
+        const decoded = decodeHtmlEntities(token.text || token.raw || '');
+        if (decoded.indexOf('\x01') !== -1) {
+          spans.push(...spansFromSentinelText(decoded, inheritedStyle));
+        } else {
+          spans.push({ text: decoded, ...inheritedStyle });
+        }
         break;
+      }
 
       case 'strong':
         if (token.tokens) {
@@ -417,7 +490,9 @@ export function mergeAdjacentSpans(spans: TextSpan[]): TextSpan[] {
       current.code === span.code &&
       current.strikethrough === span.strikethrough &&
       current.highlight === span.highlight &&
-      current.link === span.link
+      current.link === span.link &&
+      current.footnoteNumber === undefined &&
+      span.footnoteNumber === undefined
     ) {
       // Same styling, merge text
       current.text += span.text;

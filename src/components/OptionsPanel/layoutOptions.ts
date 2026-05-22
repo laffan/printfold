@@ -32,5 +32,24 @@ export function setupLayoutOptions(debounce: (fn: DebounceCallback) => void): vo
     appState.updateLayoutOptions({ paragraphSpacing: value });
   }, debounce);
 
+  // Show footnotes as endnotes
+  bindCheckbox('opt-show-endnotes', (checked) => {
+    appState.updateLayoutOptions({ showFootnotesAsEndnotes: checked });
+    const sub = document.getElementById('endnote-placement-options');
+    if (sub) sub.style.display = checked ? 'block' : 'none';
+  });
+
+  // Endnote placement (radio group)
+  const placementRadios = document.querySelectorAll<HTMLInputElement>(
+    'input[name="opt-endnote-placement"]'
+  );
+  placementRadios.forEach(radio => {
+    radio.addEventListener('change', () => {
+      if (!radio.checked) return;
+      const value = radio.value as 'document' | 'chapter';
+      appState.updateLayoutOptions({ endnotePlacement: value });
+    });
+  });
+
   // Note: Line Height is now controlled per-element in the Styles tab
 }

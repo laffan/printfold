@@ -64,6 +64,8 @@ export const defaultLayoutOptions: LayoutOptions = {
   paragraphSpacing: 12,
   lineHeight: 1.5,
   textAlign: 'left',
+  showFootnotesAsEndnotes: false,
+  endnotePlacement: 'document',
 };
 
 export const defaultFontOptions: FontOptions = {
@@ -83,6 +85,11 @@ export const defaultFontOptions: FontOptions = {
     ...defaultFontStyle,
     fontStyle: 'italic',
     color: '#555555',
+  },
+  footnote: {
+    ...defaultFontStyle,
+    fontSize: 9,
+    lineHeight: 1.3,
   },
   // Inline styles for Obsidian-flavored markdown
   highlight: {

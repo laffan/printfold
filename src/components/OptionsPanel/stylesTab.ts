@@ -84,6 +84,7 @@ interface DetectedStyles {
   hasBlockquote: boolean;
   hasHighlight: boolean;
   hasStrikethrough: boolean;
+  hasFootnote: boolean;
 }
 
 /**
@@ -106,6 +107,7 @@ function detectUsedStyles(): DetectedStyles {
     hasBlockquote: false,
     hasHighlight: false,
     hasStrikethrough: false,
+    hasFootnote: false,
   };
 
   if (markdownFiles.length > 0) {
@@ -150,6 +152,7 @@ function detectUsedStyles(): DetectedStyles {
     if (/^> /m.test(content)) result.hasBlockquote = true;
     if (/==.+?==/.test(content)) result.hasHighlight = true;
     if (/~~.+?~~/.test(content)) result.hasStrikethrough = true;
+    if (/^\[\^[^\]]+\]:/m.test(content)) result.hasFootnote = true;
   }
 
   return result;
@@ -332,6 +335,20 @@ function createBlockquoteSection(): HTMLElement {
   section.innerHTML = `
     <h4 class="section-header">Blockquote</h4>
     ${generateTextFormatControls('dyn-blockquote')}
+  `;
+  return section;
+}
+
+/**
+ * Create footnote style section. Controls the typography of the footnote
+ * block at the bottom of each page (and endnote bodies).
+ */
+function createFootnoteSection(): HTMLElement {
+  const section = document.createElement('div');
+  section.className = 'options-section';
+  section.innerHTML = `
+    <h4 class="section-header">Footnote</h4>
+    ${generateTextFormatControls('dyn-footnote', { showAlignment: false, showBackground: false })}
   `;
   return section;
 }
@@ -645,6 +662,17 @@ function setupInputHandlers(): void {
     }
   );
 
+  // Footnote
+  setupTextFormatHandlers(
+    'dyn-footnote',
+    () => appState.getProject().fontOptions.footnote as any,
+    (updates) => {
+      const fonts = appState.getProject().fontOptions;
+      const fontUpdates = extractFontStyleUpdates(updates);
+      appState.updateFontOptions({ footnote: { ...fonts.footnote, ...fontUpdates } });
+    }
+  );
+
   // Highlight
   setupHighlightHandlers();
 
@@ -939,6 +967,7 @@ function computeRenderSignature(): string {
     styles.hasH5 ? '5' : '-',
     styles.hasH6 ? '6' : '-',
     styles.hasBlockquote ? 'q' : '-',
+    styles.hasFootnote ? 'n' : '-',
     styles.hasHighlight ? 'h' : '-',
     styles.hasStrikethrough ? 's' : '-',
     project.headerFooter.header.enabled ? 'H' : '-',
@@ -999,6 +1028,7 @@ export function updateStylesTab(force = false): void {
   if (hasAnyHeading) appendAccordion(createHeadingsSection(styles), 'headings', 'Headings');
 
   if (styles.hasBlockquote) appendAccordion(createBlockquoteSection(), 'blockquote', 'Blockquote');
+  if (styles.hasFootnote) appendAccordion(createFootnoteSection(), 'footnote', 'Footnote');
   if (styles.hasHighlight) appendAccordion(createHighlightSection(), 'highlight', 'Highlight');
   if (styles.hasStrikethrough) appendAccordion(createStrikethroughSection(), 'strikethrough', 'Strikethrough');
 

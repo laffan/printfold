@@ -30,18 +30,26 @@ export function createEmptyPage(pageNumber: number, isBlank = false, isStatic = 
 }
 
 /**
- * Flow sections across pages
+ * Flow sections across pages.
+ *
+ * `getReservedHeight(pageIndex)` lets the caller subtract space from the
+ * content area for a specific page (used to reserve room for an on-page
+ * footnote block). pageIndex is 0-based and matches the eventual position
+ * of the page in the returned array.
  */
 export function flowSections(
   ctx: CanvasRenderingContext2D,
   sections: DocumentSection[],
   pageDimensions: PageDimensions,
   fontOptions: FontOptions,
-  layoutOptions: LayoutOptions
+  layoutOptions: LayoutOptions,
+  getReservedHeight?: (pageIndex: number) => number,
 ): PageContent[] {
   const pages: PageContent[] = [];
   let currentPage: PageContent = createEmptyPage(1);
   let currentHeight = 0;
+  const availableHeight = () =>
+    pageDimensions.contentHeight - (getReservedHeight ? getReservedHeight(pages.length) : 0);
 
   for (let i = 0; i < sections.length; i++) {
     const section = sections[i];
@@ -74,7 +82,7 @@ export function flowSections(
     const measured = measureSection(ctx, section, pageDimensions.contentWidth, fontOptions, layoutOptions);
 
     // Check if section fits on current page
-    if (currentHeight + measured.measuredHeight <= pageDimensions.contentHeight) {
+    if (currentHeight + measured.measuredHeight <= availableHeight()) {
       currentPage.sections.push(measured);
       currentHeight += measured.measuredHeight;
     } else {
@@ -94,7 +102,7 @@ export function flowSections(
         let remainingLineIndex = 0;
 
         // First, fit what we can on the current page
-        const remainingHeight = pageDimensions.contentHeight - currentHeight;
+        const remainingHeight = availableHeight() - currentHeight;
         const linesForCurrentPage = Math.floor(remainingHeight / lineHeight);
 
         if (linesForCurrentPage >= 2 && remainingLineIndex < totalLineCount) {
@@ -122,7 +130,7 @@ export function flowSections(
         }
 
         // Now handle remaining lines, splitting across as many pages as needed
-        const maxLinesPerPage = Math.floor(pageDimensions.contentHeight / lineHeight);
+        const maxLinesPerPage = Math.floor(availableHeight() / lineHeight);
 
         while (remainingLineIndex < totalLineCount) {
           const linesLeft = totalLineCount - remainingLineIndex;
@@ -161,14 +169,14 @@ export function flowSections(
       currentHeight = 0;
 
       // Add section to new page - handle oversized sections by splitting
-      if (measured.measuredHeight <= pageDimensions.contentHeight) {
+      if (measured.measuredHeight <= availableHeight()) {
         currentPage.sections.push(measured);
         currentHeight = measured.measuredHeight;
       } else {
         // Section is too tall for a single page - force-break by lines
         const fontStyle = getFontStyleForSection(section, fontOptions);
         const lineHeight = layoutOptions.lineHeight * fontStyle.fontSize;
-        const maxLinesPerPage = Math.floor(pageDimensions.contentHeight / lineHeight);
+        const maxLinesPerPage = Math.floor(availableHeight() / lineHeight);
         const sourceLines = measured.richLines && measured.richLines.length > 0
           ? measured.richLines
           : measured.lines;

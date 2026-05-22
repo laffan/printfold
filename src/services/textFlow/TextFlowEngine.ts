@@ -4,7 +4,7 @@
  */
 
 import { appState } from '../state';
-import { parseMarkdown } from './parsing';
+import { parseMarkdownWithFootnotes } from './parsing';
 import { flowSections, insertBlankPages } from './pagination';
 import { calculatePageDimensions } from './dimensions';
 import { buildInitialSlots, flowSectionsIntoSlots, materializeSlots } from './slotFlow';
@@ -15,7 +15,13 @@ import {
   createSignaturesFromPages,
   createDefaultSignature
 } from './signatures';
-import type { TextFlowPageItem } from '../../types';
+import {
+  buildEndnoteSections,
+  collectFootnoteNumbersOnPage,
+  injectChapterEndnotes,
+  measureFootnoteBlockHeight,
+} from './footnotes';
+import type { FootnoteDefinition, PageContent, TextFlowPageItem } from '../../types';
 import { calculateImposition, ImpositionSheet } from './imposition';
 import type { FlowResult } from './types';
 import type { FontOptions, LayoutOptions, OutputOptions, HeaderFooterOptions, Signature } from '../../types';
@@ -52,8 +58,22 @@ export class TextFlowEngine {
     // Capture existing static pages from current signatures
     const staticPagesByNumber = captureStaticPages(project.signatures);
 
-    // Parse markdown into sections
-    const sections = parseMarkdown(markdown);
+    // Parse markdown into sections + extract footnote definitions.
+    const parsed = parseMarkdownWithFootnotes(markdown);
+    let sections = parsed.sections;
+    const footnotes = parsed.footnotes;
+    const footnotesByNumber = new Map<number, FootnoteDefinition>();
+    for (const f of footnotes) footnotesByNumber.set(f.number, f);
+
+    // When endnote mode is on, append the synthetic endnote sections.
+    const showAsEndnotes = this.layoutOptions.showFootnotesAsEndnotes === true;
+    if (showAsEndnotes && footnotes.length > 0) {
+      if (this.layoutOptions.endnotePlacement === 'chapter') {
+        sections = injectChapterEndnotes(sections, footnotes);
+      } else {
+        sections = [...sections, ...buildEndnoteSections(footnotes)];
+      }
+    }
 
     // Calculate page dimensions
     const pageDimensions = calculatePageDimensions(
@@ -72,29 +92,86 @@ export class TextFlowEngine {
     let textPages: import('../../types').PageContent[];
     let effectiveStaticPages = staticPagesByNumber;
 
-    if (hasTextFlowItems) {
-      const initialSlots = buildInitialSlots(staticPagesByNumber, pageDimensions);
-      const filledSlots = flowSectionsIntoSlots(
+    // Per-page reservations let the flow shrink the available content area
+    // for pages that carry on-page footnotes. Recomputed each iteration
+    // from the previous pass's results until it converges.
+    const placeFootnotesOnPage = !showAsEndnotes && footnotes.length > 0;
+    let reservations: number[] = [];
+    // Footnotes should never crowd out the body content. Cap each page's
+    // reservation so flow always has at least 30% of the content area for
+    // body text — a runaway footnote block (e.g. one page bunching many
+    // references) gets clipped here instead of producing zero body lines.
+    const maxReservation = pageDimensions.contentHeight * 0.7;
+    const computeReservations = (pages: PageContent[]): number[] => {
+      if (!placeFootnotesOnPage) return [];
+      return pages.map(page => {
+        const nums = collectFootnoteNumbersOnPage(page);
+        if (nums.length === 0) return 0;
+        const defs = nums
+          .map(n => footnotesByNumber.get(n))
+          .filter((d): d is FootnoteDefinition => !!d);
+        const raw = measureFootnoteBlockHeight(
+          this.ctx,
+          defs,
+          pageDimensions.contentWidth,
+          this.fontOptions,
+          this.layoutOptions,
+        );
+        return Math.min(raw, maxReservation);
+      });
+    };
+
+    const runFlow = (): PageContent[] => {
+      const getReserved = (pageIndex: number) => reservations[pageIndex] || 0;
+      if (hasTextFlowItems) {
+        const initialSlots = buildInitialSlots(staticPagesByNumber, pageDimensions);
+        const filledSlots = flowSectionsIntoSlots(
+          this.ctx,
+          sections,
+          initialSlots,
+          pageDimensions,
+          staticPagesByNumber,
+          this.fontOptions,
+          this.layoutOptions,
+          getReserved,
+        );
+        const materialized = materializeSlots(filledSlots, staticPagesByNumber);
+        effectiveStaticPages = materialized.updatedStaticPages;
+        return materialized.textPages;
+      }
+      return flowSections(
         this.ctx,
         sections,
-        initialSlots,
-        pageDimensions,
-        staticPagesByNumber,
-        this.fontOptions,
-        this.layoutOptions
-      );
-      const materialized = materializeSlots(filledSlots, staticPagesByNumber);
-      textPages = materialized.textPages;
-      effectiveStaticPages = materialized.updatedStaticPages;
-    } else {
-      // Flow sections across pages (legacy path)
-      textPages = flowSections(
-        this.ctx,
-        sections,
         pageDimensions,
         this.fontOptions,
-        this.layoutOptions
+        this.layoutOptions,
+        getReserved,
       );
+    };
+
+    textPages = runFlow();
+    if (placeFootnotesOnPage) {
+      // Iterate until the reservation array is stable (typically 1-2 extra
+      // passes). Cap the loop so we never spin forever on pathological
+      // markdown.
+      for (let iter = 0; iter < 4; iter++) {
+        const next = computeReservations(textPages);
+        const stable =
+          next.length === reservations.length &&
+          next.every((v, i) => Math.abs(v - reservations[i]) < 0.5);
+        if (stable) break;
+        reservations = next;
+        textPages = runFlow();
+      }
+      // Attach final footnote lists to each page so renderers can draw them.
+      for (const page of textPages) {
+        const nums = collectFootnoteNumbersOnPage(page);
+        if (nums.length === 0) continue;
+        const defs = nums
+          .map(n => footnotesByNumber.get(n))
+          .filter((d): d is FootnoteDefinition => !!d);
+        if (defs.length > 0) page.footnotes = defs;
+      }
     }
 
     // Insert blank pages (user-specified)

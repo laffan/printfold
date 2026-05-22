@@ -98,6 +98,10 @@ export function getFontStyleForSection(
       return fontOptions.code;
     case 'blockquote':
       return fontOptions.blockquote;
+    case 'endnoteHeader':
+      return fontOptions[`h${section.level || 2}` as keyof FontOptions] as FontStyle;
+    case 'endnote':
+      return fontOptions.footnote;
     default:
       return fontOptions.body;
   }
@@ -169,7 +173,11 @@ export function measureSection(
   let finalLines: string[] = wrappedLines;
   let finalLineHeights: number[] = lineHeights;
 
-  if (section.type === 'paragraph' || section.type === 'blockquote') {
+  if (
+    section.type === 'paragraph' ||
+    section.type === 'blockquote' ||
+    section.type === 'endnote'
+  ) {
     richLines = wrapRichText(ctx, section.rawMarkdown, contentWidth, fontStyle, fontOptions);
 
     // IMPORTANT: Derive lines from richLines to ensure consistent line counts
@@ -203,6 +211,16 @@ export function getSpanFontStyle(baseStyle: FontStyle, span: TextSpan, fontOptio
       ...style,
       fontFamily: fontOptions.code.fontFamily,
       fontSize: baseStyle.fontSize * 0.9, // Slightly smaller for inline code
+    };
+  }
+
+  // Footnote reference markers render as a small superscript.
+  if (span.footnoteNumber !== undefined) {
+    style = {
+      ...style,
+      fontSize: baseStyle.fontSize * 0.65,
+      fontWeight: 'normal',
+      fontStyle: 'normal',
     };
   }
 

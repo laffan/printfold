@@ -86,10 +86,15 @@ export function drawRichLine(
       });
     }
 
+    // Footnote-reference markers render raised so they read as superscript.
+    const drawY = span.footnoteNumber !== undefined
+      ? y + baseStyle.fontSize * 0.35
+      : y;
+
     // Draw the text
     pdfPage.drawText(text, {
       x: currentX,
-      y: y,
+      y: drawY,
       size: fontSize,
       font,
       color: textColor,

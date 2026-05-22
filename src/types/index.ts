@@ -92,11 +92,23 @@ export interface ProjectFile {
 // Document structure
 export interface DocumentSection {
   id: string;
-  type: 'heading' | 'paragraph' | 'image' | 'list' | 'code' | 'blockquote' | 'hr';
+  type: 'heading' | 'paragraph' | 'image' | 'list' | 'code' | 'blockquote' | 'hr' | 'endnoteHeader' | 'endnote';
   level?: number; // For headings
   content: string;
   rawMarkdown: string;
   imageRef?: string; // Reference to uploaded image
+  // Sequential footnote numbers referenced anywhere in this section's
+  // inline content (populated by parseMarkdown when footnotes exist).
+  footnoteRefs?: number[];
+  // For type === 'endnote': the number being defined here.
+  endnoteNumber?: number;
+}
+
+// A footnote definition extracted from the source markdown.
+export interface FootnoteDefinition {
+  id: string;       // The user-supplied label (e.g. '1', 'note-a')
+  number: number;   // 1-based sequential number through the document
+  content: string;  // Raw markdown content of the footnote
 }
 
 // Page state for the three-state model
@@ -116,6 +128,9 @@ export interface PageContent {
   items?: PageItem[]; // Items placed on static pages
   backgroundFill?: FillConfig; // Optional background fill for the page
   customBackgroundImageId?: string; // Optional custom background image (sits above backgroundFill, below items)
+  // Footnotes whose reference markers landed on this page. Populated by
+  // pagination when LayoutOptions.showFootnotesAsEndnotes is false.
+  footnotes?: FootnoteDefinition[];
 }
 
 // Items that can be placed on static pages
@@ -321,6 +336,12 @@ export interface LayoutOptions {
   paragraphSpacing: number;
   lineHeight: number;
   textAlign: 'left' | 'justify';
+  // When false (default): footnotes render at the bottom of the page that
+  // contains their reference; the text content area shrinks accordingly.
+  // When true: footnotes are collected and rendered as endnotes; placement
+  // is controlled by `endnotePlacement`.
+  showFootnotesAsEndnotes?: boolean;
+  endnotePlacement?: 'document' | 'chapter';
 }
 
 export interface FontStyle {
@@ -358,6 +379,9 @@ export interface TextSpan {
   strikethrough?: boolean;
   highlight?: boolean;
   link?: string;  // For future hyperlink support
+  // When set, this span renders as a superscript footnote reference marker.
+  // `text` is the visible number (matches the corresponding FootnoteDefinition).
+  footnoteNumber?: number;
 }
 
 // Rich text line - a line composed of multiple styled spans
@@ -375,6 +399,8 @@ export interface FontOptions {
   h6: FontStyle;
   code: FontStyle;
   blockquote: FontStyle;
+  // Style used for footnote text at the bottom of a page (and endnote bodies).
+  footnote: FontStyle;
   // Inline styles for Obsidian-flavored markdown
   highlight?: HighlightStyle;
   strikethrough?: StrikethroughStyle;

@@ -12,6 +12,7 @@
 import JSZip from 'jszip';
 import { appState } from './state';
 import type { ProjectFile, BookletProject, PageItem } from '../types';
+import { defaultFontOptions, defaultLayoutOptions } from './state/defaults';
 
 /**
  * File entry in the manifest
@@ -276,13 +277,26 @@ export class ZipHandler {
 
     // Update project settings from manifest
     if (manifest) {
+      // Backfill new option fields onto older projects so callers that
+      // assume them (e.g. fontOptions.footnote, layoutOptions.showFootnotesAsEndnotes)
+      // don't see `undefined` on legacy files.
+      const mergedFontOptions = {
+        ...defaultFontOptions,
+        ...manifest.fontOptions,
+        footnote: manifest.fontOptions?.footnote ?? defaultFontOptions.footnote,
+      };
+      const mergedLayoutOptions = {
+        ...defaultLayoutOptions,
+        ...manifest.layoutOptions,
+      };
+
       appState.updateProject({
         id: manifest.projectId || crypto.randomUUID(),
         name: manifest.name,
         measurementUnit: manifest.measurementUnit || 'in', // Default to inches for legacy files
         outputOptions: manifest.outputOptions,
-        layoutOptions: manifest.layoutOptions,
-        fontOptions: manifest.fontOptions,
+        layoutOptions: mergedLayoutOptions,
+        fontOptions: mergedFontOptions,
         headerFooter: manifest.headerFooter,
         blankPages: manifest.blankPages || [],
       });
