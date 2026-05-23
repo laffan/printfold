@@ -121,6 +121,24 @@ export class TextFlowEngine {
       });
     };
 
+    // Merge two reservation arrays with a per-page maximum. We never let a
+    // page's reservation shrink between iterations: when a footnote marker
+    // sits right at a page boundary, reserving space for it pushes the
+    // marker line to the next page — which would zero out the reservation
+    // and let the line come back. That bounces forever. By keeping each
+    // page's reservation monotonically non-decreasing, we anchor whichever
+    // side of the boundary the marker landed on and converge in 1–2 extra
+    // iterations. The worst case is a slightly under-filled body on the
+    // page the marker vacated, which beats overlap.
+    const mergeReservations = (prev: number[], next: number[]): number[] => {
+      const len = Math.max(prev.length, next.length);
+      const out = new Array<number>(len);
+      for (let i = 0; i < len; i++) {
+        out[i] = Math.max(prev[i] || 0, next[i] || 0);
+      }
+      return out;
+    };
+
     const runFlow = (): PageContent[] => {
       const getReserved = (pageIndex: number) => reservations[pageIndex] || 0;
       if (hasTextFlowItems) {
@@ -151,16 +169,19 @@ export class TextFlowEngine {
 
     textPages = runFlow();
     if (placeFootnotesOnPage) {
-      // Iterate until the reservation array is stable (typically 1-2 extra
-      // passes). Cap the loop so we never spin forever on pathological
-      // markdown.
-      for (let iter = 0; iter < 4; iter++) {
-        const next = computeReservations(textPages);
+      // Iterate until reservations are stable. With monotonic merging,
+      // each iteration can only add to the reservation total (or leave it
+      // unchanged), so the loop is bounded by the number of distinct page
+      // slots that ever hold a footnote. 6 is generous for any realistic
+      // document.
+      for (let iter = 0; iter < 6; iter++) {
+        const needed = computeReservations(textPages);
+        const merged = mergeReservations(reservations, needed);
         const stable =
-          next.length === reservations.length &&
-          next.every((v, i) => Math.abs(v - reservations[i]) < 0.5);
+          merged.length === reservations.length &&
+          merged.every((v, i) => Math.abs(v - reservations[i]) < 0.5);
         if (stable) break;
-        reservations = next;
+        reservations = merged;
         textPages = runFlow();
       }
       // Attach final footnote lists to each page so renderers can draw them.
