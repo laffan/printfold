@@ -549,6 +549,40 @@ The Array effect creates multiple copies of an item with configurable offsets:
 - **Multiplicative**: Dimensions multiply (e.g., 3×2 = 6 total copies in a grid)
 - **Example**: Dimension 1 (count=3, x=30) + Dimension 2 (count=2, y=40) creates a 3×2 grid
 
+### Footnotes
+
+Footnotes use GFM syntax — `[^id]` for references and `[^id]: body` for
+definitions. The "Footnotes" section in the Document tab controls
+placement:
+
+- **Off (default)**: footnotes render at the bottom of the page that
+  holds their reference, separated by a short rule. Pagination
+  iteratively shrinks the content area for pages that carry footnotes
+  until the per-page reservation converges, so body text reflows around
+  the footnote block.
+- **On (Show footnotes as endnotes)**: footnotes are collected as
+  endnotes; placement is either at the end of the document or at the
+  end of each H1-delimited chapter. A hard page break precedes each
+  endnote group.
+
+References appear as superscript numbers inline. Numbering is sequential
+through the document (a reference to the same id repeats the same
+number). The body styling of footnote/endnote text is controlled by the
+**Footnote** entry in the Styles tab, which appears whenever the
+markdown contains a definition.
+
+Reservations are monotonically non-decreasing across reflow iterations
+so a marker sitting exactly at a page boundary can't oscillate between
+"on this page" and "pushed to the next page" — once a page has
+reserved footnote space, it keeps it for the rest of the reflow.
+
+Key files: `services/textFlow/footnotes.ts` (extraction, numbering,
+reservation height, endnote section synthesis),
+`services/textFlow/TextFlowEngine.ts` (iterative reflow loop),
+`components/SpreadEditor/content.ts` and
+`services/pdfGenerator/PDFGenerator.ts` (footnote block + superscript
+rendering).
+
 ### Imposition
 
 PDF export handles booklet imposition automatically:
@@ -638,6 +672,7 @@ src/
 │   │   ├── types.ts
 │   │   ├── cache.ts
 │   │   ├── parsing.ts        # Markdown parsing
+│   │   ├── footnotes.ts      # Footnote extraction, numbering, reservation
 │   │   ├── measurement.ts    # Text measurement
 │   │   ├── pagination.ts     # Page break logic
 │   │   ├── slotFlow.ts       # Slot-based flow (text-flow items)
@@ -732,6 +767,7 @@ npm run build:electron  # Production electron build
 | Feature | Files |
 |---------|-------|
 | Text Layout | `textFlow/` (parsing, measurement, pagination, imposition) |
+| Footnotes | `textFlow/footnotes.ts`, `textFlow/TextFlowEngine.ts` (iterative reservation), `SpreadEditor/content.ts` + `pdfGenerator/PDFGenerator.ts` (rendering), `OptionsPanel/layoutOptions.ts` (Document-tab toggle) |
 | Text-Flow Items | `textFlow/slotFlow.ts`, `textFlow/polygonPath.ts`, `SpreadEditor/items/textFlowRendering.ts`, `SpreadEditor/items/vertexHandles.ts` |
 | PDF Export | `pdfGenerator/`, `pageRenderer.ts` (pre-rendering, fonts, images, itemDrawing) |
 | Page Export | `pageExport.ts` (PNG export, image replacement for static pages) |
