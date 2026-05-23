@@ -337,14 +337,61 @@ export class SpreadEditor {
         (spread.verso && spread.verso.pageNumber === pageNumber) ||
         (spread.recto && spread.recto.pageNumber === pageNumber)
       ) {
-        if (this.currentSpreadIndex !== i) {
+        const didChange = this.currentSpreadIndex !== i;
+        if (didChange) {
           this.currentSpreadIndex = i;
           this.updateSpreadIndicator();
           this.render();
         }
+        this.flashPage(spread, pageNumber);
         return;
       }
     }
+  }
+
+  private flashTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  private flashPage(spread: VisualSpread, pageNumber: number): void {
+    const pageDimensions = this.getPageDimensions();
+    const isVerso = spread.verso?.pageNumber === pageNumber;
+    const x = isVerso ? 0 : pageDimensions.width;
+
+    // Remove any existing flash overlay
+    if (this.flashTimeout) {
+      clearTimeout(this.flashTimeout);
+      this.flashTimeout = null;
+    }
+    this.layer.find('.cursor-flash').forEach(n => n.destroy());
+
+    const flash = new Konva.Rect({
+      name: 'cursor-flash',
+      x,
+      y: 0,
+      width: pageDimensions.width,
+      height: pageDimensions.height,
+      fill: '#4a9eff',
+      opacity: 0.12,
+      listening: false,
+    });
+    this.layer.add(flash);
+    this.layer.draw();
+
+    // Fade out over 600ms
+    const tween = new Konva.Tween({
+      node: flash,
+      duration: 0.6,
+      opacity: 0,
+      onFinish: () => {
+        flash.destroy();
+        this.layer.draw();
+      },
+    });
+    tween.play();
+    this.flashTimeout = setTimeout(() => {
+      flash.destroy();
+      this.layer.draw();
+      this.flashTimeout = null;
+    }, 700);
   }
 
   private setupControls(): void {

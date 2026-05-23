@@ -604,16 +604,22 @@ export class PDFGenerator {
     const font = getFont(style, this.fontCache);
     const lineHeight = (style.lineHeight ?? layoutOptions.lineHeight) * style.fontSize;
 
+    const footnoteGap = fontOptions.footnoteGap ?? 0;
+    const numberColorHex = fontOptions.footnoteNumberColor || style.color;
+    const numberColor = parseColor(numberColorHex);
+    const hasDistinctNumberColor = numberColorHex !== style.color;
+
     // Measure each footnote (line count) to compute total block height.
     const wrappedPerFootnote: string[][] = pageContent.footnotes.map(f => {
       return wrapPlainText(`${f.number}. ${f.content}`, contentWidth, font, style.fontSize);
     });
     const totalLines = wrappedPerFootnote.reduce((a, b) => a + b.length, 0);
+    const totalGap = Math.max(0, wrappedPerFootnote.length - 1) * footnoteGap;
 
     const ruleGap = 4;
     const ruleThickness = 0.5;
     const ruleSpace = ruleGap + ruleThickness + ruleGap;
-    const blockHeight = ruleSpace + totalLines * lineHeight;
+    const blockHeight = ruleSpace + totalLines * lineHeight + totalGap;
 
     // PDF coords: y=0 at bottom. The block sits with its top at
     // (contentY + blockHeight) above contentY.
@@ -630,16 +636,42 @@ export class PDFGenerator {
     // Walk top to bottom; each line lives at (y - fontSize) baseline in
     // pdf-lib's coordinate system. textY is the top-of-line cursor.
     let textY = ruleY - ruleGap;
-    for (const lines of wrappedPerFootnote) {
-      for (const line of lines) {
-        pdfPage.drawText(sanitizeText(line), {
-          x: contentX,
-          y: textY - style.fontSize,
-          size: style.fontSize,
-          font,
-          color: parseColor(style.color),
-        });
+    for (let fi = 0; fi < wrappedPerFootnote.length; fi++) {
+      const lines = wrappedPerFootnote[fi];
+      const prefix = `${pageContent.footnotes[fi].number}. `;
+      for (let li = 0; li < lines.length; li++) {
+        const line = lines[li];
+        // Color the number prefix on the first line of each footnote
+        if (li === 0 && hasDistinctNumberColor) {
+          const prefixWidth = font.widthOfTextAtSize(sanitizeText(prefix), style.fontSize);
+          pdfPage.drawText(sanitizeText(prefix), {
+            x: contentX,
+            y: textY - style.fontSize,
+            size: style.fontSize,
+            font,
+            color: numberColor,
+          });
+          pdfPage.drawText(sanitizeText(line.slice(prefix.length)), {
+            x: contentX + prefixWidth,
+            y: textY - style.fontSize,
+            size: style.fontSize,
+            font,
+            color: parseColor(style.color),
+          });
+        } else {
+          pdfPage.drawText(sanitizeText(line), {
+            x: contentX,
+            y: textY - style.fontSize,
+            size: style.fontSize,
+            font,
+            color: parseColor(style.color),
+          });
+        }
         textY -= lineHeight;
+      }
+      // Add gap between footnotes (not after the last one)
+      if (fi < wrappedPerFootnote.length - 1) {
+        textY -= footnoteGap;
       }
     }
   }

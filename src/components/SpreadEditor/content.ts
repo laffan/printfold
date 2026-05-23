@@ -240,6 +240,8 @@ function drawFootnoteBlock(
   const style = project.fontOptions.footnote;
   const lineHeight = (style.lineHeight ?? project.layoutOptions.lineHeight) * style.fontSize;
 
+  const footnoteGap = project.fontOptions.footnoteGap ?? 0;
+
   // Estimate total block height the same way the pagination reservation
   // did, then anchor the block flush against the bottom of the content area.
   let totalLines = 0;
@@ -248,7 +250,8 @@ function drawFootnoteBlock(
     totalLines += lines;
   }
   const ruleSpace = FOOTNOTE_RULE_GAP + FOOTNOTE_RULE_THICKNESS + FOOTNOTE_RULE_GAP;
-  const blockHeight = ruleSpace + totalLines * lineHeight;
+  const totalGapSpace = Math.max(0, footnotes.length - 1) * footnoteGap;
+  const blockHeight = ruleSpace + totalLines * lineHeight + totalGapSpace;
 
   let currentY = y + height - blockHeight;
 
@@ -262,13 +265,29 @@ function drawFootnoteBlock(
   layer.add(rule);
   currentY += ruleSpace;
 
+  const footnoteNumberColor = project.fontOptions.footnoteNumberColor || style.color;
+
   // One footnote per loop; each may wrap across multiple lines.
-  for (const f of footnotes) {
-    const text = `${f.number}. ${f.content}`;
+  for (let fi = 0; fi < footnotes.length; fi++) {
+    const f = footnotes[fi];
+    const prefix = `${f.number}. `;
+    const text = prefix + f.content;
     const wrapped = wrapPlainToWidth(text, width, style);
-    for (const line of wrapped) {
-      drawSimpleSpan(layer, { text: line }, x, currentY, style);
+    for (let li = 0; li < wrapped.length; li++) {
+      const line = wrapped[li];
+      // Color the number prefix on the first line of each footnote
+      if (li === 0 && footnoteNumberColor !== style.color) {
+        drawSimpleSpan(layer, { text: prefix }, x, currentY, { ...style, color: footnoteNumberColor });
+        const prefixWidth = measureTextWidth(prefix, style);
+        drawSimpleSpan(layer, { text: line.slice(prefix.length) }, x + prefixWidth, currentY, style);
+      } else {
+        drawSimpleSpan(layer, { text: line }, x, currentY, style);
+      }
       currentY += lineHeight;
+    }
+    // Add gap between footnotes (not after the last one)
+    if (fi < footnotes.length - 1) {
+      currentY += footnoteGap;
     }
   }
 }
@@ -295,6 +314,15 @@ function drawSimpleSpan(
     listening: false,
   });
   layer.add(text);
+}
+
+function measureTextWidth(text: string, style: FontStyle): number {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return 0;
+  const quoted = style.fontFamily.includes(' ') ? `"${style.fontFamily}"` : style.fontFamily;
+  ctx.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize}px ${quoted}`;
+  return ctx.measureText(text).width;
 }
 
 function estimateLineCount(text: string, contentWidth: number, style: FontStyle): number {
@@ -471,6 +499,14 @@ function drawRichLineKonva(
       ? -baseStyle.fontSize * 0.35
       : 0;
 
+    // Determine fill color: highlights, footnote numbers, or base color
+    let spanFill = baseStyle.color;
+    if (span.highlight && fontOptions.highlight) {
+      spanFill = fontOptions.highlight.textColor;
+    } else if (span.footnoteNumber !== undefined && fontOptions.footnoteNumberColor) {
+      spanFill = fontOptions.footnoteNumberColor;
+    }
+
     // Create text node for this span
     const textNode = new Konva.Text({
       x: currentX,
@@ -479,9 +515,7 @@ function drawRichLineKonva(
       fontSize,
       fontFamily,
       fontStyle: fontStyleStr,
-      fill: span.highlight && fontOptions.highlight
-        ? fontOptions.highlight.textColor
-        : baseStyle.color,
+      fill: spanFill,
       textDecoration,
       listening: false, // Don't intercept mouse events
     });

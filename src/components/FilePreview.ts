@@ -162,58 +162,58 @@ export class FilePreview {
   private cursorTimeout: number | null = null;
 
   private handleCursorChange(view: EditorView): void {
-    // Only sync for markdown files
     if (!this.currentFile || this.currentFile.type !== 'markdown') {
       return;
     }
 
-    // Debounce cursor changes
     if (this.cursorTimeout) {
       clearTimeout(this.cursorTimeout);
     }
 
     this.cursorTimeout = window.setTimeout(() => {
       const pos = view.state.selection.main.head;
-      const lineNumber = view.state.doc.lineAt(pos).number;
-      const currentFileLines = view.state.doc.lines;
-
-      // Get all markdown files to calculate position in concatenated content
       const project = appState.getProject();
       const markdownFiles = project.files.filter(f => f.type === 'markdown');
+      if (markdownFiles.length === 0) return;
 
-      // Calculate total lines and offset for current file
-      let totalLines = 0;
-      let lineOffset = 0;
-      let foundCurrentFile = false;
-
+      // Find the cursor's character offset within the concatenated markdown
+      let charOffset = 0;
+      let foundFile = false;
       for (const file of markdownFiles) {
-        const fileLines = (file.content.match(/\n/g) || []).length + 1;
         if (file.id === this.currentFile!.id) {
-          foundCurrentFile = true;
-          lineOffset = totalLines;
+          foundFile = true;
+          charOffset += Math.min(pos, file.content.length);
+          break;
         }
-        totalLines += fileLines + 1; // +1 for the blank line between files
+        charOffset += file.content.length + 2; // +2 for '\n\n' separator
       }
+      if (!foundFile) return;
 
-      if (!foundCurrentFile) return;
-
-      // Calculate absolute line position in concatenated content
-      const absoluteLine = lineOffset + lineNumber;
-
-      // Get total pages from project
-      const totalPages = project.signatures.reduce(
-        (sum, sig) => sum + sig.spreads.length * 2,
-        0
-      );
-
-      if (totalPages === 0 || totalLines === 0) return;
-
-      // Estimate page number based on line position ratio
-      const ratio = absoluteLine / totalLines;
-      const estimatedPage = Math.max(1, Math.ceil(ratio * totalPages));
-
-      // Update editor state (this will trigger SpreadEditor to navigate)
-      appState.updateEditor({ selectedPageNumber: estimatedPage });
+      // Walk pages in order, accumulating raw markdown offsets to find
+      // which page contains text around the cursor position.
+      const combinedMarkdown = markdownFiles.map(f => f.content).join('\n\n');
+      let bestPage = 1;
+      for (const sig of project.signatures) {
+        for (const spread of sig.spreads) {
+          for (const page of [spread.verso, spread.recto]) {
+            if (!page || !page.sections || page.sections.length === 0) continue;
+            if (page.pageState === 'static' || page.pageState === 'available') continue;
+            for (const section of page.sections) {
+              if (!section.rawMarkdown) continue;
+              const idx = combinedMarkdown.indexOf(section.rawMarkdown);
+              if (idx === -1) continue;
+              if (idx <= charOffset && charOffset <= idx + section.rawMarkdown.length) {
+                appState.updateEditor({ selectedPageNumber: page.pageNumber });
+                return;
+              }
+              if (idx <= charOffset) {
+                bestPage = page.pageNumber;
+              }
+            }
+          }
+        }
+      }
+      appState.updateEditor({ selectedPageNumber: bestPage });
     }, 150);
   }
 

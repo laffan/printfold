@@ -72,6 +72,19 @@
 
 .column-input {
   flex: 0 0 280px;
+  transition: flex-basis 0.2s ease, opacity 0.2s ease;
+}
+
+.column-input.sidebar-hidden {
+  flex-basis: 0 !important;
+  min-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.column-input.sidebar-hidden + .column-resizer {
+  display: none;
 }
 
 .column-editor {

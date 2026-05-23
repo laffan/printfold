@@ -401,6 +401,13 @@ export interface FontOptions {
   blockquote: FontStyle;
   // Style used for footnote text at the bottom of a page (and endnote bodies).
   footnote: FontStyle;
+  // Color for footnote reference numbers (both inline superscript and
+  // the number prefix in the footnote block). Falls back to the
+  // footnote style color when unset.
+  footnoteNumberColor?: string;
+  // Vertical gap (in points) between individual footnotes in the
+  // on-page footnote block. Defaults to 0.
+  footnoteGap?: number;
   // Inline styles for Obsidian-flavored markdown
   highlight?: HighlightStyle;
   strikethrough?: StrikethroughStyle;

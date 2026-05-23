@@ -64,3 +64,77 @@
   color: var(--color-error);
 }
 
+/* Header menus */
+.header-menus {
+  display: flex;
+  gap: 4px;
+  -webkit-app-region: no-drag;
+}
+
+.header-menu {
+  position: relative;
+}
+
+.header-menu-btn {
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.header-menu-btn:hover,
+.header-menu.open .header-menu-btn {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.header-menu-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 220px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  padding: 4px 0;
+  z-index: 1000;
+}
+
+.header-menu-dropdown.hidden {
+  display: none;
+}
+
+.header-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 12px;
+  background: none;
+  border: none;
+  color: var(--color-text);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.header-menu-item:hover {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.menu-item-shortcut {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-left: 24px;
+}
+
+.header-menu-item:hover .menu-item-shortcut {
+  color: rgba(255, 255, 255, 0.7);
+}
+

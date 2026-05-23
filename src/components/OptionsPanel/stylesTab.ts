@@ -348,7 +348,17 @@ function createFootnoteSection(): HTMLElement {
   section.className = 'options-section';
   section.innerHTML = `
     <h4 class="section-header">Footnote</h4>
-    ${generateTextFormatControls('dyn-footnote', { showAlignment: false, showBackground: false })}
+    ${generateTextFormatControls('dyn-footnote', { showAlignment: false, showBackground: false, showLetterSpacing: false })}
+    <div class="form-group style-controls-row">
+      ${colorPickerField('Number Color', 'dyn-footnote-number-color')}
+      <label>
+        <span>Gap</span>
+        <div class="input-with-cap">
+          <input type="number" id="dyn-footnote-gap" min="0" max="36" step="1" value="0">
+          <span class="input-cap" data-for="dyn-footnote-gap">pt</span>
+        </div>
+      </label>
+    </div>
   `;
   return section;
 }
@@ -673,6 +683,24 @@ function setupInputHandlers(): void {
     }
   );
 
+  // Footnote number color
+  const fnNumberColor = appState.getProject().fontOptions.footnoteNumberColor
+    || appState.getProject().fontOptions.footnote.color
+    || '#000000';
+  mountColorPicker('dyn-footnote-number-color', fnNumberColor, (color) => {
+    appState.updateFontOptions({ footnoteNumberColor: color });
+  });
+
+  // Footnote gap
+  const gapInput = document.getElementById('dyn-footnote-gap') as HTMLInputElement;
+  if (gapInput) {
+    gapInput.value = (appState.getProject().fontOptions.footnoteGap ?? 0).toString();
+    gapInput.addEventListener('input', () => {
+      const value = parseFloat(gapInput.value);
+      if (!isNaN(value)) appState.updateFontOptions({ footnoteGap: value });
+    });
+  }
+
   // Highlight
   setupHighlightHandlers();
 
@@ -917,6 +945,16 @@ function setupFontDropdowns(): void {
   if (blockquoteDropdown) {
     blockquoteDropdown.setValue(fontOptions.blockquote.fontFamily);
     dynamicFontDropdowns.set('blockquote', blockquoteDropdown);
+  }
+
+  // Footnote - uses styles mode
+  const footnoteDropdown = createStylesFontDropdown('dyn-footnote-font', (value) => {
+    const fonts = appState.getProject().fontOptions;
+    appState.updateFontOptions({ footnote: { ...fonts.footnote, fontFamily: value } });
+  });
+  if (footnoteDropdown) {
+    footnoteDropdown.setValue(fontOptions.footnote.fontFamily);
+    dynamicFontDropdowns.set('footnote', footnoteDropdown);
   }
 
   // Header - uses styles mode

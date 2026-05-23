@@ -72,8 +72,11 @@ export function drawRichLine(
     const text = sanitizeText(span.text);
     const spanWidth = spanWidths[i];
 
-    // Get text color (base color or could be modified for links)
-    const textColor = parseColor(baseStyle.color);
+    // Get text color: footnote numbers, highlights, or base color
+    let textColor = parseColor(baseStyle.color);
+    if (span.footnoteNumber !== undefined && fontOptions.footnoteNumberColor) {
+      textColor = parseColor(fontOptions.footnoteNumberColor);
+    }
 
     // Draw highlight background if needed
     if (span.highlight && fontOptions.highlight) {

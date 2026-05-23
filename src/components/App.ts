@@ -66,6 +66,7 @@ export class App {
 
     // Set up event listeners
     this.setupHeaderButtons();
+    this.setupHeaderMenus();
     this.setupTabs();
     this.setupOptionsTabs();
     this.setupCollapsiblePanels();
@@ -295,6 +296,52 @@ export class App {
       } catch (error) {
         console.error('PDF generation failed:', error);
         alert('Failed to generate PDF. See console for details.');
+      }
+    });
+  }
+
+  private setupHeaderMenus(): void {
+    const viewMenu = document.getElementById('menu-view');
+    const viewBtn = viewMenu?.querySelector('.header-menu-btn');
+    const viewDropdown = viewMenu?.querySelector('.header-menu-dropdown');
+    const toggleSidebarBtn = document.getElementById('menu-toggle-sidebar');
+    const sidebar = document.querySelector('.column-input') as HTMLElement | null;
+    const sidebarResizer = sidebar?.nextElementSibling as HTMLElement | null;
+
+    if (!viewMenu || !viewBtn || !viewDropdown || !toggleSidebarBtn || !sidebar) return;
+
+    const toggleSidebar = () => {
+      const isHidden = sidebar.classList.toggle('sidebar-hidden');
+      const label = toggleSidebarBtn.querySelector('.menu-item-label');
+      if (label) label.textContent = isHidden ? 'Show Files Sidebar' : 'Hide Files Sidebar';
+      // Close the menu
+      viewDropdown.classList.add('hidden');
+      viewMenu.classList.remove('open');
+      // Resize the editor after layout settles
+      setTimeout(() => this.spreadEditor.resize(), 250);
+    };
+
+    toggleSidebarBtn.addEventListener('click', toggleSidebar);
+
+    // Open/close the View dropdown
+    viewBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = viewDropdown.classList.toggle('hidden');
+      viewMenu.classList.toggle('open', !isOpen);
+    });
+
+    // Close on outside click
+    document.addEventListener('click', () => {
+      viewDropdown.classList.add('hidden');
+      viewMenu.classList.remove('open');
+    });
+    viewDropdown.addEventListener('click', (e) => e.stopPropagation());
+
+    // Keyboard shortcut: Cmd+\ (Mac) or Ctrl+\ (Windows/Linux)
+    document.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === '\\') {
+        e.preventDefault();
+        toggleSidebar();
       }
     });
   }

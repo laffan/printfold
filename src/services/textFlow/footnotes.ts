@@ -207,14 +207,16 @@ export function measureFootnoteBlockHeight(
   if (footnotes.length === 0) return 0;
   const style = fontOptions.footnote;
   const lineHeight = (style.lineHeight ?? layoutOptions.lineHeight) * style.fontSize;
-  // Reserve: rule + small top gap + per-footnote lines + bottom gap.
+  const footnoteGap = fontOptions.footnoteGap ?? 0;
+  // Reserve: rule + small top gap + per-footnote lines + gaps + bottom gap.
   const rule = FOOTNOTE_RULE_GAP + FOOTNOTE_RULE_THICKNESS + FOOTNOTE_RULE_GAP;
   let lines = 0;
   for (const f of footnotes) {
     const text = `${f.number}. ${f.content}`;
     lines += estimateWrappedLineCount(ctx, text, contentWidth, style);
   }
-  return rule + lines * lineHeight;
+  const totalGap = Math.max(0, footnotes.length - 1) * footnoteGap;
+  return rule + lines * lineHeight + totalGap;
 }
 
 /** Layout constants shared with the renderers (canvas and PDF). */
