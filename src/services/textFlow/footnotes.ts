@@ -280,15 +280,21 @@ export function collectFootnoteNumbersOnPage(page: PageContent): number[] {
     // recursively reserve a footnote block at the page bottom.
     if (section.type === 'endnote' || section.type === 'endnoteHeader') continue;
     const lines = (section as { richLines?: RichTextLine[] }).richLines;
-    if (lines) {
+    if (lines && lines.length > 0) {
+      // Rich-text section: the slice of lines that landed on this page is
+      // the source of truth. Pagination splits a paragraph by slicing its
+      // richLines, but the section's `footnoteRefs` array is the union of
+      // refs across the WHOLE original paragraph — using it here would
+      // make every page slice claim every footnote.
       for (const line of lines) {
         for (const span of line.spans) {
           if (span.footnoteNumber !== undefined) add(span.footnoteNumber);
         }
       }
+      continue;
     }
-    // Sections that don't produce rich lines (headings, lists) still carry
-    // their referenced footnote numbers from the parsing pass.
+    // Non-rich sections (headings, lists, etc.) don't split across pages,
+    // so their footnoteRefs are accurate as-is.
     if (section.footnoteRefs) {
       for (const n of section.footnoteRefs) add(n);
     }
