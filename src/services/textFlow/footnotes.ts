@@ -298,22 +298,20 @@ export function collectFootnoteNumbersOnPage(page: PageContent): number[] {
 
 /**
  * Build the synthetic endnote sections appended to the document when
- * `showFootnotesAsEndnotes` is enabled. For 'document' placement the
- * returned array is flushed once at the very end; for 'chapter' placement
- * the caller should call this with a per-chapter slice.
+ * `showFootnotesAsEndnotes` is enabled. The block starts with an `hr`
+ * (which pagination treats as a hard page break) so endnotes always begin
+ * on a fresh page rather than running on from the previous body content.
  */
 export function buildEndnoteSections(
   footnotes: FootnoteDefinition[],
-  heading = 'Endnotes',
 ): DocumentSection[] {
   if (footnotes.length === 0) return [];
   const sections: DocumentSection[] = [];
   sections.push({
     id: crypto.randomUUID(),
-    type: 'endnoteHeader',
-    level: 2,
-    content: heading,
-    rawMarkdown: `## ${heading}`,
+    type: 'hr',
+    content: '',
+    rawMarkdown: '---',
   });
   for (const f of footnotes) {
     const prefixed = `${f.number}. ${f.content}`;
@@ -347,7 +345,7 @@ export function injectChapterEndnotes(
 
   const flushPending = () => {
     if (pending.length === 0) return;
-    result.push(...buildEndnoteSections(pending, 'Endnotes'));
+    result.push(...buildEndnoteSections(pending));
     pending = [];
   };
 

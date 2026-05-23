@@ -449,6 +449,9 @@ function wrapSpansToLines(
  * Check if two spans have the same styling
  */
 function spansHaveSameStyle(a: TextSpan, b: TextSpan): boolean {
+  // Footnote-marker spans must never merge with their neighbours — the
+  // footnoteNumber and the smaller superscript size are span-specific.
+  if (a.footnoteNumber !== undefined || b.footnoteNumber !== undefined) return false;
   return (
     a.bold === b.bold &&
     a.italic === b.italic &&
