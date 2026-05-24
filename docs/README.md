@@ -262,6 +262,7 @@ Main application orchestrator.
 - Welcome-screen-driven project lifecycle (New / Open / Recent)
 - Auto-save loop (debounced writes to the bound `.printfold` file)
 - Header button handlers (Projects, Save fallback, Export)
+- Sidebar toggle (Cmd+\\) and collapsible preview pane
 - Tab and panel management
 - State listener setup
 - Reflow triggering
@@ -312,6 +313,9 @@ Konva.js-based visual editor for spreads.
 - Right-click context menu with align/distribute
 - Zoom and pan
 - Keyboard shortcuts
+- Cursor sync: clicking in the markdown editor navigates to the
+  corresponding page; optional red-dot indicator shows the cursor
+  position on the rendered text (toggle in the preview header)
 
 ---
 
@@ -451,8 +455,14 @@ The left-hand Files panel is split into three tabs:
 | **Fonts** | `.ttf`, `.otf`, `.woff` | Each file is registered via `@font-face` and appears at the top of every font dropdown under a "Custom Fonts" heading; usable in body/headings/headers/footers and on static-page text items |
 
 Files in every tab can be dragged into the panel or added via the
-"+ Files" button. Selecting a font shows a sample preview (Aa, pangram,
-digits) in the preview pane below the list.
+"+ Files" button. Each file row shows edit (pencil) and remove (×)
+icons on hover. The edit button opens the file in the preview pane
+below the list; the close (×) button on the preview header hides the
+pane entirely. The sidebar toggle (icon in the Editor/Preview tab
+row, or **Cmd+\\**) collapses the entire left column.
+
+Selecting a font shows a sample preview (Aa, pangram, digits) in the
+preview pane.
 
 ### Static Spreads
 
@@ -569,7 +579,17 @@ References appear as superscript numbers inline. Numbering is sequential
 through the document (a reference to the same id repeats the same
 number). The body styling of footnote/endnote text is controlled by the
 **Footnote** entry in the Styles tab, which appears whenever the
-markdown contains a definition.
+markdown contains a definition. The Footnote section includes:
+
+- **Font, Size, Line Height** — standard typography controls.
+- **Number Color** — sets the color for footnote reference numbers,
+  both the inline superscript in body text and the number prefix in
+  the footnote block. Falls back to the footnote text color when unset.
+  Stored as `FontOptions.footnoteNumberColor`.
+- **Gap** — vertical spacing (in points) between individual footnotes
+  in the on-page block. Stored as `FontOptions.footnoteGap`; defaults
+  to 0. The gap is included in the pagination height reservation so
+  body text reflows correctly.
 
 Reservations are monotonically non-decreasing across reflow iterations
 so a marker sitting exactly at a page boundary can't oscillate between
@@ -581,7 +601,7 @@ reservation height, endnote section synthesis),
 `services/textFlow/TextFlowEngine.ts` (iterative reflow loop),
 `components/SpreadEditor/content.ts` and
 `services/pdfGenerator/PDFGenerator.ts` (footnote block + superscript
-rendering).
+rendering), `OptionsPanel/stylesTab.ts` (Footnote section UI).
 
 ### Imposition
 
@@ -767,7 +787,7 @@ npm run build:electron  # Production electron build
 | Feature | Files |
 |---------|-------|
 | Text Layout | `textFlow/` (parsing, measurement, pagination, imposition) |
-| Footnotes | `textFlow/footnotes.ts`, `textFlow/TextFlowEngine.ts` (iterative reservation), `SpreadEditor/content.ts` + `pdfGenerator/PDFGenerator.ts` (rendering), `OptionsPanel/layoutOptions.ts` (Document-tab toggle) |
+| Footnotes | `textFlow/footnotes.ts`, `textFlow/TextFlowEngine.ts` (iterative reservation), `SpreadEditor/content.ts` + `pdfGenerator/PDFGenerator.ts` (rendering), `pdfGenerator/textUtils.ts` (inline number color), `OptionsPanel/layoutOptions.ts` (Document-tab toggle), `OptionsPanel/stylesTab.ts` (number color + gap) |
 | Text-Flow Items | `textFlow/slotFlow.ts`, `textFlow/polygonPath.ts`, `SpreadEditor/items/textFlowRendering.ts`, `SpreadEditor/items/vertexHandles.ts` |
 | PDF Export | `pdfGenerator/`, `pageRenderer.ts` (pre-rendering, fonts, images, itemDrawing) |
 | Page Export | `pageExport.ts` (PNG export, image replacement for static pages) |
@@ -783,6 +803,8 @@ npm run build:electron  # Production electron build
 | Project Lifecycle | `WelcomeScreen.ts`, `App.ts` (auto-save loop), `projectFile.ts`, `recentProjects.ts` |
 | Settings UI | `OptionsPanel/` |
 | Styles Tab Accordion | `OptionsPanel/stylesTab.ts` (signature-gated rebuild, per-section `accordion-section`) |
+| Cursor Sync | `FilePreview.ts` (cursor-to-page mapping via `extractFootnotes` + normalized text matching), `SpreadEditor/component.ts` (red dot + flash rendering), `types/index.ts` (`CursorMark`) |
+| Sidebar Toggle | `App.ts` (`setupHeaderMenus`), `styles/modules/layout.css` (`.sidebar-hidden`), `index.html` (`#btn-toggle-sidebar`) |
 | Styles | `styles/modules/` (12 modular CSS files) |
 
 ### Important Constants
