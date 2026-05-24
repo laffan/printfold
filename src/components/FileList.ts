@@ -245,8 +245,9 @@ export class FileList {
     // Add drag handle for text files
     const dragHandle = isTextFile ? '<span class="drag-handle" title="Drag to reorder">⋮⋮</span>' : '';
 
+    const editBtn = '<button class="btn btn-icon btn-small btn-edit-file" title="Edit file">✎</button>';
+
     if (isImageFile && file.isBase64) {
-      // Image file: show thumbnail
       item.className = 'file-item file-item-image';
       item.innerHTML = `
         <div class="file-thumbnail">
@@ -254,11 +255,11 @@ export class FileList {
         </div>
         <span class="file-name" title="${file.name}">${file.name}</span>
         <div class="file-actions">
+          ${editBtn}
           <button class="btn btn-icon btn-remove" title="Remove file">×</button>
         </div>
       `;
     } else if (isFontFile) {
-      // Font file: render the family name in its own typeface as a live preview.
       item.classList.add('file-item-text', 'file-item-font');
       const family = file.name.replace(/\.[^.]+$/, '');
       const icon = this.getFileIcon(file.type);
@@ -266,11 +267,11 @@ export class FileList {
         <span class="file-icon">${icon}</span>
         <span class="file-name file-font-preview" title="${file.name}" style="font-family: '${family.replace(/'/g, "\\'")}', sans-serif;">${family}</span>
         <div class="file-actions">
+          ${editBtn}
           <button class="btn btn-icon btn-remove" title="Remove file">×</button>
         </div>
       `;
     } else {
-      // Text file: show icon and name
       item.classList.add('file-item-text');
       const icon = this.getFileIcon(file.type);
       item.innerHTML = `
@@ -278,6 +279,7 @@ export class FileList {
         <span class="file-icon">${icon}</span>
         <span class="file-name" title="${file.name}">${file.name}</span>
         <div class="file-actions">
+          ${editBtn}
           <button class="btn btn-icon btn-remove" title="Remove file">×</button>
         </div>
       `;
@@ -366,6 +368,22 @@ export class FileList {
       this.selectedFileId = file.id;
       this.render();
       this.onFileSelect?.(file);
+    });
+
+    // Edit file — open in preview panel
+    const editFileBtn = item.querySelector('.btn-edit-file');
+    editFileBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.selectedFileId = file.id;
+      this.render();
+      this.onFileSelect?.(file);
+      // Ensure preview panel is expanded
+      const previewPanel = document.querySelector('.panel-preview');
+      const filesPanel = document.querySelector('.panel-files');
+      if (previewPanel?.classList.contains('collapsed')) {
+        previewPanel.classList.remove('collapsed');
+        filesPanel?.classList.remove('expanded');
+      }
     });
 
     // Remove file

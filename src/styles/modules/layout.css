@@ -110,16 +110,26 @@
   justify-content: space-between;
 }
 
-#btn-toggle-sidebar {
+.sidebar-toggle-btn {
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
   opacity: 0.6;
-  transition: opacity 0.15s;
+  transition: all 0.15s ease;
 }
 
-#btn-toggle-sidebar:hover {
+.sidebar-toggle-btn:hover {
   opacity: 1;
+  color: var(--color-text);
+  background: var(--color-bg-hover);
 }
 
-#btn-toggle-sidebar.active {
+.sidebar-toggle-btn.active {
   opacity: 1;
   color: var(--color-text);
   background: var(--color-bg-tertiary);

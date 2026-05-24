@@ -28,6 +28,13 @@
   display: none;
 }
 
+.panel-header-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-left: auto;
+}
+
 #btn-cursor-sync {
   opacity: 0.4;
   transition: opacity 0.15s;
@@ -39,6 +46,16 @@
 
 #btn-cursor-sync:hover {
   opacity: 0.8;
+}
+
+.btn-edit-file {
+  font-size: 11px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.file-item:hover .btn-edit-file {
+  opacity: 1;
 }
 
 .file-list {

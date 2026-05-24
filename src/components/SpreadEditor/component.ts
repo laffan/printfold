@@ -378,19 +378,16 @@ export class SpreadEditor {
     });
     this.layer.add(flash);
 
-    // Draw red cursor dot if cursor sync is active
     const mark = appState.getEditor().cursorMark;
     if (mark && mark.pageNumber === pageNumber) {
       const page = isVerso ? spread.verso : spread.recto;
       if (page) {
-        const dotY = this.computeCursorDotY(page, pageX, pageDimensions, mark.sectionRaw, mark.charFraction);
-        if (dotY !== null) {
-          const margins = getMarginsForPage(page.pageNumber);
-          const leftMargin = page.isRecto ? margins.inner : margins.outer;
+        const pos = this.computeCursorPosition(page, pageX, mark.sectionRaw, mark.charFraction);
+        if (pos) {
           const dot = new Konva.Circle({
             name: 'cursor-dot',
-            x: pageX + leftMargin - 6,
-            y: dotY,
+            x: pos.x,
+            y: pos.y,
             radius: 4,
             fill: '#e74c3c',
             opacity: 0.9,
@@ -414,7 +411,6 @@ export class SpreadEditor {
     });
     tween.play();
 
-    // Fade out the cursor dot after a delay
     const dotNode = this.layer.findOne('.cursor-dot');
     if (dotNode) {
       setTimeout(() => {
@@ -439,15 +435,16 @@ export class SpreadEditor {
     }, 3000);
   }
 
-  private computeCursorDotY(
+  private computeCursorPosition(
     page: PageContent,
     pageX: number,
-    pageDimensions: { width: number; height: number },
     sectionRaw: string,
     charFraction: number,
-  ): number | null {
+  ): { x: number; y: number } | null {
     const project = appState.getProject();
     const margins = getMarginsForPage(page.pageNumber);
+    const leftMargin = page.isRecto ? margins.inner : margins.outer;
+    const contentX = pageX + leftMargin;
     let currentY = margins.top;
 
     for (const section of page.sections) {
@@ -462,19 +459,42 @@ export class SpreadEditor {
         }
       }
 
-      const measuredSection = section as any;
-      const lines = measuredSection.richLines || measuredSection.lines || [section.content];
-      const lineCount = Array.isArray(lines) ? lines.length : 1;
+      const ms = section as any;
+      const plainLines: string[] = ms.lines || [section.content];
+      const lineCount = plainLines.length;
       const sectionHeight = lineCount * lineHeight;
 
       if (section.rawMarkdown === sectionRaw) {
-        const lineIndex = Math.floor(charFraction * lineCount);
-        return currentY + lineIndex * lineHeight + lineHeight / 2;
+        const charPos = Math.floor(charFraction * (section.content?.length || 1));
+        let consumed = 0;
+        for (let li = 0; li < plainLines.length; li++) {
+          const lineLen = plainLines[li].length;
+          if (consumed + lineLen >= charPos || li === plainLines.length - 1) {
+            const posInLine = charPos - consumed;
+            const textBefore = plainLines[li].substring(0, Math.min(posInLine, lineLen));
+            const xOffset = this.measureText(textBefore, fontStyle);
+            return {
+              x: contentX + xOffset,
+              y: currentY + li * lineHeight + lineHeight / 2,
+            };
+          }
+          consumed += lineLen + 1;
+        }
+        return { x: contentX, y: currentY + lineHeight / 2 };
       }
 
       currentY += sectionHeight + project.layoutOptions.paragraphSpacing;
     }
     return null;
+  }
+
+  private measureText(text: string, style: { fontFamily: string; fontSize: number; fontWeight: string; fontStyle: string }): number {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return 0;
+    const quoted = style.fontFamily.includes(' ') ? `"${style.fontFamily}"` : style.fontFamily;
+    ctx.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize}px ${quoted}`;
+    return ctx.measureText(text).width;
   }
 
   private setupControls(): void {
