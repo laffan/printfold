@@ -39,17 +39,6 @@
         <span class="logo">📖</span>
         <h1>PrintFold</h1>
       </div>
-      <div class="header-menus">
-        <div class="header-menu" id="menu-view">
-          <button class="header-menu-btn">View</button>
-          <div class="header-menu-dropdown hidden">
-            <button class="header-menu-item" id="menu-toggle-sidebar">
-              <span class="menu-item-label">Hide Files Sidebar</span>
-              <span class="menu-item-shortcut">⌘\</span>
-            </button>
-          </div>
-        </div>
-      </div>
       <div class="header-actions">
         <span id="project-name-display" class="project-name-display"></span>
         <span id="save-status" class="save-status" aria-live="polite"></span>
@@ -79,6 +68,9 @@
         <div class="panel panel-preview">
           <div class="panel-header collapsible">
             <span id="preview-filename" class="filename"></span>
+            <button id="btn-cursor-sync" class="btn btn-icon btn-small" title="Show cursor position in editor" style="display: none;">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="4" fill="#e74c3c" opacity="0.8"/></svg>
+            </button>
             <button id="btn-download-file" class="btn btn-icon btn-small" title="Download file" style="display: none;">↓</button>
             <span class="collapse-icon">▼</span>
           </div>
@@ -96,6 +88,7 @@
       <!-- Column 2: Editor / Preview -->
       <section class="column column-editor">
         <div class="column-header">
+          <button id="btn-toggle-sidebar" class="tab" title="Toggle Files Sidebar (⌘\)">Files</button>
           <div class="tabs" role="tablist">
             <button class="tab active" role="tab" data-tab="editor" aria-selected="true">Editor</button>
             <button class="tab" role="tab" data-tab="preview" aria-selected="false">Preview</button>

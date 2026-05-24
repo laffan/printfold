@@ -15,6 +15,8 @@ export class FilePreview {
   private container!: HTMLElement;
   private filenameSpan!: HTMLElement;
   private downloadBtn!: HTMLButtonElement;
+  private cursorSyncBtn!: HTMLButtonElement;
+  private cursorSyncEnabled = false;
   private editor: EditorView | null = null;
   private currentFile: ProjectFile | null = null;
   private updateTimeout: number | null = null;
@@ -23,12 +25,16 @@ export class FilePreview {
     this.container = document.getElementById('file-preview')!;
     this.filenameSpan = document.getElementById('preview-filename')!;
     this.downloadBtn = document.getElementById('btn-download-file') as HTMLButtonElement;
+    this.cursorSyncBtn = document.getElementById('btn-cursor-sync') as HTMLButtonElement;
 
-    // Setup download button handler
     this.downloadBtn.addEventListener('click', () => this.downloadCurrentFile());
 
-    // Listen for file selection from FileList
-    // This is connected through App component
+    this.cursorSyncBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.cursorSyncEnabled = !this.cursorSyncEnabled;
+      this.cursorSyncBtn.classList.toggle('active', this.cursorSyncEnabled);
+    });
+
     this.showPlaceholder();
   }
 
@@ -38,11 +44,13 @@ export class FilePreview {
     if (!file) {
       this.showPlaceholder();
       this.downloadBtn.style.display = 'none';
+      this.cursorSyncBtn.style.display = 'none';
       return;
     }
 
     this.filenameSpan.textContent = file.name;
     this.downloadBtn.style.display = 'inline-flex';
+    this.cursorSyncBtn.style.display = file.type === 'markdown' ? 'inline-flex' : 'none';
 
     switch (file.type) {
       case 'markdown':
@@ -176,7 +184,6 @@ export class FilePreview {
       const markdownFiles = project.files.filter(f => f.type === 'markdown');
       if (markdownFiles.length === 0) return;
 
-      // Find the cursor's character offset within the concatenated markdown
       let charOffset = 0;
       let foundFile = false;
       for (const file of markdownFiles) {
@@ -185,14 +192,15 @@ export class FilePreview {
           charOffset += Math.min(pos, file.content.length);
           break;
         }
-        charOffset += file.content.length + 2; // +2 for '\n\n' separator
+        charOffset += file.content.length + 2;
       }
       if (!foundFile) return;
 
-      // Walk pages in order, accumulating raw markdown offsets to find
-      // which page contains text around the cursor position.
       const combinedMarkdown = markdownFiles.map(f => f.content).join('\n\n');
       let bestPage = 1;
+      let bestSection = '';
+      let bestFraction = 0;
+
       for (const sig of project.signatures) {
         for (const spread of sig.spreads) {
           for (const page of [spread.verso, spread.recto]) {
@@ -203,17 +211,28 @@ export class FilePreview {
               const idx = combinedMarkdown.indexOf(section.rawMarkdown);
               if (idx === -1) continue;
               if (idx <= charOffset && charOffset <= idx + section.rawMarkdown.length) {
-                appState.updateEditor({ selectedPageNumber: page.pageNumber });
+                const fraction = section.rawMarkdown.length > 0
+                  ? (charOffset - idx) / section.rawMarkdown.length
+                  : 0;
+                const mark = this.cursorSyncEnabled
+                  ? { pageNumber: page.pageNumber, sectionRaw: section.rawMarkdown, charFraction: fraction }
+                  : null;
+                appState.updateEditor({ selectedPageNumber: page.pageNumber, cursorMark: mark });
                 return;
               }
               if (idx <= charOffset) {
                 bestPage = page.pageNumber;
+                bestSection = section.rawMarkdown;
+                bestFraction = 1;
               }
             }
           }
         }
       }
-      appState.updateEditor({ selectedPageNumber: bestPage });
+      const mark = this.cursorSyncEnabled
+        ? { pageNumber: bestPage, sectionRaw: bestSection, charFraction: bestFraction }
+        : null;
+      appState.updateEditor({ selectedPageNumber: bestPage, cursorMark: mark });
     }, 150);
   }
 

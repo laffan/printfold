@@ -567,6 +567,13 @@ export function formatMarginValue(points: number, unit: MarginUnit): string {
   return `${value}${conv.label}`;
 }
 
+// Cursor mark for syncing the text editor cursor to the rendered page.
+export interface CursorMark {
+  pageNumber: number;
+  sectionRaw: string;
+  charFraction: number; // 0–1 within the matched section
+}
+
 // Editor state
 export interface EditorState {
   selectedPageNumber: number | null;
@@ -581,4 +588,5 @@ export interface EditorState {
   activeTab: 'editor' | 'preview';
   marginUnit: MarginUnit;
   clipboard: PageItem[]; // Clipboard for copy/paste
+  cursorMark: CursorMark | null;
 }

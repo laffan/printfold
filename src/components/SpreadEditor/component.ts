@@ -11,7 +11,7 @@ import type { MarginLine, MarginLabel } from './types';
 import { createItemNode, renderPageItems } from './items';
 import { renderThumbnails } from './thumbnails';
 import { drawMarginGuides, getMarginsForPage } from './margins';
-import { drawPageContent } from './content';
+import { drawPageContent, getFontStyleForSection } from './content';
 import { switchToSelectedTab } from '../OptionsPanel/editPage';
 import { createSelectionMarquee, showContextMenu, createItemContextMenu, hideContextMenu } from './selection';
 
@@ -298,6 +298,9 @@ export class SpreadEditor {
       // Navigate to selected page
       if (state.selectedPageNumber !== null && state.selectedPageNumber !== prevState.selectedPageNumber) {
         this.navigateToPage(state.selectedPageNumber);
+      } else if (state.cursorMark && state.cursorMark !== prevState.cursorMark && state.selectedPageNumber !== null) {
+        // Cursor moved within the same page — show the dot without navigating
+        this.navigateToPage(state.selectedPageNumber);
       }
       // Re-render when margin unit changes (to update labels)
       if (state.marginUnit !== prevState.marginUnit) {
@@ -354,18 +357,18 @@ export class SpreadEditor {
   private flashPage(spread: VisualSpread, pageNumber: number): void {
     const pageDimensions = this.getPageDimensions();
     const isVerso = spread.verso?.pageNumber === pageNumber;
-    const x = isVerso ? 0 : pageDimensions.width;
+    const pageX = isVerso ? 0 : pageDimensions.width;
 
-    // Remove any existing flash overlay
     if (this.flashTimeout) {
       clearTimeout(this.flashTimeout);
       this.flashTimeout = null;
     }
     this.layer.find('.cursor-flash').forEach(n => n.destroy());
+    this.layer.find('.cursor-dot').forEach(n => n.destroy());
 
     const flash = new Konva.Rect({
       name: 'cursor-flash',
-      x,
+      x: pageX,
       y: 0,
       width: pageDimensions.width,
       height: pageDimensions.height,
@@ -374,9 +377,32 @@ export class SpreadEditor {
       listening: false,
     });
     this.layer.add(flash);
+
+    // Draw red cursor dot if cursor sync is active
+    const mark = appState.getEditor().cursorMark;
+    if (mark && mark.pageNumber === pageNumber) {
+      const page = isVerso ? spread.verso : spread.recto;
+      if (page) {
+        const dotY = this.computeCursorDotY(page, pageX, pageDimensions, mark.sectionRaw, mark.charFraction);
+        if (dotY !== null) {
+          const margins = getMarginsForPage(page.pageNumber);
+          const leftMargin = page.isRecto ? margins.inner : margins.outer;
+          const dot = new Konva.Circle({
+            name: 'cursor-dot',
+            x: pageX + leftMargin - 6,
+            y: dotY,
+            radius: 4,
+            fill: '#e74c3c',
+            opacity: 0.9,
+            listening: false,
+          });
+          this.layer.add(dot);
+        }
+      }
+    }
+
     this.layer.draw();
 
-    // Fade out over 600ms
     const tween = new Konva.Tween({
       node: flash,
       duration: 0.6,
@@ -387,11 +413,68 @@ export class SpreadEditor {
       },
     });
     tween.play();
+
+    // Fade out the cursor dot after a delay
+    const dotNode = this.layer.findOne('.cursor-dot');
+    if (dotNode) {
+      setTimeout(() => {
+        const dotTween = new Konva.Tween({
+          node: dotNode,
+          duration: 1.5,
+          opacity: 0,
+          onFinish: () => {
+            dotNode.destroy();
+            this.layer.draw();
+          },
+        });
+        dotTween.play();
+      }, 800);
+    }
+
     this.flashTimeout = setTimeout(() => {
-      flash.destroy();
+      this.layer.find('.cursor-flash').forEach(n => n.destroy());
+      this.layer.find('.cursor-dot').forEach(n => n.destroy());
       this.layer.draw();
       this.flashTimeout = null;
-    }, 700);
+    }, 3000);
+  }
+
+  private computeCursorDotY(
+    page: PageContent,
+    pageX: number,
+    pageDimensions: { width: number; height: number },
+    sectionRaw: string,
+    charFraction: number,
+  ): number | null {
+    const project = appState.getProject();
+    const margins = getMarginsForPage(page.pageNumber);
+    let currentY = margins.top;
+
+    for (const section of page.sections) {
+      const fontStyle = getFontStyleForSection(section.type, section.level);
+      const lineHeight = (fontStyle.lineHeight ?? project.layoutOptions.lineHeight) * fontStyle.fontSize;
+
+      if (section.type === 'heading') {
+        switch (section.level) {
+          case 1: currentY += project.layoutOptions.spacingAboveH1; break;
+          case 2: currentY += project.layoutOptions.spacingAboveH2; break;
+          case 3: currentY += project.layoutOptions.spacingAboveH3; break;
+        }
+      }
+
+      const measuredSection = section as any;
+      const lines = measuredSection.richLines || measuredSection.lines || [section.content];
+      const lineCount = Array.isArray(lines) ? lines.length : 1;
+      const sectionHeight = lineCount * lineHeight;
+
+      if (section.rawMarkdown === sectionRaw) {
+        const lineIndex = Math.floor(charFraction * lineCount);
+        return currentY + lineIndex * lineHeight + lineHeight / 2;
+      }
+
+      currentY += sectionHeight + project.layoutOptions.paragraphSpacing;
+    }
+    return null;
   }
 
   private setupControls(): void {

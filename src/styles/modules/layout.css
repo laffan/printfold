@@ -105,9 +105,24 @@
   border-radius: var(--radius-md);
 }
 
-/* Editor column header: tabs aligned to the right */
+/* Editor column header: Files toggle left, tabs right */
 .column-editor .column-header {
-  justify-content: flex-end;
+  justify-content: space-between;
+}
+
+#btn-toggle-sidebar {
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+#btn-toggle-sidebar:hover {
+  opacity: 1;
+}
+
+#btn-toggle-sidebar.active {
+  opacity: 1;
+  color: var(--color-text);
+  background: var(--color-bg-tertiary);
 }
 
 .column-header h2 {

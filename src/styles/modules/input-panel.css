@@ -28,6 +28,19 @@
   display: none;
 }
 
+#btn-cursor-sync {
+  opacity: 0.4;
+  transition: opacity 0.15s;
+}
+
+#btn-cursor-sync.active {
+  opacity: 1;
+}
+
+#btn-cursor-sync:hover {
+  opacity: 0.8;
+}
+
 .file-list {
   flex: 1;
   overflow: hidden;

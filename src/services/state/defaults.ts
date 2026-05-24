@@ -134,6 +134,7 @@ export const defaultEditorState: EditorState = {
   activeTab: 'editor',
   marginUnit: 'in',
   clipboard: [],
+  cursorMark: null,
 };
 
 export function createEmptyProject(): BookletProject {
