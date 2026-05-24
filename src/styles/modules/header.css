@@ -1,5 +1,6 @@
 /* Header */
 .app-header {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -45,14 +46,17 @@
 }
 
 .project-name-display {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   font-size: 12px;
   font-weight: 700;
   color: var(--color-text-muted);
-  max-width: 240px;
+  max-width: 300px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  -webkit-app-region: no-drag;
+  pointer-events: none;
 }
 
 .save-status {
