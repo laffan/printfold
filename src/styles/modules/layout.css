@@ -111,15 +111,16 @@
 }
 
 .sidebar-toggle-btn {
-  padding: 4px 12px;
-  font-size: 12px;
-  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
   color: var(--color-text-secondary);
   background: transparent;
   border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  opacity: 0.6;
+  opacity: 0.5;
   transition: all 0.15s ease;
 }
 
@@ -130,9 +131,8 @@
 }
 
 .sidebar-toggle-btn.active {
-  opacity: 1;
+  opacity: 0.8;
   color: var(--color-text);
-  background: var(--color-bg-tertiary);
 }
 
 .column-header h2 {

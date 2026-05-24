@@ -377,12 +377,13 @@ export class FileList {
       this.selectedFileId = file.id;
       this.render();
       this.onFileSelect?.(file);
-      // Ensure preview panel is expanded
       const previewPanel = document.querySelector('.panel-preview');
       const filesPanel = document.querySelector('.panel-files');
+      const previewResizer = document.querySelector('[data-resizer="files-preview"]') as HTMLElement | null;
       if (previewPanel?.classList.contains('collapsed')) {
         previewPanel.classList.remove('collapsed');
         filesPanel?.classList.remove('expanded');
+        if (previewResizer) previewResizer.style.display = '';
       }
     });
 

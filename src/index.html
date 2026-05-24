@@ -90,7 +90,12 @@
       <!-- Column 2: Editor / Preview -->
       <section class="column column-editor">
         <div class="column-header">
-          <button id="btn-toggle-sidebar" class="sidebar-toggle-btn" title="Toggle Files Sidebar (⌘\)">Files</button>
+          <button id="btn-toggle-sidebar" class="sidebar-toggle-btn" title="Toggle Files Sidebar (⌘\)">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="1" y="2" width="14" height="12" rx="1.5"/>
+              <line x1="5.5" y1="2" x2="5.5" y2="14"/>
+            </svg>
+          </button>
           <div class="tabs" role="tablist">
             <button class="tab active" role="tab" data-tab="editor" aria-selected="true">Editor</button>
             <button class="tab" role="tab" data-tab="preview" aria-selected="false">Preview</button>

@@ -20,11 +20,6 @@
 }
 
 .panel-preview.collapsed {
-  flex: 0 0 auto;
-  min-height: 0;
-}
-
-.panel-preview.collapsed .file-preview {
   display: none;
 }
 
@@ -50,12 +45,6 @@
 
 .btn-edit-file {
   font-size: 11px;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-
-.file-item:hover .btn-edit-file {
-  opacity: 1;
 }
 
 .file-list {

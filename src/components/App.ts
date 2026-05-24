@@ -449,14 +449,17 @@ export class App {
       }
     });
 
-    // Handle preview panel close button
-    const previewPanel = document.querySelector('.panel-preview');
+    // Handle preview panel close button — fully hides the preview pane
+    const previewPanel = document.querySelector('.panel-preview') as HTMLElement | null;
     const filesPanel = document.querySelector('.panel-files');
+    const previewResizer = document.querySelector('[data-resizer="files-preview"]') as HTMLElement | null;
     const closePreviewBtn = document.getElementById('btn-close-preview');
     if (previewPanel && closePreviewBtn) {
       closePreviewBtn.addEventListener('click', () => {
-        previewPanel.classList.toggle('collapsed');
-        filesPanel?.classList.toggle('expanded', previewPanel.classList.contains('collapsed'));
+        previewPanel.classList.add('collapsed');
+        filesPanel?.classList.add('expanded');
+        if (previewResizer) previewResizer.style.display = 'none';
+        this.filePreview.showFile(null);
       });
     }
   }
