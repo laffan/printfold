@@ -363,8 +363,8 @@ export class SpreadEditor {
       clearTimeout(this.flashTimeout);
       this.flashTimeout = null;
     }
-    this.layer.find('.cursor-flash').forEach(n => n.destroy());
-    this.layer.find('.cursor-dot').forEach(n => n.destroy());
+    this.layer.find('.cursor-flash').forEach(n => { n.destroy(); });
+    this.layer.find('.cursor-dot').forEach(n => { n.destroy(); });
 
     const flash = new Konva.Rect({
       name: 'cursor-flash',
@@ -382,7 +382,7 @@ export class SpreadEditor {
     if (mark && mark.pageNumber === pageNumber) {
       const page = isVerso ? spread.verso : spread.recto;
       if (page) {
-        const pos = this.computeCursorPosition(page, pageX, mark.sectionRaw, mark.charFraction);
+        const pos = this.computeCursorPosition(page, pageX, mark.sectionIndex, mark.lineIndex, mark.charInLine);
         if (pos) {
           const dot = new Konva.Circle({
             name: 'cursor-dot',
@@ -400,7 +400,7 @@ export class SpreadEditor {
 
     this.layer.draw();
 
-    const tween = new Konva.Tween({
+    new Konva.Tween({
       node: flash,
       duration: 0.6,
       opacity: 0,
@@ -408,13 +408,13 @@ export class SpreadEditor {
         flash.destroy();
         this.layer.draw();
       },
-    });
-    tween.play();
+    }).play();
 
     const dotNode = this.layer.findOne('.cursor-dot');
     if (dotNode) {
       setTimeout(() => {
-        const dotTween = new Konva.Tween({
+        if (!dotNode.getLayer()) return;
+        new Konva.Tween({
           node: dotNode,
           duration: 1.5,
           opacity: 0,
@@ -422,14 +422,13 @@ export class SpreadEditor {
             dotNode.destroy();
             this.layer.draw();
           },
-        });
-        dotTween.play();
+        }).play();
       }, 800);
     }
 
     this.flashTimeout = setTimeout(() => {
-      this.layer.find('.cursor-flash').forEach(n => n.destroy());
-      this.layer.find('.cursor-dot').forEach(n => n.destroy());
+      this.layer.find('.cursor-flash').forEach(n => { n.destroy(); });
+      this.layer.find('.cursor-dot').forEach(n => { n.destroy(); });
       this.layer.draw();
       this.flashTimeout = null;
     }, 3000);
@@ -438,8 +437,9 @@ export class SpreadEditor {
   private computeCursorPosition(
     page: PageContent,
     pageX: number,
-    sectionRaw: string,
-    charFraction: number,
+    sectionIndex: number,
+    lineIndex: number,
+    charInLine: number,
   ): { x: number; y: number } | null {
     const project = appState.getProject();
     const margins = getMarginsForPage(page.pageNumber);
@@ -447,7 +447,8 @@ export class SpreadEditor {
     const contentX = pageX + leftMargin;
     let currentY = margins.top;
 
-    for (const section of page.sections) {
+    for (let si = 0; si < page.sections.length; si++) {
+      const section = page.sections[si];
       const fontStyle = getFontStyleForSection(section.type, section.level);
       const lineHeight = (fontStyle.lineHeight ?? project.layoutOptions.lineHeight) * fontStyle.fontSize;
 
@@ -461,29 +462,20 @@ export class SpreadEditor {
 
       const ms = section as any;
       const plainLines: string[] = ms.lines || [section.content];
-      const lineCount = plainLines.length;
-      const sectionHeight = lineCount * lineHeight;
 
-      if (section.rawMarkdown === sectionRaw) {
-        const charPos = Math.floor(charFraction * (section.content?.length || 1));
-        let consumed = 0;
-        for (let li = 0; li < plainLines.length; li++) {
-          const lineLen = plainLines[li].length;
-          if (consumed + lineLen >= charPos || li === plainLines.length - 1) {
-            const posInLine = charPos - consumed;
-            const textBefore = plainLines[li].substring(0, Math.min(posInLine, lineLen));
-            const xOffset = this.measureText(textBefore, fontStyle);
-            return {
-              x: contentX + xOffset,
-              y: currentY + li * lineHeight + lineHeight / 2,
-            };
-          }
-          consumed += lineLen + 1;
-        }
-        return { x: contentX, y: currentY + lineHeight / 2 };
+      if (si === sectionIndex) {
+        const li = Math.min(lineIndex, plainLines.length - 1);
+        const lineText = plainLines[li] || '';
+        const col = Math.min(charInLine, lineText.length);
+        const textBefore = lineText.substring(0, col);
+        const xOffset = this.measureText(textBefore, fontStyle);
+        return {
+          x: contentX + xOffset,
+          y: currentY + li * lineHeight + lineHeight / 2,
+        };
       }
 
-      currentY += sectionHeight + project.layoutOptions.paragraphSpacing;
+      currentY += plainLines.length * lineHeight + project.layoutOptions.paragraphSpacing;
     }
     return null;
   }

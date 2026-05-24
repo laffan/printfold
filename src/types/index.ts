@@ -570,8 +570,9 @@ export function formatMarginValue(points: number, unit: MarginUnit): string {
 // Cursor mark for syncing the text editor cursor to the rendered page.
 export interface CursorMark {
   pageNumber: number;
-  sectionRaw: string;
-  charFraction: number; // 0–1 within the matched section
+  sectionIndex: number;  // Index within the page's sections array
+  lineIndex: number;     // Wrapped-line index within the section
+  charInLine: number;    // Character offset within that line
 }
 
 // Editor state

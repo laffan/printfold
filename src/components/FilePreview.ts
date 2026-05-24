@@ -9,6 +9,7 @@ import { EditorState } from '@codemirror/state';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import { appState } from '../services/state';
+import { extractFootnotes } from '../services/textFlow/footnotes';
 import type { ProjectFile } from '../types';
 
 export class FilePreview {
@@ -170,13 +171,8 @@ export class FilePreview {
   private cursorTimeout: number | null = null;
 
   private handleCursorChange(view: EditorView): void {
-    if (!this.currentFile || this.currentFile.type !== 'markdown') {
-      return;
-    }
-
-    if (this.cursorTimeout) {
-      clearTimeout(this.cursorTimeout);
-    }
+    if (!this.currentFile || this.currentFile.type !== 'markdown') return;
+    if (this.cursorTimeout) clearTimeout(this.cursorTimeout);
 
     this.cursorTimeout = window.setTimeout(() => {
       const pos = view.state.selection.main.head;
@@ -184,6 +180,7 @@ export class FilePreview {
       const markdownFiles = project.files.filter(f => f.type === 'markdown');
       if (markdownFiles.length === 0) return;
 
+      // Cursor offset in the original concatenated markdown
       let charOffset = 0;
       let foundFile = false;
       for (const file of markdownFiles) {
@@ -197,42 +194,104 @@ export class FilePreview {
       if (!foundFile) return;
 
       const combinedMarkdown = markdownFiles.map(f => f.content).join('\n\n');
-      let bestPage = 1;
-      let bestSection = '';
-      let bestFraction = 0;
 
-      for (const sig of project.signatures) {
-        for (const spread of sig.spreads) {
-          for (const page of [spread.verso, spread.recto]) {
-            if (!page || !page.sections || page.sections.length === 0) continue;
-            if (page.pageState === 'static' || page.pageState === 'available') continue;
-            for (const section of page.sections) {
-              if (!section.rawMarkdown) continue;
-              const idx = combinedMarkdown.indexOf(section.rawMarkdown);
-              if (idx === -1) continue;
-              if (idx <= charOffset && charOffset <= idx + section.rawMarkdown.length) {
-                const fraction = section.rawMarkdown.length > 0
-                  ? (charOffset - idx) / section.rawMarkdown.length
-                  : 0;
-                const mark = this.cursorSyncEnabled
-                  ? { pageNumber: page.pageNumber, sectionRaw: section.rawMarkdown, charFraction: fraction }
-                  : null;
-                appState.updateEditor({ selectedPageNumber: page.pageNumber, cursorMark: mark });
-                return;
-              }
-              if (idx <= charOffset) {
-                bestPage = page.pageNumber;
-                bestSection = section.rawMarkdown;
-                bestFraction = 1;
-              }
+      // Strip footnote definitions to match what the parser sees.
+      const extraction = extractFootnotes(combinedMarkdown);
+      const strippedMarkdown = extraction.strippedMarkdown;
+
+      // Map charOffset from original → stripped by walking lines
+      const origLines = combinedMarkdown.split('\n');
+      const strippedLines = strippedMarkdown.split('\n');
+      let origAcc = 0;
+      let strippedAcc = 0;
+      let si = 0;
+      let strippedOffset = 0;
+      let mapped = false;
+      for (let oi = 0; oi < origLines.length; oi++) {
+        const origLine = origLines[oi];
+        const origLineEnd = origAcc + origLine.length;
+        const kept = si < strippedLines.length && origLine === strippedLines[si];
+        if (!mapped && charOffset <= origLineEnd) {
+          strippedOffset = kept ? strippedAcc + (charOffset - origAcc) : strippedAcc;
+          mapped = true;
+        }
+        if (kept) {
+          strippedAcc += origLine.length + 1;
+          si++;
+        }
+        origAcc = origLineEnd + 1;
+      }
+      if (!mapped) strippedOffset = strippedAcc;
+
+      // Normalize: strip footnote ref markers so text matches between
+      // the source ([^id]) and parsed sections (sentinel chars).
+      const norm = (t: string) =>
+        t.replace(/\x01FN\d+\x01/g, '').replace(/\[\^[^\]]+\]/g, '');
+
+      const normBefore = norm(strippedMarkdown.substring(0, strippedOffset));
+      const normOffset = normBefore.length;
+      const normText = norm(strippedMarkdown);
+
+      // Pre-compute total line count per unique rawMarkdown to handle splits
+      const totalLinesByRaw = new Map<string, number>();
+      for (const sg of project.signatures) {
+        for (const sp of sg.spreads) {
+          for (const pg of [sp.verso, sp.recto]) {
+            if (!pg?.sections || pg.pageState !== 'text') continue;
+            for (const sec of pg.sections) {
+              const ms = sec as any;
+              const lines: string[] = ms.lines || [sec.content];
+              const key = sec.rawMarkdown || '';
+              totalLinesByRaw.set(key, (totalLinesByRaw.get(key) || 0) + lines.length);
             }
           }
         }
       }
-      const mark = this.cursorSyncEnabled
-        ? { pageNumber: bestPage, sectionRaw: bestSection, charFraction: bestFraction }
-        : null;
-      appState.updateEditor({ selectedPageNumber: bestPage, cursorMark: mark });
+
+      const linesSeenByRaw = new Map<string, number>();
+      let bestPage = 1;
+
+      for (const sg of project.signatures) {
+        for (const sp of sg.spreads) {
+          for (const pg of [sp.verso, sp.recto]) {
+            if (!pg?.sections || pg.pageState !== 'text') continue;
+            for (let secIdx = 0; secIdx < pg.sections.length; secIdx++) {
+              const sec = pg.sections[secIdx];
+              if (!sec.rawMarkdown) continue;
+              const ms = sec as any;
+              const secLines: string[] = ms.lines || [sec.content];
+              const key = sec.rawMarkdown;
+              const normRaw = norm(key);
+              const secStart = normText.indexOf(normRaw);
+              if (secStart === -1) continue;
+              const secEnd = secStart + normRaw.length;
+
+              if (normOffset >= secStart && normOffset <= secEnd) {
+                const totalLines = totalLinesByRaw.get(key) || secLines.length;
+                const linesSoFar = linesSeenByRaw.get(key) || 0;
+                const frac = normRaw.length > 0 ? (normOffset - secStart) / normRaw.length : 0;
+                const cursorLine = Math.min(Math.floor(frac * totalLines), totalLines - 1);
+
+                if (cursorLine >= linesSoFar && cursorLine < linesSoFar + secLines.length) {
+                  const localLine = cursorLine - linesSoFar;
+                  const lineFrac = (frac * totalLines) - cursorLine;
+                  const lineText = secLines[localLine] || '';
+                  const charInLine = Math.min(Math.floor(lineFrac * lineText.length), lineText.length);
+
+                  const mark = this.cursorSyncEnabled
+                    ? { pageNumber: pg.pageNumber, sectionIndex: secIdx, lineIndex: localLine, charInLine }
+                    : null;
+                  appState.updateEditor({ selectedPageNumber: pg.pageNumber, cursorMark: mark });
+                  return;
+                }
+              }
+              if (secStart <= normOffset) bestPage = pg.pageNumber;
+              linesSeenByRaw.set(key, (linesSeenByRaw.get(key) || 0) + secLines.length);
+            }
+          }
+        }
+      }
+      appState.updateEditor({ selectedPageNumber: bestPage, cursorMark: null });
     }, 150);
   }
 
