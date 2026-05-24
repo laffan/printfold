@@ -4,7 +4,7 @@
   align-items: center;
   justify-content: space-between;
   height: var(--header-height);
-  padding: 0 16px;
+  padding: 0 12px;
   background: var(--color-bg-secondary);
   border-bottom: 1px solid var(--color-border);
   -webkit-app-region: drag;
@@ -17,11 +17,11 @@
 }
 
 .app-title .logo {
-  font-size: 20px;
+  font-size: 16px;
 }
 
 .app-title h1 {
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
@@ -35,18 +35,24 @@
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   -webkit-app-region: no-drag;
+}
+
+.header-actions .btn {
+  padding: 4px 10px;
+  font-size: 11px;
 }
 
 .project-name-display {
   font-size: 12px;
-  font-weight: 500;
-  color: var(--color-text);
+  font-weight: 700;
+  color: var(--color-text-muted);
   max-width: 240px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  -webkit-app-region: no-drag;
 }
 
 .save-status {

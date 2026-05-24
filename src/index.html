@@ -38,9 +38,9 @@
       <div class="app-title">
         <span class="logo">📖</span>
         <h1>PrintFold</h1>
+        <span id="project-name-display" class="project-name-display"></span>
       </div>
       <div class="header-actions">
-        <span id="project-name-display" class="project-name-display"></span>
         <span id="save-status" class="save-status" aria-live="polite"></span>
         <button id="btn-welcome" class="btn btn-secondary" title="Open the welcome screen">Projects…</button>
         <button id="btn-save" class="btn btn-secondary" style="display: none;">Save</button>
@@ -62,10 +62,10 @@
         </div>
 
         <!-- Resizer between Files and Preview -->
-        <div class="panel-resizer" data-resizer="files-preview"></div>
+        <div class="panel-resizer" data-resizer="files-preview" style="display: none;"></div>
 
         <!-- File Preview / Editor -->
-        <div class="panel panel-preview">
+        <div class="panel panel-preview collapsed">
           <div class="panel-header">
             <span id="preview-filename" class="filename"></span>
             <div class="panel-header-actions">

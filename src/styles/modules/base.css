@@ -30,7 +30,7 @@
   --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.5);
 
-  --header-height: 48px;
+  --header-height: 38px;
   --column-min-width: 280px;
   --panel-gap: 8px;
 }
