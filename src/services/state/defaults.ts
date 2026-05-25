@@ -35,9 +35,11 @@ const defaultHeadingStyle = (size: number, weight: 'bold' | 'normal' = 'bold'): 
 // Default options
 export const defaultOutputOptions: OutputOptions = {
   sheetSize: 'letter',
+  bookletType: 'booklet',
   bookletSize: 'quarter',
   pagesPerSignature: 4,
   orientation: 'portrait',
+  placement: 'autofill',
   fillAvailableSpace: true,
   showFoldMarks: false,
   creepEnabled: false,

@@ -727,6 +727,14 @@
                 </select>
               </div>
               <div class="form-group">
+                <label for="opt-booklet-type">Booklet Type</label>
+                <select id="opt-booklet-type">
+                  <option value="booklet" selected>Booklet</option>
+                  <option value="doubleSided">Double sided pages</option>
+                  <option value="singleSided">Single sided pages</option>
+                </select>
+              </div>
+              <div class="form-group" id="booklet-size-group">
                 <label for="opt-booklet-size">Booklet Size</label>
                 <select id="opt-booklet-size">
                   <option value="half">1/2</option>
@@ -743,11 +751,19 @@
                 </label>
                 <p class="hint" id="fill-space-hint">Print multiple rows per sheet, then cut</p>
               </div>
-              <div class="form-group">
+              <div class="form-group" id="fold-marks-group">
                 <label class="checkbox-label">
                   <input type="checkbox" id="opt-fold-marks">
                   <span>Show fold marks</span>
                 </label>
+              </div>
+              <div class="form-group" id="placement-group" style="display: none;">
+                <label for="opt-placement">Placement</label>
+                <select id="opt-placement">
+                  <option value="autofill" selected>Autofill</option>
+                  <option value="center">Center</option>
+                  <option value="upperLeft">Upper Left</option>
+                </select>
               </div>
               <div class="form-group">
                 <label class="checkbox-label">
@@ -776,7 +792,7 @@
               </div>
             </div>
 
-            <div class="options-section">
+            <div class="options-section" id="signatures-section">
               <h4 class="section-header">Signatures</h4>
               <div class="form-group">
                 <label for="opt-pages-per-sig">Pages per Signature</label>

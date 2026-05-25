@@ -98,6 +98,14 @@ export class PDFGenerator {
       }
     }
 
+    const bookletType = project.outputOptions.bookletType ?? 'booklet';
+
+    if (bookletType !== 'booklet') {
+      // Sequential page mode (double-sided or single-sided)
+      await this.generateSequentialPages(pdfDoc, sheetSize, pageWidth, pageHeight, globalPageMap, project);
+      return pdfDoc.save();
+    }
+
     // Calculate rows per sheet for fill mode
     const rowsPerSheet = calculateSpreadRowsPerSheet(
       sheetSize,
@@ -231,6 +239,114 @@ export class PDFGenerator {
           this.drawPage(backPage, rightPage, pageWidth, rowY, pageWidth, pageHeight, project, rightPage.isRecto, adjacentPage, spanningItems);
         }
       });
+    }
+  }
+
+  /**
+   * Generate sequential PDF pages (double-sided or single-sided, no imposition)
+   */
+  private async generateSequentialPages(
+    pdfDoc: PDFDocument,
+    sheetSize: { width: number; height: number },
+    pageWidth: number,
+    pageHeight: number,
+    globalPageMap: Map<number, PageContent>,
+    project: ReturnType<typeof appState.getProject>
+  ): Promise<void> {
+    const bookletType = project.outputOptions.bookletType ?? 'booklet';
+    const placement = project.outputOptions.placement ?? 'autofill';
+    const staticSpreads = project.staticSpreads || [];
+
+    // Collect all pages in reading order
+    const allPages: PageContent[] = [];
+    for (const sig of project.signatures) {
+      for (const spread of sig.spreads) {
+        if (spread.verso) allPages.push(spread.verso);
+        if (spread.recto) allPages.push(spread.recto);
+      }
+    }
+
+    // Build spread lookup for spanning items
+    const spreadForPage: Map<number, { spread: Spread; staticSpread?: StaticSpread }> = new Map();
+    for (const sig of project.signatures) {
+      for (const spread of sig.spreads) {
+        const staticSpread = staticSpreads.find(s => s.id === spread.id);
+        if (spread.verso) spreadForPage.set(spread.verso.pageNumber, { spread, staticSpread });
+        if (spread.recto) spreadForPage.set(spread.recto.pageNumber, { spread, staticSpread });
+      }
+    }
+
+    const getReadingOrderAdjacent = (page: PageContent): PageContent | null => {
+      const adjacentPageNum = page.isRecto ? page.pageNumber - 1 : page.pageNumber + 1;
+      return globalPageMap.get(adjacentPageNum) || null;
+    };
+
+    // Calculate placement offsets
+    const calcOffset = (idx: number): { x: number; y: number } => {
+      if (placement === 'center') {
+        return {
+          x: (sheetSize.width - pageWidth) / 2,
+          y: (sheetSize.height - pageHeight) / 2,
+        };
+      } else if (placement === 'upperLeft') {
+        return { x: 0, y: sheetSize.height - pageHeight };
+      }
+      // autofill: tile pages to fill the sheet
+      const cols = Math.max(1, Math.floor(sheetSize.width / pageWidth));
+      const rows = Math.max(1, Math.floor(sheetSize.height / pageHeight));
+      const pagesPerSheet = cols * rows;
+      const posOnSheet = idx % pagesPerSheet;
+      const col = posOnSheet % cols;
+      const row = Math.floor(posOnSheet / cols);
+      return {
+        x: col * pageWidth,
+        y: sheetSize.height - (row + 1) * pageHeight,
+      };
+    };
+
+    const pagesPerSheet = placement === 'autofill'
+      ? Math.max(1, Math.floor(sheetSize.width / pageWidth)) * Math.max(1, Math.floor(sheetSize.height / pageHeight))
+      : 1;
+
+    if (bookletType === 'doubleSided') {
+      // Double-sided: pair pages onto front/back of sheets
+      for (let i = 0; i < allPages.length; i += pagesPerSheet * 2) {
+        const frontPages = allPages.slice(i, i + pagesPerSheet);
+        const backPages = allPages.slice(i + pagesPerSheet, i + pagesPerSheet * 2);
+
+        const frontPdf = pdfDoc.addPage([sheetSize.width, sheetSize.height]);
+        frontPages.forEach((page, idx) => {
+          const { x, y } = calcOffset(idx);
+          const info = spreadForPage.get(page.pageNumber);
+          const spanningItems = info?.staticSpread?.spanningItems;
+          const adjacentPage = getReadingOrderAdjacent(page);
+          this.drawPage(frontPdf, page, x, y, pageWidth, pageHeight, project, page.isRecto, adjacentPage, spanningItems);
+        });
+
+        if (backPages.length > 0) {
+          const backPdf = pdfDoc.addPage([sheetSize.width, sheetSize.height]);
+          backPages.forEach((page, idx) => {
+            const { x, y } = calcOffset(idx);
+            const info = spreadForPage.get(page.pageNumber);
+            const spanningItems = info?.staticSpread?.spanningItems;
+            const adjacentPage = getReadingOrderAdjacent(page);
+            this.drawPage(backPdf, page, x, y, pageWidth, pageHeight, project, page.isRecto, adjacentPage, spanningItems);
+          });
+        }
+      }
+    } else {
+      // Single-sided: each sheet front only
+      for (let i = 0; i < allPages.length; i += pagesPerSheet) {
+        const sheetPages = allPages.slice(i, i + pagesPerSheet);
+        const pdfPage = pdfDoc.addPage([sheetSize.width, sheetSize.height]);
+        sheetPages.forEach((page, idx) => {
+          const { x, y } = calcOffset(idx);
+          const info = spreadForPage.get(page.pageNumber);
+          const spanningItems = info?.staticSpread?.spanningItems;
+          const adjacentPage = getReadingOrderAdjacent(page);
+          this.drawPage(pdfPage, page, x, y, pageWidth, pageHeight, project, page.isRecto, adjacentPage, spanningItems);
+        });
+      }
     }
   }
 

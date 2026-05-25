@@ -4,7 +4,7 @@
  */
 
 import { appState } from '../../services/state';
-import type { OutputOptions } from '../../types';
+import type { OutputOptions, BookletType, PagePlacement } from '../../types';
 import { getOrientedSheetSize, UNIT_CONVERSIONS } from '../../types';
 import { bindSelect, bindCheckbox, type DebounceCallback } from './helpers';
 import { PDFGenerator } from '../../services/pdfGenerator';
@@ -34,6 +34,18 @@ export function setupOutputOptions(debounce: (fn: DebounceCallback) => void): vo
   bindSelect('opt-orientation', (value) => {
     appState.updateOutputOptions({ orientation: value as OutputOptions['orientation'] });
     updateFillSpaceVisibility();
+  }, debounce);
+
+  // Booklet type
+  bindSelect('opt-booklet-type', (value) => {
+    appState.updateOutputOptions({ bookletType: value as BookletType });
+    updateBookletTypeVisibility();
+    updateFillSpaceVisibility();
+  }, debounce);
+
+  // Placement (for non-booklet modes)
+  bindSelect('opt-placement', (value) => {
+    appState.updateOutputOptions({ placement: value as PagePlacement });
   }, debounce);
 
   // Booklet size
@@ -241,10 +253,37 @@ export function getPageHeight(): number {
 }
 
 /**
+ * Update visibility of booklet-specific vs non-booklet controls based on booklet type
+ */
+export function updateBookletTypeVisibility(): void {
+  const project = appState.getProject();
+  const isBooklet = (project.outputOptions.bookletType ?? 'booklet') === 'booklet';
+
+  const bookletSizeGroup = document.getElementById('booklet-size-group');
+  const foldMarksGroup = document.getElementById('fold-marks-group');
+  const signaturesSection = document.getElementById('signatures-section');
+  const placementGroup = document.getElementById('placement-group');
+  const fillSpaceGroup = document.getElementById('fill-space-group');
+  const customSizeGroup = document.getElementById('custom-size-group');
+
+  if (bookletSizeGroup) bookletSizeGroup.style.display = isBooklet ? '' : 'none';
+  if (foldMarksGroup) foldMarksGroup.style.display = isBooklet ? '' : 'none';
+  if (signaturesSection) signaturesSection.style.display = isBooklet ? '' : 'none';
+  if (placementGroup) placementGroup.style.display = isBooklet ? 'none' : '';
+  if (fillSpaceGroup) fillSpaceGroup.style.display = isBooklet ? '' : 'none';
+  if (customSizeGroup) customSizeGroup.style.display =
+    isBooklet && project.outputOptions.bookletSize === 'custom' ? 'block' : 'none';
+}
+
+/**
  * Update the visibility of the fill space option based on whether it's applicable
  */
 export function updateFillSpaceVisibility(): void {
   const project = appState.getProject();
+
+  // Fill space only applies in booklet mode
+  if ((project.outputOptions.bookletType ?? 'booklet') !== 'booklet') return;
+
   const sheetSize = getOrientedSheetSize(
     project.outputOptions.sheetSize,
     project.outputOptions.orientation

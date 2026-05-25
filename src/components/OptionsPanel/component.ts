@@ -17,7 +17,7 @@ import {
   updateInputCapLabels,
 } from './helpers';
 import { convertFromPoints, UNIT_CONVERSIONS, type MarginUnit } from '../../types';
-import { setupOutputOptions, updateFillSpaceVisibility, syncCropMarkColorPicker } from './outputOptions';
+import { setupOutputOptions, updateFillSpaceVisibility, updateBookletTypeVisibility, syncCropMarkColorPicker } from './outputOptions';
 import { setupLayoutOptions } from './layoutOptions';
 import { setupHeaderFooterOptions } from './headerFooterOptions';
 import { initFontDropdowns, setupFontOptions, preloadFonts } from './fontOptions';
@@ -121,12 +121,18 @@ export class OptionsPanel {
     // Output options
     setSelectValue('opt-sheet-size', project.outputOptions.sheetSize);
     setSelectValue('opt-orientation', project.outputOptions.orientation);
+    setSelectValue('opt-booklet-type', project.outputOptions.bookletType ?? 'booklet');
     setSelectValue('opt-booklet-size', project.outputOptions.bookletSize);
+    setSelectValue('opt-placement', project.outputOptions.placement ?? 'autofill');
     setSelectValue('opt-pages-per-sig', project.outputOptions.pagesPerSignature.toString());
 
-    // Show/hide custom size
+    // Update visibility based on booklet type
+    updateBookletTypeVisibility();
+
+    // Show/hide custom size (only relevant in booklet mode)
+    const isBooklet = (project.outputOptions.bookletType ?? 'booklet') === 'booklet';
     document.getElementById('custom-size-group')!.style.display =
-      project.outputOptions.bookletSize === 'custom' ? 'block' : 'none';
+      isBooklet && project.outputOptions.bookletSize === 'custom' ? 'block' : 'none';
 
     // Update custom size inputs with unit conversion
     this.updateCustomSizeInputs();
