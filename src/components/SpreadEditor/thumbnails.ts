@@ -96,33 +96,46 @@ export function renderThumbnails(
     pageMap.set(page.pageNumber, page);
   }
 
+  // Determine layout mode
+  const bookletType = project.outputOptions.bookletType ?? 'booklet';
+  const singlePageLayout = bookletType === 'singleSided';
+
   // Calculate thumbnail dimensions
   const thumbWidth = 80;
-  const spreadAspect = (pageDimensions.width * 2) / pageDimensions.height;
+  const spreadAspect = singlePageLayout
+    ? pageDimensions.width / pageDimensions.height
+    : (pageDimensions.width * 2) / pageDimensions.height;
   const thumbHeight = thumbWidth / spreadAspect;
 
-  // Create visual spreads: [null|1], [2|3], [4|5], ..., [N|null]
-  // Page 1 is always recto (right), page 2 is verso (left), etc.
-  // Visual spread index 0 = [null|1], index 1 = [2|3], etc.
+  // Create visual spreads based on booklet type
   const visualSpreads: Array<{ verso: PageContent | null; recto: PageContent | null }> = [];
 
-  // First spread: [null | page 1]
-  visualSpreads.push({
-    verso: null,
-    recto: pageMap.get(1) || null,
-  });
-
-  // Middle and last spreads: [2|3], [4|5], etc.
-  for (let versoNum = 2; versoNum <= maxPageNum; versoNum += 2) {
-    const rectoNum = versoNum + 1;
+  if (bookletType === 'singleSided') {
+    for (const page of allPages) {
+      visualSpreads.push({ verso: page, recto: null });
+    }
+  } else if (bookletType === 'doubleSided') {
+    for (let i = 0; i < allPages.length; i += 2) {
+      visualSpreads.push({
+        verso: allPages[i],
+        recto: allPages[i + 1] || null,
+      });
+    }
+  } else {
+    // Booklet mode: [null|1], [2|3], [4|5], ..., [N|null]
     visualSpreads.push({
-      verso: pageMap.get(versoNum) || null,
-      recto: rectoNum <= maxPageNum ? (pageMap.get(rectoNum) || null) : null,
+      verso: null,
+      recto: pageMap.get(1) || null,
     });
-  }
 
-  // If maxPageNum is even, last spread ends with [maxPageNum | null]
-  // This is already handled above
+    for (let versoNum = 2; versoNum <= maxPageNum; versoNum += 2) {
+      const rectoNum = versoNum + 1;
+      visualSpreads.push({
+        verso: pageMap.get(versoNum) || null,
+        recto: rectoNum <= maxPageNum ? (pageMap.get(rectoNum) || null) : null,
+      });
+    }
+  }
 
   // Helper to get background color
   const getBackgroundColor = (page: PageContent | null): string | null => {
@@ -139,6 +152,9 @@ export function renderThumbnails(
     }
     return null;
   };
+
+  // In single-page mode, each thumb shows one page at full width
+  const pageThumbWidth = singlePageLayout ? thumbWidth : thumbWidth / 2;
 
   // Render each visual spread
   visualSpreads.forEach((vSpread, vSpreadIdx) => {
@@ -165,78 +181,75 @@ export function renderThumbnails(
     ctx.globalAlpha = 1.0;
     ctx.scale(2, 2);
 
-    // Draw verso background (left side)
+    // Draw verso background (left side, or full width in single-page mode)
     if (vSpread.verso) {
       const bgColor = getBackgroundColor(vSpread.verso);
       if (bgColor) {
         ctx.fillStyle = bgColor;
-        ctx.fillRect(0, 0, thumbWidth / 2, thumbHeight);
+        ctx.fillRect(0, 0, pageThumbWidth, thumbHeight);
       } else {
-        // Page exists but has no custom background - draw white
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, thumbWidth / 2, thumbHeight);
+        ctx.fillRect(0, 0, pageThumbWidth, thumbHeight);
       }
     } else {
-      // Draw null page (inactive) with container background and dashed border
-      ctx.fillStyle = 'rgba(187, 186, 186, 1)'; // #bbbaba with explicit opacity
-      ctx.fillRect(0, 0, thumbWidth / 2, thumbHeight);
-      ctx.strokeStyle = 'rgba(170, 170, 170, 1)'; // #aaaaaa
+      ctx.fillStyle = 'rgba(187, 186, 186, 1)';
+      ctx.fillRect(0, 0, pageThumbWidth, thumbHeight);
+      ctx.strokeStyle = 'rgba(170, 170, 170, 1)';
       ctx.lineWidth = 0.5;
       ctx.setLineDash([4, 2]);
-      ctx.strokeRect(0, 0, thumbWidth / 2, thumbHeight);
+      ctx.strokeRect(0, 0, pageThumbWidth, thumbHeight);
       ctx.setLineDash([]);
     }
 
-    // Draw recto background (right side)
-    if (vSpread.recto) {
-      const bgColor = getBackgroundColor(vSpread.recto);
-      if (bgColor) {
-        ctx.fillStyle = bgColor;
-        ctx.fillRect(thumbWidth / 2, 0, thumbWidth / 2, thumbHeight);
+    if (!singlePageLayout) {
+      // Draw recto background (right side)
+      if (vSpread.recto) {
+        const bgColor = getBackgroundColor(vSpread.recto);
+        if (bgColor) {
+          ctx.fillStyle = bgColor;
+          ctx.fillRect(pageThumbWidth, 0, pageThumbWidth, thumbHeight);
+        } else {
+          ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+          ctx.fillRect(pageThumbWidth, 0, pageThumbWidth, thumbHeight);
+        }
       } else {
-        // Page exists but has no custom background - draw white
-        ctx.fillStyle = 'rgba(255, 255, 255, 1)'; // White with explicit opacity
-        ctx.fillRect(thumbWidth / 2, 0, thumbWidth / 2, thumbHeight);
+        ctx.fillStyle = 'rgba(187, 186, 186, 1)';
+        ctx.fillRect(pageThumbWidth, 0, pageThumbWidth, thumbHeight);
+        ctx.strokeStyle = 'rgba(170, 170, 170, 1)';
+        ctx.lineWidth = 0.5;
+        ctx.setLineDash([4, 2]);
+        ctx.strokeRect(pageThumbWidth, 0, pageThumbWidth, thumbHeight);
+        ctx.setLineDash([]);
       }
-    } else {
-      // Draw null page (inactive) with container background and dashed border
-      ctx.fillStyle = 'rgba(187, 186, 186, 1)'; // #bbbaba with explicit opacity
-      ctx.fillRect(thumbWidth / 2, 0, thumbWidth / 2, thumbHeight);
-      ctx.strokeStyle = 'rgba(170, 170, 170, 1)'; // #aaaaaa
-      ctx.lineWidth = 0.5;
-      ctx.setLineDash([4, 2]);
-      ctx.strokeRect(thumbWidth / 2, 0, thumbWidth / 2, thumbHeight);
-      ctx.setLineDash([]);
-    }
 
-    // Draw spine line (with signature boundary indicator if needed)
-    if (hasSigBoundary) {
-      // Dashed line for signature boundary
-      ctx.strokeStyle = '#f97316'; // Orange for signature boundary
-      ctx.lineWidth = 1;
-      ctx.setLineDash([2, 2]);
-    } else {
-      ctx.strokeStyle = '#e0e0e0';
-      ctx.lineWidth = 0.5;
+      // Draw spine line (with signature boundary indicator if needed)
+      if (hasSigBoundary) {
+        ctx.strokeStyle = '#f97316';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 2]);
+      } else {
+        ctx.strokeStyle = '#e0e0e0';
+        ctx.lineWidth = 0.5;
+        ctx.setLineDash([]);
+      }
+      ctx.beginPath();
+      ctx.moveTo(pageThumbWidth, 0);
+      ctx.lineTo(pageThumbWidth, thumbHeight);
+      ctx.stroke();
       ctx.setLineDash([]);
     }
-    ctx.beginPath();
-    ctx.moveTo(thumbWidth / 2, 0);
-    ctx.lineTo(thumbWidth / 2, thumbHeight);
-    ctx.stroke();
-    ctx.setLineDash([]);
 
     // Draw page content (items and text sections)
     const contentMargin = 3;
 
     // Verso content
     if (vSpread.verso) {
-      drawPageContent(ctx, vSpread.verso, 0, thumbWidth / 2, thumbHeight, contentMargin, pageDimensions);
+      drawPageContent(ctx, vSpread.verso, 0, pageThumbWidth, thumbHeight, contentMargin, pageDimensions);
     }
 
-    // Recto content
-    if (vSpread.recto) {
-      drawPageContent(ctx, vSpread.recto, thumbWidth / 2, thumbWidth / 2, thumbHeight, contentMargin, pageDimensions);
+    // Recto content (not in single-page mode)
+    if (!singlePageLayout && vSpread.recto) {
+      drawPageContent(ctx, vSpread.recto, pageThumbWidth, pageThumbWidth, thumbHeight, contentMargin, pageDimensions);
     }
 
     thumbDiv.appendChild(canvas);
@@ -255,36 +268,38 @@ export function renderThumbnails(
     if (vSpread.verso) {
       const versoLabel = createPageLabel(
         vSpread.verso,
-        isVersoSelected,
+        isVersoSelected || (singlePageLayout && vSpread.verso?.pageNumber === editorState.selectedPageNumber),
         'verso',
         selectPageFn,
         updateSpreadIndicatorFn,
         thumbnailContainer
       );
       labelsContainer.appendChild(versoLabel);
-    } else {
+    } else if (!singlePageLayout) {
       const spacer = document.createElement('div');
       spacer.className = 'spread-thumbnail-page-label empty';
       spacer.style.visibility = 'hidden';
       labelsContainer.appendChild(spacer);
     }
 
-    // Recto label
-    if (vSpread.recto) {
-      const rectoLabel = createPageLabel(
-        vSpread.recto,
-        isRectoSelected,
-        'recto',
-        selectPageFn,
-        updateSpreadIndicatorFn,
-        thumbnailContainer
-      );
-      labelsContainer.appendChild(rectoLabel);
-    } else {
-      const spacer = document.createElement('div');
-      spacer.className = 'spread-thumbnail-page-label empty';
-      spacer.style.visibility = 'hidden';
-      labelsContainer.appendChild(spacer);
+    // Recto label (not in single-page mode)
+    if (!singlePageLayout) {
+      if (vSpread.recto) {
+        const rectoLabel = createPageLabel(
+          vSpread.recto,
+          isRectoSelected,
+          'recto',
+          selectPageFn,
+          updateSpreadIndicatorFn,
+          thumbnailContainer
+        );
+        labelsContainer.appendChild(rectoLabel);
+      } else {
+        const spacer = document.createElement('div');
+        spacer.className = 'spread-thumbnail-page-label empty';
+        spacer.style.visibility = 'hidden';
+        labelsContainer.appendChild(spacer);
+      }
     }
 
     thumbDiv.appendChild(labelsContainer);
@@ -321,23 +336,23 @@ export function renderThumbnails(
     }
     clickContainer.appendChild(versoClick);
 
-    // Recto click/drag area
-    const rectoClick = document.createElement('div');
-    rectoClick.style.cssText = 'flex: 1; cursor: pointer;';
-    rectoClick.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (vSpread.recto) {
-        // Select page - editor will navigate to correct spread via state listener
-        selectPageFn(vSpread.recto.pageNumber, 'recto');
-        updateSpreadIndicatorFn();
-      }
-    });
+    // Recto click/drag area (not in single-page mode)
+    if (!singlePageLayout) {
+      const rectoClick = document.createElement('div');
+      rectoClick.style.cssText = 'flex: 1; cursor: pointer;';
+      rectoClick.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (vSpread.recto) {
+          selectPageFn(vSpread.recto.pageNumber, 'recto');
+          updateSpreadIndicatorFn();
+        }
+      });
 
-    // Add drag/drop handlers to recto click area
-    if (vSpread.recto) {
-      setupPageDragDrop(rectoClick, vSpread.recto, 'recto', thumbnailContainer);
+      if (vSpread.recto) {
+        setupPageDragDrop(rectoClick, vSpread.recto, 'recto', thumbnailContainer);
+      }
+      clickContainer.appendChild(rectoClick);
     }
-    clickContainer.appendChild(rectoClick);
 
     thumbDiv.appendChild(clickContainer);
 

@@ -812,11 +812,16 @@ export class SpreadEditor {
     }
   }
 
+  private isSinglePageLayout(): boolean {
+    const bookletType = appState.getProject().outputOptions.bookletType ?? 'booklet';
+    return bookletType === 'singleSided';
+  }
+
   private fitToView(): void {
     const pageDimensions = this.getPageDimensions();
 
     // Calculate spread size
-    const spreadWidth = pageDimensions.width * 2;
+    const spreadWidth = this.isSinglePageLayout() ? pageDimensions.width : pageDimensions.width * 2;
     const spreadHeight = pageDimensions.height;
 
     // Calculate scale to fit - fill available space (no upper limit)
@@ -870,6 +875,7 @@ export class SpreadEditor {
    */
   private getVisualSpreads(): VisualSpread[] {
     const project = appState.getProject();
+    const bookletType = project.outputOptions.bookletType ?? 'booklet';
 
     // Collect all pages from all signatures
     const allPages: PageContent[] = [];
@@ -885,25 +891,38 @@ export class SpreadEditor {
 
     if (allPages.length === 0) return [];
 
-    // Find the highest page number to determine total visual spreads
-    const maxPageNum = Math.max(...allPages.map(p => p.pageNumber));
+    if (bookletType === 'singleSided') {
+      return allPages.map(page => ({
+        verso: page,
+        recto: null,
+      }));
+    }
 
-    // Create a map for quick page lookup
+    if (bookletType === 'doubleSided') {
+      const visualSpreads: VisualSpread[] = [];
+      for (let i = 0; i < allPages.length; i += 2) {
+        visualSpreads.push({
+          verso: allPages[i],
+          recto: allPages[i + 1] || null,
+        });
+      }
+      return visualSpreads;
+    }
+
+    // Booklet mode: [null|1], [2|3], [4|5], ..., [N|null]
+    const maxPageNum = Math.max(...allPages.map(p => p.pageNumber));
     const pageMap = new Map<number, PageContent>();
     for (const page of allPages) {
       pageMap.set(page.pageNumber, page);
     }
 
-    // Create visual spreads: [null|1], [2|3], [4|5], ..., [N|null]
     const visualSpreads: VisualSpread[] = [];
 
-    // First spread: [null | page 1]
     visualSpreads.push({
       verso: null,
       recto: pageMap.get(1) || null,
     });
 
-    // Middle and last spreads: [2|3], [4|5], etc.
     for (let versoNum = 2; versoNum <= maxPageNum; versoNum += 2) {
       const rectoNum = versoNum + 1;
       visualSpreads.push({
@@ -981,7 +1000,16 @@ export class SpreadEditor {
     const visualSpreads = this.getVisualSpreads();
     const totalSpreads = visualSpreads.length;
     const indicator = document.getElementById('spread-indicator')!;
-    indicator.textContent = `Spread ${this.currentSpreadIndex + 1} of ${Math.max(1, totalSpreads)}`;
+    const bookletType = appState.getProject().outputOptions.bookletType ?? 'booklet';
+    const idx = this.currentSpreadIndex + 1;
+    const total = Math.max(1, totalSpreads);
+    if (bookletType === 'singleSided') {
+      indicator.textContent = `Page ${idx} of ${total}`;
+    } else if (bookletType === 'doubleSided') {
+      indicator.textContent = `Sheet ${idx} of ${total}`;
+    } else {
+      indicator.textContent = `Spread ${idx} of ${total}`;
+    }
   }
 
   render(): void {
@@ -1011,11 +1039,13 @@ export class SpreadEditor {
     this.marginLabels = [];
 
     const spread = this.getCurrentSpread();
+    const singlePageLayout = this.isSinglePageLayout();
 
     if (!spread) {
       // Show empty state
+      const emptyWidth = singlePageLayout ? pageDimensions.width / 2 : pageDimensions.width;
       const text = new Konva.Text({
-        x: pageDimensions.width,
+        x: emptyWidth,
         y: pageDimensions.height / 2,
         text: 'Add a markdown file to begin',
         fontSize: 14,
@@ -1027,31 +1057,33 @@ export class SpreadEditor {
 
       // Still draw empty page outlines
       this.drawPageOutline(0, 0, pageDimensions.width, pageDimensions.height);
-      this.drawPageOutline(pageDimensions.width, 0, pageDimensions.width, pageDimensions.height);
+      if (!singlePageLayout) {
+        this.drawPageOutline(pageDimensions.width, 0, pageDimensions.width, pageDimensions.height);
+      }
 
       this.layer.draw();
       this.updateSpreadIndicator();
       return;
     }
 
-    // Visual spreads use reading order: [null|1], [2|3], [4|5], etc.
-    // Null pages only appear at booklet edges (first spread verso, or last spread recto)
-    // These are rendered as transparent placeholders, not white pages
-
-    // Draw verso (left) page
-    if (spread.verso) {
-      this.drawPage(spread.verso, 0, 0, pageDimensions);
+    if (singlePageLayout) {
+      // Single-sided: draw only verso (the one page in the spread)
+      if (spread.verso) {
+        this.drawPage(spread.verso, 0, 0, pageDimensions);
+      }
     } else {
-      // First spread has null verso - draw transparent placeholder
-      this.drawTransparentPlaceholder(0, 0, pageDimensions.width, pageDimensions.height);
-    }
+      // Booklet and double-sided: two-page layout
+      if (spread.verso) {
+        this.drawPage(spread.verso, 0, 0, pageDimensions);
+      } else {
+        this.drawTransparentPlaceholder(0, 0, pageDimensions.width, pageDimensions.height);
+      }
 
-    // Draw recto (right) page
-    if (spread.recto) {
-      this.drawPage(spread.recto, pageDimensions.width, 0, pageDimensions);
-    } else {
-      // Last spread may have null recto - draw transparent placeholder
-      this.drawTransparentPlaceholder(pageDimensions.width, 0, pageDimensions.width, pageDimensions.height);
+      if (spread.recto) {
+        this.drawPage(spread.recto, pageDimensions.width, 0, pageDimensions);
+      } else {
+        this.drawTransparentPlaceholder(pageDimensions.width, 0, pageDimensions.width, pageDimensions.height);
+      }
     }
 
     // Draw selected page indicator
@@ -1110,6 +1142,8 @@ export class SpreadEditor {
     spread: VisualSpread,
     pageDimensions: { width: number; height: number }
   ): void {
+    const singlePage = this.isSinglePageLayout();
+
     // Verso click area
     if (spread.verso) {
       const versoArea = new Konva.Rect({
@@ -1126,8 +1160,8 @@ export class SpreadEditor {
       this.layer.add(versoArea);
     }
 
-    // Recto click area
-    if (spread.recto) {
+    // Recto click area (not shown in single-page layout)
+    if (!singlePage && spread.recto) {
       const rectoArea = new Konva.Rect({
         x: pageDimensions.width,
         y: 0,

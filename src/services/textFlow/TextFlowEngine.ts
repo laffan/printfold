@@ -222,8 +222,12 @@ export class TextFlowEngine {
     // when slot-based flow ran, so populated textFlow items are kept).
     const allPages = mergeStaticPagesInPlace(textPagesWithBlanks, effectiveStaticPages);
 
-    // Pad pages to complete signatures
-    const paddedPages = padPagesToCompleteSignature(allPages, this.outputOptions.pagesPerSignature);
+    const bookletType = this.outputOptions.bookletType ?? 'booklet';
+
+    // Pad pages to complete signatures (booklet mode only)
+    const paddedPages = bookletType === 'booklet'
+      ? padPagesToCompleteSignature(allPages, this.outputOptions.pagesPerSignature)
+      : allPages;
 
     // Create signatures from pages
     const signatures = createSignaturesFromPages(paddedPages, this.outputOptions.pagesPerSignature);
