@@ -327,12 +327,12 @@ Settings interface with tabbed organization.
 - Selected - Item editing and effects
 - Styles - Dynamic typography (based on content)
 - Document - Layout, margins, info
-- Output - Sheet/booklet settings
+- Output - Sheet/booklet settings (booklet type, size, placement, signatures)
 
 **Modules:**
 - `component.ts` - Main panel class
 - `helpers.ts` - Input binding utilities
-- `outputOptions.ts` - Sheet/booklet settings
+- `outputOptions.ts` - Sheet/booklet settings, booklet type visibility logic
 - `layoutOptions.ts` - Margins and spacing
 - `fontOptions.ts` - Typography
 - `headerFooterOptions.ts` - Headers/footers
@@ -603,14 +603,15 @@ reservation height, endnote section synthesis),
 `services/pdfGenerator/PDFGenerator.ts` (footnote block + superscript
 rendering), `OptionsPanel/stylesTab.ts` (Footnote section UI).
 
-### Imposition
+### PDF Output Modes
 
-PDF export handles booklet imposition automatically:
+PDF export supports three booklet types:
 
-- Pages arranged for duplex printing
-- Fold and cut marks added
-- Multi-row layout for efficiency (fill mode)
-- Signature grouping for binding
+- **Booklet** (default): Imposition for duplex printing and folding, with fold/cut marks, multi-row layout, and signature grouping
+- **Double sided pages**: Sequential front/back pairs — each sheet position pairs a front page with its back so cutting yields double-sided pieces
+- **Single sided pages**: Sequential pages on sheet fronts only
+
+Non-booklet modes support three placement options: Autofill (tile as many pages as fit), Center, and Upper Left.
 
 ---
 

@@ -79,10 +79,15 @@ Contains:
 ### Output Tab
 
 Contains:
-- **Sheet & Booklet Section** - Paper size, booklet size, signatures
-- **Creep Compensation** - Adjustment for paper thickness in signatures
+- **Sheet & Booklet Section** - Paper size, booklet type, booklet size, placement, signatures
+- **Creep Compensation** - Adjustment for paper thickness in signatures (booklet mode only)
 - **Print Settings Section** - Duplex offset for printer alignment, crop marks customization
 - **Download Blanks Section** - Export blank page/spread templates for external editing
+
+The Output tab dynamically shows/hides controls based on the selected
+Booklet Type:
+- **Booklet**: Shows fold marks, fill available space, and Signatures section
+- **Double sided / Single sided**: Hides booklet-only controls (fold marks, fill space, signatures) and shows Placement dropdown instead
 
 ## Main Class (`component.ts`)
 
@@ -219,12 +224,15 @@ function createDebouncer() {
 | ID | Type | Description |
 |----|------|-------------|
 | `opt-sheet-size` | Select | Paper size (letter, A4, legal, tabloid, A3) |
-| `opt-booklet-size` | Select | Booklet size (half, quarter, custom) |
+| `opt-orientation` | Select | Sheet orientation (portrait, landscape) |
+| `opt-booklet-type` | Select | Output mode (booklet, doubleSided, singleSided) |
+| `opt-booklet-size` | Select | Page crop size (half, quarter, eighth, sixteenth, custom) |
+| `opt-placement` | Select | Page placement for non-booklet modes (autofill, center, upperLeft) |
 | `opt-custom-width` | Number | Custom width in current unit |
 | `opt-custom-height` | Number | Custom height in current unit |
-| `opt-pages-per-sig` | Select | Pages per signature (4, 8, 12, 16, 20, 24) |
-| `opt-fill-space` | Checkbox | Fill available space mode |
-| `opt-fold-marks` | Checkbox | Show fold marks on printed PDF |
+| `opt-pages-per-sig` | Select | Pages per signature (4, 8, 12, 16, 20, 24) — booklet only |
+| `opt-fill-space` | Checkbox | Fill available space mode — booklet only |
+| `opt-fold-marks` | Checkbox | Show fold marks on printed PDF — booklet only |
 | `opt-render-text-as-images` | Checkbox | Render all text as images (fallback for font issues) |
 | `opt-duplex-offset-x` | Number | Horizontal duplex offset in mm |
 | `opt-duplex-offset-y` | Number | Vertical duplex offset in mm |

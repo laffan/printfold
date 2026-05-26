@@ -4,7 +4,7 @@ The PDF Generator creates print-ready PDF files with booklet imposition using th
 
 ## Overview
 
-The `PDFGenerator` class generates imposed PDF documents suitable for duplex printing and folding into booklets. It handles text rendering, shapes, images, and print marks.
+The `PDFGenerator` class generates print-ready PDF documents. In booklet mode it produces imposed sheets for duplex printing and folding. In double-sided and single-sided modes it generates sequential pages with configurable placement. It handles text rendering, shapes, images, and print marks.
 
 ## Architecture
 
@@ -312,7 +312,41 @@ const sheetSize = getOrientedSheetSize(
 );
 ```
 
-## Imposition Layout
+## Sequential Page Modes (Non-Booklet)
+
+When `bookletType` is `doubleSided` or `singleSided`, the generator
+bypasses imposition and outputs pages sequentially via
+`generateSequentialPages()`.
+
+### Double-Sided Mode
+
+Pages are interleaved so each physical slot on the sheet has a
+front/back pair. When cutting, each position yields a correctly
+paired double-sided piece.
+
+For a letter sheet with 1/4 booklet size (4 slots per side):
+```
+Front of Sheet:          Back of Sheet:
+┌──────┬──────┐          ┌──────┬──────┐
+│  1   │  3   │          │  2   │  4   │
+├──────┼──────┤          ├──────┼──────┤
+│  5   │  7   │          │  6   │  8   │
+└──────┴──────┘          └──────┴──────┘
+```
+
+### Single-Sided Mode
+
+Pages are placed sequentially on sheet fronts only (no back pages).
+
+### Placement Options
+
+| Mode | Behavior |
+|------|----------|
+| `autofill` | Tile as many pages as fit (cols × rows per sheet) |
+| `center` | One page centered on the sheet |
+| `upperLeft` | One page at the top-left corner |
+
+## Imposition Layout (Booklet Mode)
 
 For a standard 8-page signature:
 

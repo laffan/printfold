@@ -413,13 +413,18 @@ interface LayoutOptions {
 ### OutputOptions
 
 ```typescript
+type BookletType = 'booklet' | 'doubleSided' | 'singleSided';
+type PagePlacement = 'autofill' | 'center' | 'upperLeft';
+
 interface OutputOptions {
   sheetSize: 'letter' | 'a4' | 'legal' | 'tabloid' | 'a3';
+  bookletType: BookletType;
   bookletSize: 'half' | 'quarter' | 'eighth' | 'sixteenth' | 'custom';
   customWidth?: number;
   customHeight?: number;
   pagesPerSignature: 4 | 8 | 12 | 16 | 20 | 24;
   orientation: 'portrait' | 'landscape';
+  placement: PagePlacement;
   fillAvailableSpace: boolean;
   showFoldMarks: boolean;       // Show fold marks on PDF (light gray)
   creepEnabled?: boolean;       // Enable creep compensation
@@ -427,6 +432,13 @@ interface OutputOptions {
   renderTextAsImages?: boolean; // Render all pages as images (font fallback mode)
 }
 ```
+
+**Booklet Type Values:**
+| Value | Description |
+|-------|-------------|
+| booklet | Traditional booklet imposition (fold and bind) |
+| doubleSided | Sequential double-sided pages (front/back pairs) |
+| singleSided | Sequential single-sided pages (front only) |
 
 **Booklet Size Values:**
 | Value | Description |
@@ -436,6 +448,13 @@ interface OutputOptions {
 | eighth | 1/8 of sheet height |
 | sixteenth | 1/16 of sheet height |
 | custom | User-specified dimensions |
+
+**Placement Values (non-booklet modes):**
+| Value | Description |
+|-------|-------------|
+| autofill | Tile as many pages as fit on the sheet |
+| center | Place page at natural size, centered on the sheet |
+| upperLeft | Place page at natural size in the upper-left corner |
 
 ### calculateSpreadRowsPerSheet
 
