@@ -281,8 +281,11 @@ export class PDFGenerator {
       return globalPageMap.get(adjacentPageNum) || null;
     };
 
-    // Calculate placement offsets
-    const calcOffset = (idx: number): { x: number; y: number } => {
+    const cols = Math.max(1, Math.floor(sheetSize.width / pageWidth));
+    const rows = Math.max(1, Math.floor(sheetSize.height / pageHeight));
+    const slotsPerSide = placement === 'autofill' ? cols * rows : 1;
+
+    const slotOffset = (slot: number): { x: number; y: number } => {
       if (placement === 'center') {
         return {
           x: (sheetSize.width - pageWidth) / 2,
@@ -291,61 +294,55 @@ export class PDFGenerator {
       } else if (placement === 'upperLeft') {
         return { x: 0, y: sheetSize.height - pageHeight };
       }
-      // autofill: tile pages to fill the sheet
-      const cols = Math.max(1, Math.floor(sheetSize.width / pageWidth));
-      const rows = Math.max(1, Math.floor(sheetSize.height / pageHeight));
-      const pagesPerSheet = cols * rows;
-      const posOnSheet = idx % pagesPerSheet;
-      const col = posOnSheet % cols;
-      const row = Math.floor(posOnSheet / cols);
+      const col = slot % cols;
+      const row = Math.floor(slot / cols);
       return {
         x: col * pageWidth,
         y: sheetSize.height - (row + 1) * pageHeight,
       };
     };
 
-    const pagesPerSheet = placement === 'autofill'
-      ? Math.max(1, Math.floor(sheetSize.width / pageWidth)) * Math.max(1, Math.floor(sheetSize.height / pageHeight))
-      : 1;
+    const drawOnePage = (pdfPage: PDFPage, page: PageContent, slot: number) => {
+      const { x, y } = slotOffset(slot);
+      const info = spreadForPage.get(page.pageNumber);
+      const spanningItems = info?.staticSpread?.spanningItems;
+      const adjacentPage = getReadingOrderAdjacent(page);
+      this.drawPage(pdfPage, page, x, y, pageWidth, pageHeight, project, page.isRecto, adjacentPage, spanningItems);
+    };
 
     if (bookletType === 'doubleSided') {
-      // Double-sided: pair pages onto front/back of sheets
-      for (let i = 0; i < allPages.length; i += pagesPerSheet * 2) {
-        const frontPages = allPages.slice(i, i + pagesPerSheet);
-        const backPages = allPages.slice(i + pagesPerSheet, i + pagesPerSheet * 2);
+      // Each physical slot on the sheet holds a front/back pair.
+      // For N slots per side we consume 2*N pages per physical sheet:
+      //   Front slot 0 → page 0, Back slot 0 → page 1
+      //   Front slot 1 → page 2, Back slot 1 → page 3  …
+      const pagesPerPhysicalSheet = slotsPerSide * 2;
 
-        const frontPdf = pdfDoc.addPage([sheetSize.width, sheetSize.height]);
-        frontPages.forEach((page, idx) => {
-          const { x, y } = calcOffset(idx);
-          const info = spreadForPage.get(page.pageNumber);
-          const spanningItems = info?.staticSpread?.spanningItems;
-          const adjacentPage = getReadingOrderAdjacent(page);
-          this.drawPage(frontPdf, page, x, y, pageWidth, pageHeight, project, page.isRecto, adjacentPage, spanningItems);
-        });
+      for (let i = 0; i < allPages.length; i += pagesPerPhysicalSheet) {
+        const chunk = allPages.slice(i, i + pagesPerPhysicalSheet);
+        const frontPage = pdfDoc.addPage([sheetSize.width, sheetSize.height]);
+        let hasBack = false;
 
-        if (backPages.length > 0) {
-          const backPdf = pdfDoc.addPage([sheetSize.width, sheetSize.height]);
-          backPages.forEach((page, idx) => {
-            const { x, y } = calcOffset(idx);
-            const info = spreadForPage.get(page.pageNumber);
-            const spanningItems = info?.staticSpread?.spanningItems;
-            const adjacentPage = getReadingOrderAdjacent(page);
-            this.drawPage(backPdf, page, x, y, pageWidth, pageHeight, project, page.isRecto, adjacentPage, spanningItems);
-          });
+        for (let slot = 0; slot < slotsPerSide; slot++) {
+          const frontIdx = slot * 2;
+          const backIdx = slot * 2 + 1;
+          if (frontIdx < chunk.length) drawOnePage(frontPage, chunk[frontIdx], slot);
+          if (backIdx < chunk.length) hasBack = true;
+        }
+
+        if (hasBack) {
+          const backPage = pdfDoc.addPage([sheetSize.width, sheetSize.height]);
+          for (let slot = 0; slot < slotsPerSide; slot++) {
+            const backIdx = slot * 2 + 1;
+            if (backIdx < chunk.length) drawOnePage(backPage, chunk[backIdx], slot);
+          }
         }
       }
     } else {
-      // Single-sided: each sheet front only
-      for (let i = 0; i < allPages.length; i += pagesPerSheet) {
-        const sheetPages = allPages.slice(i, i + pagesPerSheet);
+      // Single-sided: fill each sheet front only
+      for (let i = 0; i < allPages.length; i += slotsPerSide) {
+        const chunk = allPages.slice(i, i + slotsPerSide);
         const pdfPage = pdfDoc.addPage([sheetSize.width, sheetSize.height]);
-        sheetPages.forEach((page, idx) => {
-          const { x, y } = calcOffset(idx);
-          const info = spreadForPage.get(page.pageNumber);
-          const spanningItems = info?.staticSpread?.spanningItems;
-          const adjacentPage = getReadingOrderAdjacent(page);
-          this.drawPage(pdfPage, page, x, y, pageWidth, pageHeight, project, page.isRecto, adjacentPage, spanningItems);
-        });
+        chunk.forEach((page, slot) => drawOnePage(pdfPage, page, slot));
       }
     }
   }

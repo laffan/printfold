@@ -357,7 +357,7 @@ export class SpreadEditor {
   private flashPage(spread: VisualSpread, pageNumber: number): void {
     const pageDimensions = this.getPageDimensions();
     const isVerso = spread.verso?.pageNumber === pageNumber;
-    const pageX = isVerso ? 0 : pageDimensions.width;
+    const pageX = isVerso ? 0 : this.getRectoX(pageDimensions);
 
     if (this.flashTimeout) {
       clearTimeout(this.flashTimeout);
@@ -817,11 +817,27 @@ export class SpreadEditor {
     return bookletType === 'singleSided';
   }
 
+  private isDoubleSidedLayout(): boolean {
+    const bookletType = appState.getProject().outputOptions.bookletType ?? 'booklet';
+    return bookletType === 'doubleSided';
+  }
+
+  private getSpreadGap(): number {
+    return this.isDoubleSidedLayout() ? 20 : 0;
+  }
+
+  private getRectoX(pageDimensions: { width: number }): number {
+    return pageDimensions.width + this.getSpreadGap();
+  }
+
   private fitToView(): void {
     const pageDimensions = this.getPageDimensions();
+    const gap = this.getSpreadGap();
 
     // Calculate spread size
-    const spreadWidth = this.isSinglePageLayout() ? pageDimensions.width : pageDimensions.width * 2;
+    const spreadWidth = this.isSinglePageLayout()
+      ? pageDimensions.width
+      : pageDimensions.width * 2 + gap;
     const spreadHeight = pageDimensions.height;
 
     // Calculate scale to fit - fill available space (no upper limit)
@@ -1041,6 +1057,8 @@ export class SpreadEditor {
     const spread = this.getCurrentSpread();
     const singlePageLayout = this.isSinglePageLayout();
 
+    const rectoX = this.getRectoX(pageDimensions);
+
     if (!spread) {
       // Show empty state
       const emptyWidth = singlePageLayout ? pageDimensions.width / 2 : pageDimensions.width;
@@ -1058,7 +1076,7 @@ export class SpreadEditor {
       // Still draw empty page outlines
       this.drawPageOutline(0, 0, pageDimensions.width, pageDimensions.height);
       if (!singlePageLayout) {
-        this.drawPageOutline(pageDimensions.width, 0, pageDimensions.width, pageDimensions.height);
+        this.drawPageOutline(rectoX, 0, pageDimensions.width, pageDimensions.height);
       }
 
       this.layer.draw();
@@ -1080,9 +1098,9 @@ export class SpreadEditor {
       }
 
       if (spread.recto) {
-        this.drawPage(spread.recto, pageDimensions.width, 0, pageDimensions);
+        this.drawPage(spread.recto, rectoX, 0, pageDimensions);
       } else {
-        this.drawTransparentPlaceholder(pageDimensions.width, 0, pageDimensions.width, pageDimensions.height);
+        this.drawTransparentPlaceholder(rectoX, 0, pageDimensions.width, pageDimensions.height);
       }
     }
 
@@ -1120,7 +1138,7 @@ export class SpreadEditor {
 
     if (!isVersoSelected && !isRectoSelected) return;
 
-    const x = isVersoSelected ? 0 : pageDimensions.width;
+    const x = isVersoSelected ? 0 : this.getRectoX(pageDimensions);
     const barHeight = 5;
 
     // Draw solid green bar below the page
@@ -1163,7 +1181,7 @@ export class SpreadEditor {
     // Recto click area (not shown in single-page layout)
     if (!singlePage && spread.recto) {
       const rectoArea = new Konva.Rect({
-        x: pageDimensions.width,
+        x: this.getRectoX(pageDimensions),
         y: 0,
         width: pageDimensions.width,
         height: pageDimensions.height,
@@ -1240,7 +1258,7 @@ export class SpreadEditor {
     if (spread.recto?.items) {
       renderPageItems(
         spread.recto,
-        pageDimensions.width,
+        this.getRectoX(pageDimensions),
         pageDimensions,
         this.itemNodes,
         this.itemsLayer,
@@ -1267,6 +1285,7 @@ export class SpreadEditor {
     pageDimensions: { width: number; height: number }
   ): void {
     const pageWidth = pageDimensions.width;
+    const rectoX = this.getRectoX(pageDimensions);
 
     // Render verso items that extend into recto (x + width > pageWidth)
     // These items are already rendered at xOffset=0, but we need to ensure
@@ -1314,7 +1333,7 @@ export class SpreadEditor {
         // Create a version of the item for the verso side
         const crossingNode = createItemNode(
           item,
-          pageWidth, // Same xOffset as original - positioned relative to recto
+          rectoX, // Same xOffset as original - positioned relative to recto
           spread.recto.pageNumber,
           this.zoomLevel,
           this.stage,

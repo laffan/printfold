@@ -129,11 +129,6 @@ export class OptionsPanel {
     // Update visibility based on booklet type
     updateBookletTypeVisibility();
 
-    // Show/hide custom size (only relevant in booklet mode)
-    const isBooklet = (project.outputOptions.bookletType ?? 'booklet') === 'booklet';
-    document.getElementById('custom-size-group')!.style.display =
-      isBooklet && project.outputOptions.bookletSize === 'custom' ? 'block' : 'none';
-
     // Update custom size inputs with unit conversion
     this.updateCustomSizeInputs();
 

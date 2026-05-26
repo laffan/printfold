@@ -259,20 +259,18 @@ export function updateBookletTypeVisibility(): void {
   const project = appState.getProject();
   const isBooklet = (project.outputOptions.bookletType ?? 'booklet') === 'booklet';
 
-  const bookletSizeGroup = document.getElementById('booklet-size-group');
   const foldMarksGroup = document.getElementById('fold-marks-group');
   const signaturesSection = document.getElementById('signatures-section');
   const placementGroup = document.getElementById('placement-group');
   const fillSpaceGroup = document.getElementById('fill-space-group');
   const customSizeGroup = document.getElementById('custom-size-group');
 
-  if (bookletSizeGroup) bookletSizeGroup.style.display = isBooklet ? '' : 'none';
   if (foldMarksGroup) foldMarksGroup.style.display = isBooklet ? '' : 'none';
   if (signaturesSection) signaturesSection.style.display = isBooklet ? '' : 'none';
   if (placementGroup) placementGroup.style.display = isBooklet ? 'none' : '';
   if (fillSpaceGroup) fillSpaceGroup.style.display = isBooklet ? '' : 'none';
   if (customSizeGroup) customSizeGroup.style.display =
-    isBooklet && project.outputOptions.bookletSize === 'custom' ? 'block' : 'none';
+    project.outputOptions.bookletSize === 'custom' ? 'block' : 'none';
 }
 
 /**
