@@ -121,10 +121,15 @@ export class OptionsPanel {
     // Output options
     setSelectValue('opt-sheet-size', project.outputOptions.sheetSize);
     setSelectValue('opt-orientation', project.outputOptions.orientation);
-    setSelectValue('opt-booklet-type', project.outputOptions.bookletType ?? 'booklet');
     setSelectValue('opt-booklet-size', project.outputOptions.bookletSize);
     setSelectValue('opt-placement', project.outputOptions.placement ?? 'autofill');
     setSelectValue('opt-pages-per-sig', project.outputOptions.pagesPerSignature.toString());
+
+    // Sync booklet type buttons
+    const activeType = project.outputOptions.bookletType ?? 'booklet';
+    document.querySelectorAll('#booklet-type-selector .booklet-type-btn').forEach(btn => {
+      btn.classList.toggle('active', (btn as HTMLElement).dataset.value === activeType);
+    });
 
     // Update visibility based on booklet type
     updateBookletTypeVisibility();

@@ -36,12 +36,21 @@ export function setupOutputOptions(debounce: (fn: DebounceCallback) => void): vo
     updateFillSpaceVisibility();
   }, debounce);
 
-  // Booklet type
-  bindSelect('opt-booklet-type', (value) => {
-    appState.updateOutputOptions({ bookletType: value as BookletType });
-    updateBookletTypeVisibility();
-    updateFillSpaceVisibility();
-  }, debounce);
+  // Booklet type (icon buttons)
+  const bookletTypeSelector = document.getElementById('booklet-type-selector');
+  if (bookletTypeSelector) {
+    bookletTypeSelector.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.booklet-type-btn');
+      if (!btn) return;
+      const value = btn.dataset.value as BookletType;
+      if (!value) return;
+      bookletTypeSelector.querySelectorAll('.booklet-type-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      appState.updateOutputOptions({ bookletType: value });
+      updateBookletTypeVisibility();
+      updateFillSpaceVisibility();
+    });
+  }
 
   // Placement (for non-booklet modes)
   bindSelect('opt-placement', (value) => {

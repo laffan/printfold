@@ -707,6 +707,34 @@
 
           <!-- Output Tab -->
           <div id="tab-output" class="tab-panel">
+            <div class="booklet-type-selector" id="booklet-type-selector">
+              <button class="booklet-type-btn active" data-value="booklet" title="Booklet">
+                <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M24 8L24 40" stroke="currentColor" stroke-width="1.5"/>
+                  <path d="M24 8L10 12V42L24 40" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                  <path d="M24 8L38 12V42L24 40" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                  <path d="M14 18H21M14 22H20M14 26H19" stroke="currentColor" stroke-width="1" stroke-linecap="round" opacity="0.5"/>
+                  <path d="M27 18H34M27 22H33M27 26H32" stroke="currentColor" stroke-width="1" stroke-linecap="round" opacity="0.5"/>
+                </svg>
+                <span>Booklet</span>
+              </button>
+              <button class="booklet-type-btn" data-value="doubleSided" title="Double sided pages">
+                <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="8" y="10" width="22" height="30" rx="1" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                  <rect x="18" y="6" width="22" height="30" rx="1" stroke="currentColor" stroke-width="1.5" fill="var(--color-bg-primary)"/>
+                  <path d="M22 13H36M22 17H34M22 21H32" stroke="currentColor" stroke-width="1" stroke-linecap="round" opacity="0.5"/>
+                </svg>
+                <span>Double Sided</span>
+              </button>
+              <button class="booklet-type-btn" data-value="singleSided" title="Single sided pages">
+                <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="11" y="8" width="26" height="34" rx="1" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                  <path d="M16 16H32M16 20H30M16 24H28M16 28H26" stroke="currentColor" stroke-width="1" stroke-linecap="round" opacity="0.5"/>
+                </svg>
+                <span>Single Sided</span>
+              </button>
+            </div>
+
             <div class="options-section">
               <h4 class="section-header">Sheet & Booklet</h4>
               <div class="form-group">
@@ -724,14 +752,6 @@
                 <select id="opt-orientation">
                   <option value="portrait" selected>Portrait</option>
                   <option value="landscape">Landscape</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label for="opt-booklet-type">Booklet Type</label>
-                <select id="opt-booklet-type">
-                  <option value="booklet" selected>Booklet</option>
-                  <option value="doubleSided">Double sided pages</option>
-                  <option value="singleSided">Single sided pages</option>
                 </select>
               </div>
               <div class="form-group" id="booklet-size-group">
