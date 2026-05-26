@@ -708,8 +708,8 @@
 /* Booklet Type Selector */
 .booklet-type-selector {
   display: flex;
-  gap: 4px;
-  padding: 10px 12px 6px;
+  gap: 15px;
+  padding: 0 0 10px 0;
   border-bottom: 1px solid var(--color-border);
 }
 
