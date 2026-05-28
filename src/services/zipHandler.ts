@@ -302,6 +302,17 @@ export class ZipHandler {
       });
     }
 
+    // Drop the placeholder signature that appState.reset() created. The
+    // reflow triggered by addFiles() below is asynchronous, so without
+    // this, waitForSignatures() would see the default (empty) signature,
+    // resolve immediately, and applyStaticPageData() would run against
+    // that default page set instead of the freshly-flowed markdown pages.
+    // Any saved static page whose number exceeds the default signature
+    // size would then be silently dropped on reload.
+    if (this.pendingStaticPages.size > 0) {
+      appState.updateProject({ signatures: [] });
+    }
+
     // Add files (this triggers an initial reflow that lays out the
     // markdown across plain text pages).
     appState.addFiles(files);
@@ -323,10 +334,43 @@ export class ZipHandler {
     // re-run would silently drop the items we just restored.
     if (this.pendingStaticPages.size > 0) {
       await this.waitForSignatures();
+      // The freshly-flowed markdown may produce fewer pages than the
+      // highest saved static-page number (static pages are interleaved, so
+      // their numbers run past the plain markdown page count). Extend the
+      // layout with available pages first so every saved static page has a
+      // slot to land on — otherwise setPageState() can't find those pages
+      // and the static pages beyond the markdown page count are dropped.
+      this.ensureCapacityForStaticPages();
       const stateChanged = this.applyStaticPageData();
       if (stateChanged) {
         appState.requestReflow();
       }
+    }
+  }
+
+  /**
+   * Append available pages until the layout has at least as many pages as
+   * the highest pending static-page number, so applyStaticPageData() can
+   * place every saved static page.
+   */
+  private ensureCapacityForStaticPages(): void {
+    if (this.pendingStaticPages.size === 0) return;
+    const maxPage = Math.max(...this.pendingStaticPages.keys());
+    const countPages = () =>
+      appState.getProject().signatures.reduce(
+        (n, sig) =>
+          n +
+          sig.spreads.reduce(
+            (m, sp) => m + (sp.verso ? 1 : 0) + (sp.recto ? 1 : 0),
+            0,
+          ),
+        0,
+      );
+    // addAvailableSignature() adds a full signature each call, so this
+    // terminates quickly; the guard is just belt-and-suspenders.
+    let guard = 0;
+    while (countPages() < maxPage && guard++ < 1000) {
+      appState.addAvailableSignature();
     }
   }
 
