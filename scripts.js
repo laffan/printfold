@@ -6,7 +6,7 @@
 
   // Tag elements that should animate in as they enter the viewport.
   var revealTargets = document.querySelectorAll(
-    ".hero-inner, .feature, .step, .img-wide, .cta-band-inner"
+    ".hero-inner, .feature, .step, .screenshot, .cta-band-inner"
   );
 
   if (!("IntersectionObserver" in window) || !revealTargets.length) {

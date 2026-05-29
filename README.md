@@ -19,10 +19,9 @@ img/          — promotional images (placeholders for now)
 
 ## Images
 
-- `img/icon.png` — the app icon, used as the hero and favicon (already in place).
-- `img/imposition.png` — imposition / printed booklet (~16:7). Still a
-  placeholder: drop the real file into `img/` and remove the matching
-  `.img-placeholder` block in `index.html`.
+- `img/app-icon.png` — the app icon, used as the hero, header mark, and favicon.
+- `img/screenshot.png` — the editor screenshot shown in the "How it works"
+  section.
 
 ## Publishing
 
