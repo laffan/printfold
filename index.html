@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrintFold — Printable booklets from Markdown</title>
+  <meta
+    name="description"
+    content="PrintFold turns Markdown into print-ready, signature-based booklets. Booklet imposition, custom fonts, flexible reflow, and one-click PDF export."
+  />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=Inter:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="#top">
+        <span class="brand-mark" aria-hidden="true">⊞</span>
+        <span class="brand-name">PrintFold</span>
+      </a>
+      <nav class="nav">
+        <a href="#features">Features</a>
+        <a href="#how">How it works</a>
+        <a href="https://github.com/laffan/printfold">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <!-- Hero -->
+    <section class="hero">
+      <div class="wrap hero-inner">
+        <div class="hero-copy">
+          <p class="eyebrow">Markdown in. Booklets out.</p>
+          <h1>Fold a document into a finished&nbsp;booklet.</h1>
+          <p class="lede">
+            PrintFold takes plain Markdown and lays it out as a printable,
+            signature-based booklet — with proper imposition, your own fonts,
+            and clean PDF export. No page-juggling required.
+          </p>
+          <div class="cta-row">
+            <a class="btn btn-primary" href="https://github.com/laffan/printfold">
+              Get PrintFold
+            </a>
+            <a class="btn btn-ghost" href="#features">See features</a>
+          </div>
+        </div>
+        <div class="hero-art">
+          <!-- IMAGE PLACEHOLDER: hero screenshot of the editor -->
+          <div class="img-placeholder img-hero" role="img" aria-label="Screenshot of the PrintFold editor">
+            <span>img/hero.png</span>
+            <small>App screenshot goes here</small>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section id="features" class="features">
+      <div class="wrap">
+        <h2 class="section-title">Everything you need to print a book</h2>
+        <p class="section-sub">
+          A focused toolkit for turning writing into something you can hold.
+        </p>
+
+        <ul class="feature-grid">
+          <li class="feature">
+            <span class="feature-icon" aria-hidden="true">↴</span>
+            <h3>Markdown support</h3>
+            <p>
+              Write in Markdown — headings, lists, footnotes and GFM syntax —
+              and let PrintFold flow it across pages automatically.
+            </p>
+          </li>
+
+          <li class="feature">
+            <span class="feature-icon" aria-hidden="true">⊞</span>
+            <h3>Booklet editing</h3>
+            <p>
+              Signature-based imposition with fold and cut marks, multi-row
+              sheets, and a visual spread editor for fine-tuning every page.
+            </p>
+          </li>
+
+          <li class="feature">
+            <span class="feature-icon" aria-hidden="true">Aa</span>
+            <h3>Custom fonts</h3>
+            <p>
+              Drop in your own <code>.ttf</code>, <code>.otf</code> or
+              <code>.woff</code> files, or reach for system and Google Fonts —
+              all embedded straight into your PDF.
+            </p>
+          </li>
+
+          <li class="feature">
+            <span class="feature-icon" aria-hidden="true">⟲</span>
+            <h3>Reflow options</h3>
+            <p>
+              Adjust margins, typography and spacing and watch text reflow live.
+              H1s start on a recto, footnotes settle into place, and everything
+              repaginates instantly.
+            </p>
+          </li>
+
+          <li class="feature">
+            <span class="feature-icon" aria-hidden="true">⬡</span>
+            <h3>Static spreads &amp; regions</h3>
+            <p>
+              Add covers, images and shapes, or pour text through custom
+              polygon regions that wrap to any silhouette.
+            </p>
+          </li>
+
+          <li class="feature">
+            <span class="feature-icon" aria-hidden="true">⤓</span>
+            <h3>PDF export</h3>
+            <p>
+              Export a print-ready PDF with embedded fonts — as a folded
+              booklet, double-sided pages, or single-sided sheets.
+            </p>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- How it works -->
+    <section id="how" class="how">
+      <div class="wrap">
+        <h2 class="section-title">From draft to finished print</h2>
+        <div class="steps">
+          <div class="step">
+            <span class="step-num">1</span>
+            <div class="step-body">
+              <h3>Bring your Markdown</h3>
+              <p>Start a project and add one or more <code>.md</code> files. They flow together in order.</p>
+            </div>
+          </div>
+          <div class="step">
+            <span class="step-num">2</span>
+            <div class="step-body">
+              <h3>Shape the layout</h3>
+              <p>Pick fonts, set margins, design covers, and tweak the booklet settings until it looks right.</p>
+            </div>
+          </div>
+          <div class="step">
+            <span class="step-num">3</span>
+            <div class="step-body">
+              <h3>Export &amp; fold</h3>
+              <p>Generate an imposed PDF, print duplex, fold along the marks, and bind your signatures.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- IMAGE PLACEHOLDER: imposition / printed booklet photo -->
+        <div class="img-placeholder img-wide" role="img" aria-label="Imposed booklet pages and a printed result">
+          <span>img/imposition.png</span>
+          <small>Imposition / printed booklet image goes here</small>
+        </div>
+      </div>
+    </section>
+
+    <!-- Closing CTA -->
+    <section class="cta-band">
+      <div class="wrap cta-band-inner">
+        <h2>Ready to make a booklet?</h2>
+        <p>PrintFold is open source and runs on the desktop or in your browser.</p>
+        <a class="btn btn-primary" href="https://github.com/laffan/printfold">View on GitHub</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-inner">
+      <span class="brand-name">PrintFold</span>
+      <span class="footer-meta">MIT Licensed · Built for makers of small books</span>
+    </div>
+  </footer>
+
+  <script src="scripts.js"></script>
+</body>
+</html>
