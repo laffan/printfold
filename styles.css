@@ -260,6 +260,10 @@ code {
   flex-wrap: wrap;
 }
 
+.footer-brand { display: flex; flex-direction: column; gap: 2px; }
+
+.footer-credit { color: var(--ink-soft); font-size: 0.9rem; }
+
 .footer-meta { color: var(--ink-soft); font-size: 0.9rem; }
 
 /* ---------- Reveal on scroll ---------- */
