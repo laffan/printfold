@@ -13,6 +13,9 @@ Project State
       │
       ▼
 PDFGenerator.generate()
+      │   (tries 'embed'; on failure retries with 'standard' fonts)
+      ▼
+generateInternal(fontMode)
       │
       ├──▶ Create PDFDocument
       ├──▶ Register fontkit (for custom font embedding)
@@ -20,10 +23,10 @@ PDFGenerator.generate()
       │         │
       │         ├──▶ Embed fallback fonts (StandardFonts)
       │         │
-      │         └──▶ If Electron: Embed actual system fonts
+      │         └──▶ If canEmbedFonts() and fontMode === 'embed':
       │                   ├──▶ Collect font families from project
       │                   ├──▶ Load font files via fontService
-      │                   └──▶ Embed with subsetting
+      │                   └──▶ Embed full fonts (subset: false)
       │
       ├──▶ Build global page map (for cross-signature adjacency)
       ├──▶ Pre-render pages with items (via Konva/pageRenderer)
@@ -86,14 +89,18 @@ pre-render failure).
 
 #### `generate(): Promise<Uint8Array>`
 
-Generates the complete PDF document.
+Generates the complete PDF document. `generate()` is a thin wrapper that calls
+`generateInternal('embed')` and, if that throws (a catchable embedding
+failure), retries once with `generateInternal('standard')` — standard PDF
+fonts only — so export always yields a usable file.
 
-**Process:**
+**Process (`generateInternal`):**
 1. Creates PDFDocument instance
 2. Registers fontkit for custom font embedding
 3. Builds font cache:
    - Embeds standard fallback fonts (Times Roman, Helvetica, Courier families)
-   - In Electron: Embeds actual system fonts with subsetting
+   - When `canEmbedFonts()` and `fontMode === 'embed'`: embeds the actual
+     font files **without subsetting** (`subset: false`)
 4. Builds global page map for cross-signature adjacency lookup
 5. Pre-renders pages with items via Konva (preserves gradients, fonts, shadows)
 6. Embeds images used in static pages
@@ -182,23 +189,34 @@ Adds production marks to all pages.
 
 The PDF generator supports two font embedding modes:
 
-#### Electron: Actual Font Embedding
+#### Actual Font Embedding
 
-In Electron, actual system fonts are embedded into PDFs for exact visual fidelity:
+When `fontService.canEmbedFonts()` is true (Electron system fonts, or any
+environment with user-uploaded custom fonts), the real font files are
+embedded into PDFs for exact visual fidelity:
 
 1. **Font Collection**: `collectFontFamilies()` gathers all fonts used in:
    - Body text, headings (h1-h6), code blocks, blockquotes
    - Headers and footers
 
-2. **Font Loading**: For each family, `fontService.loadFontFileData()` loads TTF/OTF files from the system
+2. **Font Loading**: For each family, `fontService.loadFontFileData()` loads the TTF/OTF bytes (from the system in Electron, or from the custom-font registry)
 
 3. **Font Embedding**: Fonts are embedded using pdf-lib with fontkit:
    ```typescript
    pdfDoc.registerFontkit(fontkit);
-   const font = await pdfDoc.embedFont(fontData, { subset: true });
+   const font = await pdfDoc.embedFont(fontData, { subset: false });
    ```
 
-4. **Subsetting**: The `{ subset: true }` option includes only used glyphs, reducing file size from ~30MB to ~50-200KB
+4. **No subsetting**: `{ subset: false }` embeds the full font file. This is
+   deliberate — fontkit's CFF subsetter runs its encode step inside a
+   deferred `nextTick`, so for some fonts it throws ("value" argument is out
+   of bounds) as an **uncaught** exception that also hangs `save()`. Full
+   embedding never invokes the subsetter, at the cost of larger files. See
+   [fontService.md](./fontService.md#font-embedding-no-subsetting).
+
+5. **Graceful degradation**: If embedding throws (synchronously, so it's
+   catchable), `generate()` retries with standard PDF fonts only, so an
+   export never fails outright.
 
 #### Web: Standard PDF Fonts
 
@@ -215,7 +233,7 @@ In web environments, standard PDF fonts provide reliable fallback:
 
 ```typescript
 interface FontCache {
-  embedded: Map<string, FontVariants>;  // Actual embedded fonts (Electron)
+  embedded: Map<string, FontVariants>;  // Actual embedded fonts (system or custom)
   fallback: {
     serif: FontVariants;    // TimesRoman family
     sans: FontVariants;     // Helvetica family
@@ -543,4 +561,4 @@ The following were previously limitations but are now fully supported:
 - **Custom Fonts on Items**: Custom fonts on text items render correctly (via Konva pre-rendering)
 - **Shadows**: Drop shadows render correctly (via Konva pre-rendering)
 - **Cross-page Items**: Items spanning page boundaries render correctly with proper clipping
-- **Body Text Fonts (Electron)**: Actual system fonts are now embedded into PDFs with subsetting, ensuring exact visual fidelity between editor and PDF output
+- **Body Text Fonts**: Actual system fonts (Electron) and uploaded custom fonts are embedded into PDFs in full (no subsetting), ensuring exact visual fidelity between editor and PDF output

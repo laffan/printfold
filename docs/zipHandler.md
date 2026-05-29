@@ -93,14 +93,25 @@ Main import logic:
    - `static/*.json` → pending per-page data (state, items,
      `backgroundFill`, `customBackgroundImageId`)
 5. Restore project settings from manifest
-6. `appState.addFiles(files)` — adds files, which queues the first
+6. If any `static/*.json` data was found, **clear the placeholder
+   signature** (`updateProject({ signatures: [] })`). `appState.reset()`
+   leaves a default signature in place, which would otherwise make
+   `waitForSignatures()` resolve immediately against pages that aren't
+   the flowed markdown.
+7. `appState.addFiles(files)` — adds files, which queues the first
    reflow. Markdown is flowed into plain text pages at this point;
    the saved static-page metadata hasn't been applied yet.
-7. If any `static/*.json` data was found:
+8. If any `static/*.json` data was found:
    - `await waitForSignatures()` — resolves the moment the first
      reflow publishes a non-empty `signatures` array (via a one-shot
-     `onProjectChange` listener), eliminating the 100 ms timer that
-     used to race the reflow.
+     `onProjectChange` listener). Because step 6 cleared the
+     placeholder, this genuinely blocks on the markdown reflow.
+   - `ensureCapacityForStaticPages()` appends available pages until the
+     layout has at least as many pages as the highest saved static-page
+     number. Static pages are interleaved with text, so their numbers
+     run past the plain markdown page count; without this, `setPageState`
+     couldn't find those pages and any static page beyond the markdown
+     page count would be silently dropped on reload.
    - `applyStaticPageData()` writes the saved state back through
      `setPageState`, `setPageBackgroundFill`, `setCustomBackground`,
      and `addItemToPage`. It returns `true` when at least one page
@@ -131,6 +142,14 @@ included too, so reopening the project doesn't drop them.)
 Writes pending per-page data back through the state API and returns
 whether any page state transitioned out of `text` (the import flow
 uses this to decide whether to fire a second reflow).
+
+#### `ensureCapacityForStaticPages(): void`
+
+Appends available pages (via `appState.addAvailableSignature()`) until
+the layout has at least as many pages as the highest pending static-page
+number, so `applyStaticPageData()` can place every saved static page.
+Called during import, after `waitForSignatures()` and before
+`applyStaticPageData()`.
 
 ## File Type Detection
 

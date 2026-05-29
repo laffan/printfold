@@ -154,7 +154,7 @@ Creates print-ready PDFs with booklet imposition.
 - Print marks (cut lines, fold indicators)
 - Cross-page item rendering with proper clipping
 - Pre-rendering items via Konva for gradient/font support
-- **Font embedding** (Electron): Actual system fonts embedded with subsetting
+- **Font embedding** (Electron system fonts or uploaded custom fonts): actual font files embedded in full (no subsetting — the fontkit subsetter can throw uncaught and hang `save()`); falls back to standard PDF fonts if a font can't be embedded
 - **Font fallback** (Web): Standard PDF fonts (Times, Helvetica, Courier)
 - **Render text as images** mode: Optional fallback that renders all pages as 300 DPI images for guaranteed visual fidelity when fonts don't render correctly
 
@@ -215,7 +215,9 @@ association). Internally the format is unchanged.
 - File organization (`text/`, `images/`, `fonts/`, `static/`)
 - Manifest generation (per-page state + items + fills + custom backgrounds)
 - Legacy format support
-- Two-phase import: wait for the first reflow to publish signatures,
+- Two-phase import: clear the placeholder signature so the first reflow
+  genuinely lays out the markdown, wait for that reflow to publish
+  signatures, extend the page count to cover every saved static page,
   layer the saved per-page metadata, and re-flow text around any pages
   that transitioned to a non-text state
 

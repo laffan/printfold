@@ -202,18 +202,26 @@ PDFGenerator.generate()
       │                             ├──▶ fontService.loadFontFileData()
       │                             │         └──▶ Load TTF/OTF from system
       │                             │
-      │                             └──▶ pdfDoc.embedFont() with { subset: true }
-      │                                       └──▶ Only include used glyphs
+      │                             └──▶ pdfDoc.embedFont() with { subset: false }
+      │                                       └──▶ Embed the full font bytes
       │
       └──▶ Use embedded fonts for text rendering
 ```
 
-## Font Subsetting
+## Font Embedding (no subsetting)
 
-When embedding fonts, the `{ subset: true }` option is used to include only the glyphs that are actually used in the document. This dramatically reduces PDF file size:
+Fonts are embedded with `{ subset: false }` — the full font file is written
+into the PDF rather than just the glyphs in use. This trades a larger file
+for reliability: fontkit's CFF subsetter runs its encode step inside a
+deferred `nextTick` callback, so for some CFF/OpenType fonts it throws
+("value" argument is out of bounds) in a way that **escapes every
+`try/catch` as an uncaught exception and leaves `pdfDoc.save()` hanging**.
+Full embedding never invokes the subsetter, so that path can't be hit.
 
-- Without subsetting: Full font file embedded (~30MB for complex fonts)
-- With subsetting: Only used characters (~50-200KB typical)
+If embedding a family still fails (those errors surface synchronously and
+are catchable), `PDFGenerator.generate()` falls back to standard PDF fonts
+so export always produces a usable file — see
+[pdfGenerator.md](./pdfGenerator.md).
 
 ## Usage Examples
 
@@ -259,7 +267,7 @@ if (fontService.canEmbedFonts()) {
   const fontData = await fontService.loadFontFileData('Georgia');
 
   if (fontData?.regular) {
-    const font = await pdfDoc.embedFont(fontData.regular, { subset: true });
+    const font = await pdfDoc.embedFont(fontData.regular, { subset: false });
     // Use font for text rendering
   }
 }
@@ -305,5 +313,5 @@ googleFonts.getFontFamily('Roboto');
 |--------|-----|----------|
 | Style font source | Web-safe fonts | System fonts |
 | PDF body text | Standard PDF fonts (Times/Helvetica/Courier) | Actual embedded fonts |
-| PDF file size | Small (no custom fonts) | Optimized with subsetting |
+| PDF file size | Small (no custom fonts) | Larger (full fonts embedded, no subsetting) |
 | Visual fidelity | Category-based fallback | Exact font matching |
