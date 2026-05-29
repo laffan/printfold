@@ -1,12 +1,11 @@
 /* PrintFold — promotional page styles
-   Minimal, clean, print-inspired. */
+   Minimal, clean, borderless, white background. */
 
 :root {
   --ink: #1a1714;
   --ink-soft: #5a534c;
-  --paper: #faf8f4;
-  --paper-2: #f1ede6;
-  --line: #e3ddd3;
+  --bg: #ffffff;
+  --bg-soft: #f6f4f0;
   --accent: #c2410c;      /* warm "fold" orange */
   --accent-soft: #fbe9df;
   --max: 1080px;
@@ -22,7 +21,7 @@ body {
   margin: 0;
   font-family: "Inter", system-ui, -apple-system, sans-serif;
   color: var(--ink);
-  background: var(--paper);
+  background: var(--bg);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
@@ -39,8 +38,7 @@ a { color: inherit; }
 code {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   font-size: 0.85em;
-  background: var(--paper-2);
-  border: 1px solid var(--line);
+  background: var(--bg-soft);
   border-radius: 5px;
   padding: 0.05em 0.4em;
 }
@@ -57,9 +55,8 @@ code {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: rgba(250, 248, 244, 0.85);
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: saturate(160%) blur(10px);
-  border-bottom: 1px solid var(--line);
 }
 
 .header-inner {
@@ -78,14 +75,10 @@ code {
 }
 
 .brand-mark {
-  display: inline-grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  background: var(--accent);
-  color: #fff;
-  border-radius: 8px;
-  font-size: 18px;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  object-fit: cover;
 }
 
 .brand-name {
@@ -109,43 +102,38 @@ code {
 
 .nav a:hover { color: var(--accent); }
 
-/* ---------- Hero ---------- */
-.hero {
-  padding: 80px 0 60px;
-  background:
-    radial-gradient(900px 400px at 80% -10%, var(--accent-soft), transparent 60%);
-}
+/* ---------- Hero (centered) ---------- */
+.hero { padding: 84px 0 72px; }
 
 .hero-inner {
-  display: grid;
-  grid-template-columns: 1.05fr 0.95fr;
-  gap: 56px;
+  display: flex;
+  flex-direction: column;
   align-items: center;
+  text-align: center;
 }
 
-.eyebrow {
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--accent);
-  margin: 0 0 14px;
+.hero-icon {
+  width: 168px;
+  height: 168px;
+  border-radius: 24px;
+  object-fit: cover;
+  margin-bottom: 32px;
 }
 
 .hero h1 {
   font-size: clamp(2.4rem, 5vw, 3.6rem);
   font-weight: 800;
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 
 .lede {
-  font-size: 1.15rem;
+  font-size: 1.18rem;
   color: var(--ink-soft);
-  max-width: 34ch;
+  max-width: 46ch;
   margin: 0 0 30px;
 }
 
-.cta-row { display: flex; gap: 14px; flex-wrap: wrap; }
+.cta-row { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
 
 .btn {
   display: inline-flex;
@@ -157,7 +145,6 @@ code {
   font-size: 0.98rem;
   text-decoration: none;
   transition: transform 0.12s ease, box-shadow 0.15s ease, background 0.15s ease;
-  border: 1px solid transparent;
 }
 
 .btn-primary {
@@ -168,13 +155,9 @@ code {
 
 .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(194, 65, 12, 0.34); }
 
-.btn-ghost {
-  background: transparent;
-  color: var(--ink);
-  border-color: var(--line);
-}
+.btn-ghost { background: var(--bg-soft); color: var(--ink); }
 
-.btn-ghost:hover { background: var(--paper-2); }
+.btn-ghost:hover { background: #ece8e1; }
 
 /* ---------- Image placeholders ---------- */
 .img-placeholder {
@@ -182,9 +165,7 @@ code {
   place-content: center;
   text-align: center;
   gap: 6px;
-  background:
-    repeating-linear-gradient(45deg, var(--paper-2), var(--paper-2) 12px, #ece6dc 12px, #ece6dc 24px);
-  border: 2px dashed var(--line);
+  background: var(--bg-soft);
   border-radius: var(--radius);
   color: var(--ink-soft);
 }
@@ -198,31 +179,18 @@ code {
 
 .img-placeholder small { font-size: 0.8rem; opacity: 0.75; }
 
-.img-hero {
-  aspect-ratio: 4 / 3;
-  box-shadow: var(--shadow);
-}
-
 .img-wide {
   margin-top: 48px;
   aspect-ratio: 16 / 7;
-  box-shadow: var(--shadow);
 }
 
 /* ---------- Features ---------- */
-.features { padding: 80px 0; }
+.features { padding: 72px 0; }
 
 .section-title {
   font-size: clamp(1.8rem, 3.5vw, 2.5rem);
   font-weight: 800;
   text-align: center;
-}
-
-.section-sub {
-  text-align: center;
-  color: var(--ink-soft);
-  font-size: 1.08rem;
-  margin: 12px 0 0;
 }
 
 .feature-grid {
@@ -231,18 +199,16 @@ code {
   padding: 0;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+  gap: 16px;
 }
 
 .feature {
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
   padding: 28px 24px;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  border-radius: var(--radius);
+  transition: background 0.15s ease;
 }
 
-.feature:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+.feature:hover { background: var(--bg-soft); }
 
 .feature-icon {
   display: inline-grid;
@@ -264,10 +230,8 @@ code {
 
 /* ---------- How it works ---------- */
 .how {
-  padding: 80px 0;
-  background: var(--paper-2);
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
+  padding: 72px 0;
+  background: var(--bg-soft);
 }
 
 .steps {
@@ -295,6 +259,8 @@ code {
 .step-body h3 { font-size: 1.15rem; margin-bottom: 4px; }
 .step-body p { margin: 0; color: var(--ink-soft); font-size: 0.96rem; }
 
+.how .img-wide { background: #ece8e1; }
+
 /* ---------- CTA band ---------- */
 .cta-band { padding: 84px 0; text-align: center; }
 
@@ -306,10 +272,7 @@ code {
 .cta-band-inner p { color: var(--ink-soft); font-size: 1.08rem; margin: 12px 0 28px; }
 
 /* ---------- Footer ---------- */
-.site-footer {
-  border-top: 1px solid var(--line);
-  padding: 28px 0;
-}
+.site-footer { padding: 28px 0; }
 
 .footer-inner {
   display: flex;
@@ -337,8 +300,6 @@ code {
 
 /* ---------- Responsive ---------- */
 @media (max-width: 860px) {
-  .hero-inner { grid-template-columns: 1fr; gap: 40px; }
-  .lede { max-width: none; }
   .feature-grid { grid-template-columns: repeat(2, 1fr); }
   .steps { grid-template-columns: 1fr; }
 }
@@ -346,5 +307,6 @@ code {
 @media (max-width: 560px) {
   .nav { display: none; }
   .feature-grid { grid-template-columns: 1fr; }
-  .hero { padding: 56px 0 40px; }
+  .hero { padding: 56px 0 48px; }
+  .hero-icon { width: 132px; height: 132px; }
 }

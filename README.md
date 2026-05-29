@@ -17,13 +17,12 @@ img/          — promotional images (placeholders for now)
 .nojekyll     — serve files as-is, skip Jekyll processing
 ```
 
-## Adding images
+## Images
 
-`index.html` references two placeholders. Drop the real files into `img/` and
-remove the corresponding `.img-placeholder` block:
-
-- `img/hero.png` — editor screenshot (~4:3)
-- `img/imposition.png` — imposition / printed booklet (~16:7)
+- `img/icon.png` — the app icon, used as the hero and favicon (already in place).
+- `img/imposition.png` — imposition / printed booklet (~16:7). Still a
+  placeholder: drop the real file into `img/` and remove the matching
+  `.img-placeholder` block in `index.html`.
 
 ## Publishing
 
