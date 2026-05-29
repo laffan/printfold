@@ -27,33 +27,30 @@ export class PDFGenerator {
   /**
    * Generate a print-ready PDF.
    *
-   * Fonts are embedded with glyph subsetting by default to keep file size
-   * down. Subsetting runs inside fontkit at `save()` time, and for some
-   * CFF/OpenType fonts it throws ("value" argument is out of bounds). When
-   * that happens we retry once with full (non-subset) font embedding, which
-   * bypasses the subsetter entirely so export still succeeds.
+   * Fonts are embedded WITHOUT glyph subsetting. fontkit runs the subsetter's
+   * CFF encode step inside a deferred `nextTick` callback (see its
+   * `encodeStream`), so when subsetting throws for a problematic CFF/OpenType
+   * font ("value" argument is out of bounds) the error escapes every
+   * surrounding try/catch as an uncaught exception AND leaves `save()` hanging
+   * — which is why an export could silently do nothing. Full embedding writes
+   * the original font bytes verbatim and never invokes the subsetter, so it
+   * sidesteps the bug. If embedding still fails (those errors are thrown
+   * synchronously and are catchable), we fall back to the standard PDF fonts
+   * so export always produces a usable file.
    */
   async generate(): Promise<Uint8Array> {
     try {
-      return await this.generateInternal('subset');
-    } catch (subsetErr) {
+      return await this.generateInternal('embed');
+    } catch (embedErr) {
       console.warn(
-        'PDF generation failed during font subsetting; retrying with full font embedding.',
-        subsetErr,
+        'PDF generation with embedded fonts failed; falling back to standard PDF fonts.',
+        embedErr,
       );
-      try {
-        return await this.generateInternal('full');
-      } catch (embedErr) {
-        console.warn(
-          'PDF generation failed during full font embedding; falling back to standard PDF fonts.',
-          embedErr,
-        );
-        return await this.generateInternal('standard');
-      }
+      return await this.generateInternal('standard');
     }
   }
 
-  private async generateInternal(fontMode: 'subset' | 'full' | 'standard'): Promise<Uint8Array> {
+  private async generateInternal(fontMode: 'embed' | 'standard'): Promise<Uint8Array> {
     const project = appState.getProject();
     const pdfDoc = await PDFDocument.create();
 
@@ -64,9 +61,8 @@ export class PDFGenerator {
       // Register fontkit for custom font embedding
       pdfDoc.registerFontkit(fontkit);
 
-      // Build font cache with embedded fonts (subset unless we're retrying
-      // after a subsetter failure).
-      this.fontCache = await this.buildFontCache(pdfDoc, project, fontMode === 'subset');
+      // Build font cache with embedded fonts (no subsetting — see generate()).
+      this.fontCache = await this.buildFontCache(pdfDoc, project);
     } else {
       // Use only standard PDF fonts (no custom embedding). This is the case
       // both when rendering text as images (fonts are baked into the page
@@ -880,8 +876,7 @@ export class PDFGenerator {
    */
   private async buildFontCache(
     pdfDoc: PDFDocument,
-    project: { fontOptions: import('../../types').FontOptions; headerFooter: import('../../types').HeaderFooterOptions },
-    subsetFonts: boolean = true
+    project: { fontOptions: import('../../types').FontOptions; headerFooter: import('../../types').HeaderFooterOptions }
   ): Promise<FontCache> {
     // Create fallback fonts (standard PDF fonts)
     const fallback = {
@@ -918,7 +913,7 @@ export class PDFGenerator {
           console.log(`Loading font file for: "${family}"`);
           const fontData = await fontService.loadFontFileData(family);
           if (fontData) {
-            const variants = await this.embedFontData(pdfDoc, fontData, fallback, subsetFonts);
+            const variants = await this.embedFontData(pdfDoc, fontData, fallback);
             if (variants) {
               embedded.set(family, variants);
               console.log(`Embedded font: "${family}" (has: ${Object.keys(fontData).filter(k => fontData[k as keyof typeof fontData]).join(', ')})`);
@@ -1003,8 +998,7 @@ export class PDFGenerator {
   private async embedFontData(
     pdfDoc: PDFDocument,
     fontData: FontFileData,
-    fallback: { serif: FontVariants; sans: FontVariants; mono: FontVariants },
-    subsetFonts: boolean = true
+    fallback: { serif: FontVariants; sans: FontVariants; mono: FontVariants }
   ): Promise<FontVariants | null> {
     // We need at least the regular variant
     if (!fontData.regular) {
@@ -1012,10 +1006,11 @@ export class PDFGenerator {
     }
 
     try {
-      // subset: true only embeds glyphs actually used (smaller files). Some
-      // CFF/OpenType fonts crash the subsetter at save() time, in which case
-      // generate() retries with subsetFonts = false (full embedding).
-      const regular = await pdfDoc.embedFont(fontData.regular, { subset: subsetFonts });
+      // subset: false embeds the original font bytes verbatim. We deliberately
+      // do NOT subset: fontkit's CFF subsetter can throw inside a deferred
+      // callback, which both hangs save() and escapes try/catch (see
+      // generate()). Full embedding produces larger files but is reliable.
+      const regular = await pdfDoc.embedFont(fontData.regular, { subset: false });
 
       // Try to embed other variants, fall back to regular if not available
       let bold: PDFFont | undefined;
@@ -1024,7 +1019,7 @@ export class PDFGenerator {
 
       if (fontData.bold) {
         try {
-          bold = await pdfDoc.embedFont(fontData.bold, { subset: subsetFonts });
+          bold = await pdfDoc.embedFont(fontData.bold, { subset: false });
         } catch {
           // Use regular for bold
         }
@@ -1032,7 +1027,7 @@ export class PDFGenerator {
 
       if (fontData.italic) {
         try {
-          italic = await pdfDoc.embedFont(fontData.italic, { subset: subsetFonts });
+          italic = await pdfDoc.embedFont(fontData.italic, { subset: false });
         } catch {
           // Use regular for italic
         }
@@ -1040,7 +1035,7 @@ export class PDFGenerator {
 
       if (fontData.boldItalic) {
         try {
-          boldItalic = await pdfDoc.embedFont(fontData.boldItalic, { subset: subsetFonts });
+          boldItalic = await pdfDoc.embedFont(fontData.boldItalic, { subset: false });
         } catch {
           // Use bold or italic or regular
         }
