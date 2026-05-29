@@ -1,16 +1,14 @@
 /* PrintFold — promotional page styles
-   Minimal, clean, borderless, white background. */
+   Minimal, clean, borderless. Black and white only. */
 
 :root {
-  --ink: #18181b;
+  --ink: #000000;
   --ink-soft: #555555;
   --bg: #ffffff;
   --bg-soft: #f4f4f5;
-  --accent: #c2410c;      /* warm "fold" orange */
-  --accent-soft: #fbe9df;
   --max: 1080px;
   --radius: 14px;
-  --shadow: 0 10px 40px rgba(40, 30, 20, 0.08);
+  --shadow: 0 10px 40px rgba(0, 0, 0, 0.10);
 }
 
 * { box-sizing: border-box; }
@@ -27,7 +25,7 @@ body {
 }
 
 h1, h2, h3 {
-  font-family: "Fraunces", Georgia, "Times New Roman", serif;
+  font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
   line-height: 1.1;
   letter-spacing: -0.01em;
   margin: 0;
@@ -82,7 +80,7 @@ code {
 }
 
 .brand-name {
-  font-family: "Fraunces", serif;
+  font-family: "Source Serif 4", serif;
   font-weight: 800;
   font-size: 1.15rem;
 }
@@ -100,7 +98,7 @@ code {
   transition: color 0.15s ease;
 }
 
-.nav a:hover { color: var(--accent); }
+.nav a:hover { color: var(--ink); }
 
 /* ---------- Hero (centered) ---------- */
 .hero { padding: 84px 0 72px; }
@@ -148,12 +146,12 @@ code {
 }
 
 .btn-primary {
-  background: var(--accent);
+  background: var(--ink);
   color: #fff;
-  box-shadow: 0 6px 18px rgba(194, 65, 12, 0.28);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.20);
 }
 
-.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(194, 65, 12, 0.34); }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28); }
 
 .btn-ghost { background: var(--bg-soft); color: var(--ink); }
 
@@ -167,6 +165,7 @@ code {
   margin-top: 48px;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
+  filter: grayscale(1);
 }
 
 /* ---------- Features ---------- */
@@ -201,9 +200,9 @@ code {
   width: 42px;
   height: 42px;
   border-radius: 10px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-family: "Fraunces", serif;
+  background: var(--bg-soft);
+  color: var(--ink);
+  font-family: "Source Serif 4", serif;
   font-weight: 700;
   font-size: 1.2rem;
   margin-bottom: 16px;
@@ -232,9 +231,9 @@ code {
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--ink);
   color: #fff;
-  font-family: "Fraunces", serif;
+  font-family: "Source Serif 4", serif;
   font-weight: 700;
 }
 
