@@ -436,6 +436,27 @@ subfolders.
 5. The header shows a `Saving…` / `Saved` indicator. Atomic writes
    (Electron writes to `.tmp` then renames) prevent corruption.
 
+**File association (Electron):**
+
+The packaged app registers `.printfold` as an owned file type via
+electron-builder's `fileAssociations` entry in `package.json`. Opening a
+`.printfold` from the OS is routed to the renderer by `electron/main.ts`:
+
+- macOS delivers opens through the `open-file` event (registered at
+  module load so cold-start opens aren't missed).
+- Windows/Linux pass the path as a CLI argument, parsed from
+  `process.argv` on launch.
+- A single-instance lock ensures a second launch forwards its file to the
+  already-running instance via the `second-instance` event rather than
+  opening a duplicate window.
+
+The path is stashed in `pendingOpenPath` until the renderer mounts and
+calls `printfold:getPendingOpenFile`; opens that arrive while the app is
+running are pushed over the `printfold:openFile` channel. `App.ts`
+(`setupFileAssociations` / `openProjectFromPath`) reads the file and
+loads it through the same `loadProjectFromSource` path as Open/Recent,
+adding it to recents.
+
 **Recents storage:**
 
 - *Electron*: `userData/recents.json` (file paths).
@@ -803,7 +824,7 @@ npm run build:electron  # Production electron build
 | Fonts | `fontService.ts`, `OptionsPanel/fontOptions.ts`, `pdfGenerator/fonts.ts`, `FontDropdown.ts` |
 | Custom Fonts (uploads) | `services/fontService.ts` (registry + `@font-face`), `components/FileList.ts` (Fonts tab), `services/zipHandler.ts` (`fonts/` folder) |
 | Project I/O | `zipHandler.ts` |
-| Project Lifecycle | `WelcomeScreen.ts`, `App.ts` (auto-save loop), `projectFile.ts`, `recentProjects.ts` |
+| Project Lifecycle | `WelcomeScreen.ts`, `App.ts` (auto-save loop, `setupFileAssociations`), `projectFile.ts`, `recentProjects.ts`, `electron/main.ts` (`.printfold` file-association open flow) |
 | Settings UI | `OptionsPanel/` |
 | Styles Tab Accordion | `OptionsPanel/stylesTab.ts` (signature-gated rebuild, per-section `accordion-section`) |
 | Cursor Sync | `FilePreview.ts` (cursor-to-page mapping via `extractFootnotes` + normalized text matching), `SpreadEditor/component.ts` (red dot + flash rendering), `types/index.ts` (`CursorMark`) |

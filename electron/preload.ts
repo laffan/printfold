@@ -49,6 +49,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('printfold:addRecent', entry),
   removeRecent: (path: string) =>
     ipcRenderer.invoke('printfold:removeRecent', path),
+
+  // File associations (.printfold opened from the OS)
+  // Claims any path the OS asked us to open before the renderer was ready,
+  // and signals readiness for live open events.
+  getPendingOpenFile: () => ipcRenderer.invoke('printfold:getPendingOpenFile'),
+  // Subscribe to opens that arrive while the app is already running.
+  // Returns an unsubscribe function.
+  onOpenProjectFile: (callback: (filePath: string) => void) => {
+    const listener = (_event: unknown, filePath: string) => callback(filePath);
+    ipcRenderer.on('printfold:openFile', listener);
+    return () => ipcRenderer.removeListener('printfold:openFile', listener);
+  },
 });
 
 // Type declarations for the exposed API
@@ -118,6 +130,9 @@ declare global {
         lastOpened: number;
       }) => Promise<void>;
       removeRecent: (path: string) => Promise<void>;
+
+      getPendingOpenFile: () => Promise<string | null>;
+      onOpenProjectFile: (callback: (filePath: string) => void) => () => void;
     };
   }
 }

@@ -73,6 +73,7 @@ export class App {
     this.setupStateListeners();
     this.setupResizers();
     this.setupAutoSave();
+    this.setupFileAssociations();
 
     // Show the welcome screen — the user must create or open a project
     // before the editor becomes interactive.
@@ -216,6 +217,53 @@ export class App {
     this.welcomeScreen.hide();
     this.updateHeaderForProject();
     this.performReflow();
+  }
+
+  // -------------------------------------------------------------------
+  // File associations (.printfold opened from the OS)
+  // -------------------------------------------------------------------
+
+  /**
+   * Wire up opening a .printfold that the OS handed to us via the file
+   * association (double-click, "Open With"). Electron only — the web
+   * build has no equivalent.
+   */
+  private setupFileAssociations(): void {
+    const api = window.electronAPI;
+    if (!api?.getPendingOpenFile) return;
+
+    // Opens that arrive while the app is already running.
+    api.onOpenProjectFile?.((filePath) => {
+      void this.openProjectFromPath(filePath);
+    });
+
+    // A file the OS asked us to open during cold start, stashed by the
+    // main process until the renderer was ready.
+    void api.getPendingOpenFile().then((filePath) => {
+      if (filePath) void this.openProjectFromPath(filePath);
+    });
+  }
+
+  /** Read a .printfold from an absolute path and open it as the project. */
+  private async openProjectFromPath(filePath: string): Promise<void> {
+    try {
+      const api = window.electronAPI;
+      if (!api) return;
+      const result = await api.readFile(filePath);
+      if (!result.success || !result.content) {
+        throw new Error(result.error || `Could not read ${filePath}`);
+      }
+      const binary = atob(result.content);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+      const name = filePath.split(/[\\/]/).pop() || 'Untitled.printfold';
+      await this.loadProjectFromSource(bytes, name, { path: filePath });
+      await recentProjects.addElectronPath(filePath, name);
+    } catch (e) {
+      console.error('Open from path failed:', e);
+      alert(`Could not open project: ${(e as Error).message}`);
+    }
   }
 
   private updateHeaderForProject(): void {

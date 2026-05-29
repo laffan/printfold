@@ -65,6 +65,15 @@
       "buildResources": "build"
     },
     "icon": "build/icon.png",
+    "fileAssociations": [
+      {
+        "ext": "printfold",
+        "name": "PrintFold Project",
+        "description": "PrintFold Project",
+        "role": "Editor",
+        "icon": "build/icon.png"
+      }
+    ],
     "mac": {
       "category": "public.app-category.productivity",
       "icon": "build/icon.png"
@@ -75,7 +84,10 @@
     },
     "linux": {
       "target": "AppImage",
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "mimeTypes": [
+        "application/x-printfold"
+      ]
     }
   }
 }

@@ -15,6 +15,11 @@ Projects are stored as `.printfold` files (a ZIP archive with a custom
 extension). Switch projects at any time via the **Projects…** button in
 the header.
 
+The installed desktop app registers itself as the handler for
+`.printfold` files, so double-clicking one in your file manager (or
+using **Open With → PrintFold**) launches the app straight into that
+project.
+
 ## License
 
 MIT
