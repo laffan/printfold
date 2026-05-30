@@ -71,7 +71,7 @@
         "name": "PrintFold Project",
         "description": "PrintFold Project",
         "role": "Editor",
-        "icon": "build/icon.png"
+        "icon": "build/file-icon.png"
       }
     ],
     "mac": {
