@@ -11,6 +11,76 @@ let mainWindow: BrowserWindow | null = null;
 // variant is 'regular', 'bold', 'italic', 'boldItalic'
 const fontFileCache: Map<string, Map<string, string>> = new Map();
 
+// -------------------------------------------------------------------------
+// .printfold file-association open flow
+// -------------------------------------------------------------------------
+// When the OS hands us a .printfold file to open (double-click, "Open With",
+// drag-onto-icon), we need to route the path to the renderer so it can load
+// the project. Two cases:
+//   - Cold start: the file arrives before the renderer is ready, so we stash
+//     it in `pendingOpenPath`. The renderer pulls it via the
+//     `printfold:getPendingOpenFile` IPC handler once it has mounted.
+//   - Already running: we push the path to the renderer over the
+//     `printfold:openFile` channel.
+const PROJECT_EXT = 'printfold';
+let pendingOpenPath: string | null = null;
+let rendererReady = false;
+
+function focusMainWindow(): void {
+  if (!mainWindow) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.focus();
+}
+
+/** Route a .printfold path to the renderer, or stash it until it's ready. */
+function deliverOpenPath(filePath: string): void {
+  if (!filePath || !filePath.toLowerCase().endsWith(`.${PROJECT_EXT}`)) return;
+  if (rendererReady && mainWindow) {
+    mainWindow.webContents.send('printfold:openFile', filePath);
+    focusMainWindow();
+  } else {
+    pendingOpenPath = filePath;
+    focusMainWindow();
+  }
+}
+
+/** Find the first existing .printfold path among CLI arguments (Win/Linux). */
+function findProjectPathInArgv(argv: string[]): string | null {
+  for (const arg of argv) {
+    if (arg.toLowerCase().endsWith(`.${PROJECT_EXT}`)) {
+      try {
+        if (fs.existsSync(arg)) return arg;
+      } catch {
+        // Ignore unreadable args
+      }
+    }
+  }
+  return null;
+}
+
+// macOS delivers file opens via this event, which can fire before the app is
+// ready. Register it at module load so cold-start opens aren't missed.
+app.on('open-file', (event, filePath) => {
+  event.preventDefault();
+  deliverOpenPath(filePath);
+});
+
+// A single instance owns all file opens. A second launch (e.g. double-clicking
+// another .printfold) forwards its argv to the running instance instead.
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (_event, argv) => {
+    const filePath = findProjectPathInArgv(argv);
+    if (filePath) {
+      deliverOpenPath(filePath);
+    } else {
+      focusMainWindow();
+    }
+  });
+}
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -44,6 +114,13 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  // Windows/Linux pass the opened file as a CLI argument on cold start.
+  // (macOS uses the `open-file` event handled above.)
+  if (process.platform !== 'darwin' && !pendingOpenPath) {
+    const filePath = findProjectPathInArgv(process.argv);
+    if (filePath) pendingOpenPath = filePath;
+  }
+
   createWindow();
 
   app.on('activate', () => {
@@ -157,8 +234,17 @@ function getFileType(ext: string): string {
 // PrintFold project file lifecycle (.printfold)
 // -------------------------------------------------------------------------
 
-const PROJECT_EXT = 'printfold';
 const PROJECT_FILTER = { name: 'PrintFold Project', extensions: [PROJECT_EXT] };
+
+// The renderer calls this once it has mounted to (a) claim any file the OS
+// asked us to open before the renderer was ready, and (b) signal that it's
+// now ready to receive live `printfold:openFile` pushes.
+ipcMain.handle('printfold:getPendingOpenFile', async () => {
+  rendererReady = true;
+  const filePath = pendingOpenPath;
+  pendingOpenPath = null;
+  return filePath;
+});
 
 ipcMain.handle('printfold:pickDestination', async (_event, defaultName: string) => {
   const result = await dialog.showSaveDialog(mainWindow!, {
