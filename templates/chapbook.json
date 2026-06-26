@@ -1,0 +1,88 @@
+{
+  "id": "chapbook",
+  "name": "Chapbook",
+  "description": "A traditional chapbook format with generous margins for poetry and prose",
+  "outputOptions": {
+    "sheetSize": "letter",
+    "bookletSize": "half-letter",
+    "pagesPerSignature": 16
+  },
+  "layoutOptions": {
+    "margins": {
+      "top": 72,
+      "bottom": 72,
+      "inner": 72,
+      "outer": 54
+    },
+    "emptyPageBeforeH1": true,
+    "spacingAboveH1": 108,
+    "spacingAboveH2": 54,
+    "spacingAboveH3": 36,
+    "paragraphSpacing": 18,
+    "lineHeight": 1.6
+  },
+  "fontOptions": {
+    "body": {
+      "fontFamily": "Palatino, serif",
+      "fontSize": 11,
+      "fontWeight": "normal",
+      "fontStyle": "normal",
+      "color": "#1a1a1a"
+    },
+    "h1": {
+      "fontFamily": "Palatino, serif",
+      "fontSize": 20,
+      "fontWeight": "normal",
+      "fontStyle": "normal",
+      "color": "#000000",
+      "textTransform": "uppercase",
+      "letterSpacing": 2
+    },
+    "h2": {
+      "fontFamily": "Palatino, serif",
+      "fontSize": 16,
+      "fontWeight": "normal",
+      "fontStyle": "italic",
+      "color": "#000000"
+    },
+    "h3": {
+      "fontFamily": "Palatino, serif",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "fontStyle": "normal",
+      "color": "#000000"
+    }
+  },
+  "headerFooter": {
+    "header": {
+      "enabled": true,
+      "height": 24,
+      "verso": {
+        "left": "",
+        "center": "",
+        "right": "{{title}}"
+      },
+      "recto": {
+        "left": "{{author}}",
+        "center": "",
+        "right": ""
+      },
+      "showOnFirstPage": false
+    },
+    "footer": {
+      "enabled": true,
+      "height": 24,
+      "verso": {
+        "left": "{{pageNumber}}",
+        "center": "",
+        "right": ""
+      },
+      "recto": {
+        "left": "",
+        "center": "",
+        "right": "{{pageNumber}}"
+      },
+      "showOnFirstPage": false
+    }
+  }
+}
